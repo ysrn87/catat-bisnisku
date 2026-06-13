@@ -1,0 +1,6 @@
+File ini sudah tidak digunakan dan harus dihapus.
+
+Hapus dengan:
+  del src\components\sales\manager-sales-table.tsx
+
+Manager sales page sudah menggunakan SalesTable yang sama dengan admin.
