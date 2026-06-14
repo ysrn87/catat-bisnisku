@@ -62,12 +62,12 @@ function LoginForm() {
 
       <Card className="w-3/4 max-w-md shadow-2xl relative z-10 backdrop-blur-lg bg-white/95">
         <CardHeader className="space-y-3 pb-6">
-          <div className="mx-auto w-16 h-16 flex items-center justify-center">
-            <Image src="/icon-512x512.png" alt="Catat Bisnisku" width={64} height={64} className="rounded-2xl shadow-lg" />
+          <div className="mx-auto w-32 h-32 flex items-center justify-center">
+            <Image src="/icon-512x512.png" alt="Catat Bisnisku" width={128} height={128} className="rounded-2xl shadow-lg" priority />
           </div>
-          <CardTitle className="text-xl font-bold text-center text-[#028697]">
+          {/* <CardTitle className="text-xl font-bold text-center text-[#028697]">
             Catat Bisnisku
-          </CardTitle>
+          </CardTitle> */}
           <CardDescription className="text-center text-base">
             Login untuk akses ke toko kamu
           </CardDescription>

@@ -99,7 +99,7 @@ export default function RegisterStorePage() {
       <Card className="w-full max-w-lg shadow-2xl border-0 relative z-10 bg-white/95 backdrop-blur-sm">
         <CardHeader className="space-y-3 pb-4">
           <div className="mx-auto w-14 h-14 flex items-center justify-center">
-            <Image src="/icon-512x512.png" alt="Catat Bisnisku" width={56} height={56} className="rounded-2xl shadow-lg" />
+            <Image src="/icon-512x512.png" alt="Catat Bisnisku" width={56} height={56} className="rounded-2xl shadow-lg" priority />
           </div>
           <CardTitle className="text-2xl font-bold text-center text-[#028697]">Buat Toko Baru</CardTitle>
           <CardDescription className="text-center text-sm">

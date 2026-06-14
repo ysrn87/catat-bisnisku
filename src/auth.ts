@@ -10,8 +10,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         identifier: { label: 'Email or Phone', type: 'text' },
         password:   { label: 'Password',       type: 'password' },
-        // slug dioper dari login form agar bisa resolve storeRole
-        storeSlug:  { label: 'Store Slug',     type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.identifier || !credentials?.password) return null;
@@ -34,33 +32,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!isPasswordValid) return null;
 
-        // Resolve storeSlug → storeId → storeRole (opsional saat login)
-        let storeSlug: string | null = null;
-        let storeRole: string | null = null;
-
-        if (credentials.storeSlug) {
-          const slug = credentials.storeSlug as string;
-          const storeUser = await db.storeUser.findFirst({
-            where: {
-              userId: user.id,
-              store: { slug },
-            },
-            include: { store: { select: { slug: true } } },
-          });
-
-          if (storeUser) {
-            storeSlug = storeUser.store.slug;
-            storeRole = storeUser.role;
-          }
-        }
-
         return {
-          id:        user.id,
-          email:     user.email || user.phone,
-          name:      user.name,
-          role:      user.role,
-          storeSlug: storeSlug ?? undefined,
-          storeRole: storeRole ?? undefined,
+          id:    user.id,
+          email: user.email || user.phone,
+          name:  user.name,
+          role:  user.role,
         };
       },
     }),
@@ -68,19 +44,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id        = user.id;
-        token.role      = user.role as Role;
-        token.storeSlug = (user as any).storeSlug ?? null;
-        token.storeRole = (user as any).storeRole ?? null;
+        token.id   = user.id;
+        token.role = user.role as Role;
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        session.user.id        = token.id as string;
-        session.user.role      = token.role as Role;
-        session.user.storeSlug = token.storeSlug as string | null;
-        session.user.storeRole = token.storeRole as string | null;
+        session.user.id   = token.id as string;
+        session.user.role = token.role as Role;
       }
       return session;
     },

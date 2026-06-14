@@ -3,86 +3,80 @@
 import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
+import { requireStoreAccess, getStoreContext } from '@/lib/store-context';
 
-// 🔧 Helper Functions for Data Normalization
-const normalizePhone = (phone: string): string => {
-  // Remove all spaces and keep only digits and +
-  return phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
-};
+const normalizePhone = (phone: string): string =>
+  phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
 
 const normalizeEmail = (email: string | null | undefined): string | null => {
   if (!email || email.trim() === '') return null;
-  // Trim whitespace and convert to lowercase for case-insensitive comparison
   return email.trim().toLowerCase();
 };
 
+// ─── Member-facing actions (pakai storeContext dari header) ────────────────────
+
 export async function getMemberPoints() {
   const session = await auth();
-  if (!session || session.user.role !== 'MEMBER') {
-    throw new Error('Unauthorized');
-  }
+  if (!session) throw new Error('Unauthorized');
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
     select: { points: true },
   });
-
   return user?.points || 0;
 }
 
 export async function getPointsHistory() {
   const session = await auth();
-  if (!session || session.user.role !== 'MEMBER') {
-    throw new Error('Unauthorized');
-  }
+  if (!session) throw new Error('Unauthorized');
 
-  const history = await db.pointHistory.findMany({
+  return db.pointHistory.findMany({
     where: { userId: session.user.id },
     orderBy: { createdAt: 'desc' },
     take: 50,
   });
-
-  return history;
 }
 
 export async function getPurchaseHistory() {
   const session = await auth();
-  if (!session || session.user.role !== 'MEMBER') {
-    throw new Error('Unauthorized');
-  }
+  if (!session) throw new Error('Unauthorized');
+
+  const { storeId } = await getStoreContext();
 
   const purchases = await db.sale.findMany({
-    where: { customerId: session.user.id },
+    where: { customerId: session.user.id, storeId },
     orderBy: { createdAt: 'desc' },
     include: {
-      items: {
-        include: {
-          variant: {
-            include: {
-              product: true,
-            },
-          },
-        },
-      },
+      items: { include: { variant: { include: { product: true } } } },
     },
   });
 
-  return purchases;
+  return purchases.map((p) => ({
+    ...p,
+    subtotal: Number(p.subtotal),
+    discount: Number(p.discount),
+    tax:      Number(p.tax),
+    ongkir:   Number((p as any).ongkir ?? 0),
+    total:    Number(p.total),
+    items: p.items.map((item) => ({
+      ...item,
+      price:    Number(item.price),
+      subtotal: Number(item.subtotal),
+      variant: {
+        ...item.variant,
+        price: Number(item.variant.price),
+        cost:  Number(item.variant.cost),
+      },
+    })),
+  }));
 }
 
 export async function redeemPoints(points: number, description: string) {
   const session = await auth();
-  if (!session || session.user.role !== 'MEMBER') {
-    throw new Error('Unauthorized');
-  }
+  if (!session) throw new Error('Unauthorized');
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-  });
-
-  if (!user || user.points < points) {
-    throw new Error('Insufficient points');
-  }
+  const user = await db.user.findUnique({ where: { id: session.user.id } });
+  if (!user || user.points < points) throw new Error('Poin tidak mencukupi');
 
   await db.user.update({
     where: { id: session.user.id },
@@ -90,334 +84,297 @@ export async function redeemPoints(points: number, description: string) {
   });
 
   await db.pointHistory.create({
-    data: {
-      userId: session.user.id,
-      points: -points,
-      type: 'REDEEMED',
-      description,
-    },
+    data: { userId: session.user.id, points: -points, type: 'REDEEMED', description },
   });
 
   return true;
 }
 
+// ─── Admin/Manager-facing actions ─────────────────────────────────────────────
+
 export async function getAllCustomers() {
-  const session = await auth();
-  if (!session || (session.user.role !== 'ADMINISTRATOR' && session.user.role !== 'MANAGER')) {
+  const { storeId, storeRole } = await requireStoreAccess();
+
+  if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
     throw new Error('Unauthorized');
   }
 
-  const customers = await db.user.findMany({
-    where: { role: 'MEMBER' },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      birthday: true,
-      photoUrl: true,
-      points: true,
-      createdAt: true,
+  // Member = StoreUser dengan role MEMBER di store ini
+  const storeUsers = await db.storeUser.findMany({
+    where: { storeId, role: 'MEMBER' },
+    include: {
+      user: {
+        select: { id: true, name: true, email: true, phone: true, birthday: true, photoUrl: true, points: true, createdAt: true },
+      },
     },
+    orderBy: { user: { name: 'asc' } },
   });
 
-  return customers;
+  return storeUsers.map((su) => su.user);
 }
 
 export async function getCustomerDetails(customerId: string) {
-  const session = await auth();
-  if (!session || (session.user.role !== 'ADMINISTRATOR' && session.user.role !== 'MANAGER')) {
+  const { storeId, storeRole } = await requireStoreAccess();
+
+  if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
     throw new Error('Unauthorized');
   }
 
-  const customer = await db.user.findUnique({
-    where: { id: customerId, role: 'MEMBER' },
+  const storeUser = await db.storeUser.findUnique({
+    where: { storeId_userId: { storeId, userId: customerId } },
+  });
+  if (!storeUser) throw new Error('Customer tidak ditemukan di store ini');
+
+  return db.user.findUnique({
+    where: { id: customerId },
     include: {
       sales: {
+        where: { storeId },
         orderBy: { createdAt: 'desc' },
         take: 10,
-        include: {
-          items: {
-            include: {
-              variant: {
-                include: {
-                  product: true,
-                },
-              },
-            },
-          },
-        },
+        include: { items: { include: { variant: { include: { product: true } } } } },
       },
-      pointsHistory: {
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      },
+      pointsHistory: { orderBy: { createdAt: 'desc' }, take: 10 },
     },
   });
+}
 
-  return customer;
+/**
+ * Cek apakah nomor HP sudah terdaftar di sistem.
+ * Dipakai oleh CustomerDialog untuk deteksi user existing sebelum submit.
+ */
+export async function checkPhoneExistsAction(phone: string): Promise<{
+  exists: boolean;
+  isAlreadyMember: boolean;
+  name?: string;
+}> {
+  const { storeId } = await requireStoreAccess();
+  const normalized = normalizePhone(phone);
+  if (!normalized || normalized.length < 9) return { exists: false, isAlreadyMember: false };
+
+  const user = await db.user.findFirst({
+    where: { phone: normalized },
+    select: { id: true, name: true },
+  });
+
+  if (!user) return { exists: false, isAlreadyMember: false };
+
+  // Cek apakah sudah jadi member di store ini
+  const storeUser = await db.storeUser.findUnique({
+    where: { storeId_userId: { storeId, userId: user.id } },
+  });
+
+  return {
+    exists: true,
+    isAlreadyMember: !!storeUser,
+    name: user.name,
+  };
 }
 
 export async function createCustomerAction(formData: FormData) {
   try {
-    const session = await auth();
-    if (!session || session.user.role !== 'ADMINISTRATOR') {
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    const name = formData.get('name') as string;
-    const rawEmail = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const rawPhone = formData.get('phone') as string;
-    const address = formData.get('address') as string;
-    const birthday = formData.get('birthday') as string;
-    const photoUrl = formData.get('photoUrl') as string;
+    const name      = formData.get('name')         as string;
+    const rawPhone  = formData.get('phone')         as string;
+    const rawEmail  = formData.get('email')         as string;
+    const password  = formData.get('password')      as string;
+    const address   = formData.get('address')       as string;
+    const birthday  = formData.get('birthday')      as string;
+    const photoUrl  = formData.get('photoUrl')      as string;
+    // Flag yang dikirim dari dialog ketika user memilih "link user existing"
+    const linkExisting = formData.get('linkExisting') === 'true';
 
-    // 🔧 Normalize phone and email
     const phone = normalizePhone(rawPhone);
     const email = normalizeEmail(rawEmail);
 
-    // Validation
-    if (!name || !phone || !password || !address) {
-      return { success: false, error: 'Nama, telepon, password, dan alamat wajib diisi' };
-    }
+    if (!phone) return { success: false, error: 'Nomor telepon wajib diisi' };
+    if (phone.length < 9 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
 
-    if (password.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters' };
-    }
+    // Cek apakah user dengan nomor ini sudah ada
+    const existingUser = await db.user.findFirst({ where: { phone } });
 
-    // Validate phone number format
-    if (phone.length < 10 || phone.length > 15) {
-      return { success: false, error: 'Please enter a valid phone number' };
-    }
+    if (existingUser) {
+      // ── User sudah ada di sistem ────────────────────────────────────────────
 
-    // ✅ Check for duplicate phone (now checks against normalized phone numbers)
-    const existingPhone = await db.user.findFirst({
-      where: { phone },
-    });
-
-    if (existingPhone) {
-      return { success: false, error: 'Phone number already registered' };
-    }
-
-    // ✅ Check for duplicate email (case-insensitive, if provided)
-    if (email) {
-      const existingEmail = await db.user.findFirst({
-        where: { email },
+      // Cek apakah sudah jadi member di store ini
+      const existingStoreUser = await db.storeUser.findUnique({
+        where: { storeId_userId: { storeId, userId: existingUser.id } },
       });
 
-      if (existingEmail) {
-        return { success: false, error: 'Email already registered' };
+      if (existingStoreUser) {
+        return { success: false, error: `${existingUser.name} sudah terdaftar sebagai member di toko ini` };
       }
+
+      if (!linkExisting) {
+        // Dialog belum konfirmasi → kembalikan info untuk ditampilkan ke admin
+        return {
+          success: false,
+          requiresConfirmation: true,
+          existingName: existingUser.name,
+          error: `Nomor HP ini sudah terdaftar atas nama "${existingUser.name}". Apakah ingin mendaftarkan mereka ke toko ini?`,
+        };
+      }
+
+      // Admin sudah konfirmasi → link user existing ke store ini
+      await db.storeUser.create({
+        data: { storeId, userId: existingUser.id, role: 'MEMBER' },
+      });
+
+      revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
+      revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+      return { success: true, linked: true, name: existingUser.name };
     }
 
-    // Hash password
+    // ── User belum ada → buat baru ──────────────────────────────────────────
+    if (!name || !address) {
+      return { success: false, error: 'Nama dan alamat wajib diisi' };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, error: 'Password minimal 6 karakter' };
+    }
+
+    if (email) {
+      const existingEmail = await db.user.findFirst({ where: { email } });
+      if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
+    }
+
     const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ✅ Create customer with normalized data
-    await db.user.create({
-      data: {
-        name,
-        phone,        // ✅ Saved without spaces: "081234567890"
-        password: hashedPassword,
-        email,        // ✅ Saved trimmed & lowercase: "john@example.com"
-        address: address || null,
-        birthday: birthday ? new Date(birthday) : null,
-        photoUrl: photoUrl || null,
-        role: 'MEMBER',
-        points: 0,
-      },
+    await db.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name, phone, email, address,
+          password: hashedPassword,
+          birthday: birthday ? new Date(birthday) : null,
+          photoUrl: photoUrl || null,
+          role: 'MEMBER',
+          points: 0,
+        },
+      });
+      await tx.storeUser.create({ data: { storeId, userId: newUser.id, role: 'MEMBER' } });
     });
 
-    revalidatePath('/admin/customers');
-    revalidatePath('/manager/customers');
-    return { success: true };
+    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    return { success: true, linked: false };
   } catch (error) {
     console.error('Create customer error:', error);
-    return { success: false, error: 'Failed to create customer' };
+    return { success: false, error: 'Gagal membuat customer' };
   }
 }
 
 export async function updateCustomerAction(id: string, formData: FormData) {
   try {
-    const session = await auth();
-    if (!session || session.user.role !== 'ADMINISTRATOR') {
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    const name = formData.get('name') as string;
-    const rawEmail = formData.get('email') as string;
-    const rawPhone = formData.get('phone') as string;
-    const address = formData.get('address') as string;
-    const birthday = formData.get('birthday') as string;
-    const photoUrl = formData.get('photoUrl') as string;
-    const newPassword = formData.get('password') as string;
-    const points = formData.get('points') ? parseInt(formData.get('points') as string) : undefined;
+    const name        = formData.get('name')        as string;
+    const rawPhone    = formData.get('phone')        as string;
+    const rawEmail    = formData.get('email')        as string;
+    const address     = formData.get('address')      as string;
+    const birthday    = formData.get('birthday')     as string;
+    const photoUrl    = formData.get('photoUrl')     as string;
+    const newPassword = formData.get('password')     as string;
+    const points      = formData.get('points') ? parseInt(formData.get('points') as string) : undefined;
     const pointsReason = formData.get('pointsReason') as string;
 
-    // 🔧 Normalize phone and email
     const phone = normalizePhone(rawPhone);
     const email = normalizeEmail(rawEmail);
 
-    // Validation
-    if (!name || !phone || !address) {
-      return { success: false, error: 'Nama, telepon, dan alamat wajib diisi' };
-    }
+    if (!name || !phone || !address) return { success: false, error: 'Nama, telepon, dan alamat wajib diisi' };
+    if (newPassword && newPassword.length < 6) return { success: false, error: 'Password minimal 6 karakter' };
+    if (phone.length < 10 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
 
-    // Validate password length if provided
-    if (newPassword && newPassword.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters' };
-    }
+    // Pastikan customer adalah member di store ini
+    const storeUser = await db.storeUser.findUnique({ where: { storeId_userId: { storeId, userId: id } } });
+    if (!storeUser) return { success: false, error: 'Customer tidak ditemukan di store ini' };
 
-    // Validate phone number format
-    if (phone.length < 10 || phone.length > 15) {
-      return { success: false, error: 'Please enter a valid phone number' };
-    }
+    const existingPhone = await db.user.findFirst({ where: { phone, id: { not: id } } });
+    if (existingPhone) return { success: false, error: 'Nomor telepon sudah digunakan' };
 
-    // ✅ Check for duplicate phone on different user (normalized)
-    const existingUser = await db.user.findFirst({
-      where: {
-        phone,
-        id: { not: id }
-      },
-    });
-
-    if (existingUser) {
-      return { success: false, error: 'Phone already exists' };
-    }
-
-    // ✅ Check for duplicate email on different user (case-insensitive, if provided)
     if (email) {
-      const existingEmailUser = await db.user.findFirst({
-        where: {
-          email,
-          id: { not: id }
-        },
-      });
-
-      if (existingEmailUser) {
-        return { success: false, error: 'Email already registered' };
-      }
+      const existingEmail = await db.user.findFirst({ where: { email, id: { not: id } } });
+      if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
     }
 
-    if (address && address.length > 120) {
-      return { success: false, error: 'Address cannot exceed 200 characters' };
-    }
+    const currentUser = await db.user.findUnique({ where: { id }, select: { points: true } });
+    if (!currentUser) return { success: false, error: 'Customer tidak ditemukan' };
 
-    // Get current user data to track changes
-    const currentUser = await db.user.findUnique({
-      where: { id, role: 'MEMBER' },
-      select: { points: true, name: true },
-    });
+    const updateData: any = { name, phone, email, address: address || null, birthday: birthday ? new Date(birthday) : null, photoUrl: photoUrl || null };
 
-    if (!currentUser) {
-      return { success: false, error: 'Customer not found' };
-    }
-
-    // ✅ Prepare update data with normalized values
-    const updateData: any = {
-      name,
-      phone,        // ✅ Saved without spaces: "081234567890"
-      email,        // ✅ Saved trimmed & lowercase: "john@example.com"
-      address: address || null,
-      birthday: birthday ? new Date(birthday) : null,
-      photoUrl: photoUrl || null,
-    };
-
-    // Hash password if provided
-    if (newPassword && newPassword.trim() !== '') {
+    if (newPassword?.trim()) {
       const bcrypt = require('bcryptjs');
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      updateData.password = hashedPassword;
+      updateData.password = await bcrypt.hash(newPassword, 10);
     }
 
-    // Update points if changed
     if (points !== undefined && points !== currentUser.points) {
-      // Validate that reason is provided when points are changed
-      if (!pointsReason || pointsReason.trim() === '') {
-        return { success: false, error: 'Reason is required when updating loyalty points' };
-      }
-
+      if (!pointsReason?.trim()) return { success: false, error: 'Alasan wajib diisi saat mengubah poin' };
       updateData.points = points;
-
-      // Calculate points difference
-      const pointsDifference = points - currentUser.points;
-
-      // Create point history record with custom reason
       await db.pointHistory.create({
-        data: {
-          userId: id,
-          points: pointsDifference,
-          type: 'ADJUSTED',
-          description: pointsReason,
-        },
+        data: { userId: id, points: points - currentUser.points, type: 'ADJUSTED', description: pointsReason },
       });
     }
 
-    // Update user
-    await db.user.update({
-      where: { id },
-      data: updateData,
-    });
+    await db.user.update({ where: { id }, data: updateData });
 
-    revalidatePath('/admin/customers');
-    revalidatePath('/manager/customers');
+    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
     return { success: true };
   } catch (error) {
     console.error('Update customer error:', error);
-    return { success: false, error: 'Failed to update customer' };
+    return { success: false, error: 'Gagal mengupdate customer' };
   }
 }
 
 export async function deleteCustomerAction(id: string) {
   try {
-    const session = await auth();
-    if (!session || session.user.role !== 'ADMINISTRATOR') {
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    // Check if customer has sales
-    const salesCount = await db.sale.count({
-      where: { customerId: id },
-    });
+    const storeUser = await db.storeUser.findUnique({ where: { storeId_userId: { storeId, userId: id } } });
+    if (!storeUser) return { success: false, error: 'Customer tidak ditemukan di store ini' };
 
-    if (salesCount > 0) {
-      return { success: false, error: 'Cannot delete customer with existing sales' };
-    }
+    const salesCount = await db.sale.count({ where: { customerId: id, storeId } });
+    if (salesCount > 0) return { success: false, error: 'Tidak bisa hapus customer yang punya riwayat penjualan' };
 
-    await db.user.delete({
-      where: { id, role: 'MEMBER' },
-    });
+    // Hapus StoreUser saja, user-nya tetap ada
+    await db.storeUser.delete({ where: { storeId_userId: { storeId, userId: id } } });
 
-    revalidatePath('/admin/customers');
-    revalidatePath('/manager/customers');
+    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
     return { success: true };
   } catch (error) {
     console.error('Delete customer error:', error);
-    return { success: false, error: 'Failed to delete customer' };
+    return { success: false, error: 'Gagal menghapus customer' };
   }
 }
 
-export async function getCustomerPointsHistory(customerId: string, page: number = 1, pageSize: number = 10) {
-  const session = await auth();
-  if (!session || (session.user.role !== 'ADMINISTRATOR' && session.user.role !== 'MANAGER')) {
+export async function getCustomerPointsHistory(customerId: string, page = 1, pageSize = 10) {
+  const { storeId, storeRole } = await requireStoreAccess();
+
+  if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
     throw new Error('Unauthorized');
   }
 
-  const skip = (page - 1) * pageSize;
+  const storeUser = await db.storeUser.findUnique({ where: { storeId_userId: { storeId, userId: customerId } } });
+  if (!storeUser) throw new Error('Customer tidak ditemukan di store ini');
 
+  const skip = (page - 1) * pageSize;
   const [history, total] = await Promise.all([
-    db.pointHistory.findMany({
-      where: { userId: customerId },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: pageSize,
-    }),
-    db.pointHistory.count({
-      where: { userId: customerId },
-    }),
+    db.pointHistory.findMany({ where: { userId: customerId }, orderBy: { createdAt: 'desc' }, skip, take: pageSize }),
+    db.pointHistory.count({ where: { userId: customerId } }),
   ]);
 
   return { history, total };

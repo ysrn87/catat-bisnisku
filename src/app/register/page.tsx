@@ -154,7 +154,7 @@ export default function RegisterPage() {
               alt="Catat Bisnisku"
               width={64}
               height={64}
-              className="rounded-2xl shadow-lg"
+              className="rounded-2xl shadow-lg" priority
             />
           </div>
           <CardTitle className="text-2xl sm:text-3xl font-bold text-center text-[#028697]">
