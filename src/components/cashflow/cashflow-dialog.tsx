@@ -131,7 +131,7 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
           <Button
             variant={isCreate ? 'default' : 'ghost'}
             size={isCreate ? 'default' : 'sm'}
-            className={isCreate ? 'bg-[#028697] hover:bg-[#027080] shadow-sm' : ''}
+            className={isCreate ? 'bg-[#00a090] hover:bg-[#007868] shadow-sm' : ''}
           >
             {isCreate ? (
               <>
@@ -150,7 +150,7 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
         className="sm:max-w-[480px] p-0 gap-0 overflow-hidden border-0 shadow-2xl"
       >
         {/* Header band */}
-        <div className="relative bg-gradient-to-br from-[#028697] to-[#016d7a] px-6 pt-6 pb-8">
+        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
 
@@ -240,7 +240,7 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
                   onChange={(e) => handleNumberChange(e.target.value)}
                   placeholder="0"
                   disabled={loading}
-                  className="h-10 font-mono tracking-wider border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal"
+                  className="h-10 font-mono tracking-wider border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal"
                 />
               </div>
 
@@ -260,7 +260,7 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
                   defaultValue={transaction?.category}
                   placeholder="Penjualan, Sewa, Bahan Baku..."
                   disabled={loading}
-                  className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
+                  className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
                 />
               </div>
 
@@ -280,7 +280,7 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
                   defaultValue={transaction?.description}
                   placeholder="Keterangan singkat transaksi..."
                   disabled={loading}
-                  className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
+                  className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
                 />
               </div>
 
@@ -304,7 +304,7 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
                       : new Date().toISOString().split('T')[0]
                   }
                   disabled={loading}
-                  className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors"
+                  className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors"
                 />
               </div>
             </div>
@@ -323,7 +323,7 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
             <Button
               type="submit"
               disabled={loading}
-              className="bg-[#028697] hover:bg-[#027080] text-white shadow-sm min-w-[130px] transition-all"
+              className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[130px] transition-all"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

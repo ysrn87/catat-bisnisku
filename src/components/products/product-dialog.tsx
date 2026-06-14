@@ -26,8 +26,8 @@ const TYPE_OPTIONS = [
     icon: Package,
     label: 'Ready Stock',
     sublabel: 'Produk jadi',
-    activeClass: 'border-[#028697] bg-gradient-to-br from-[#028697]/8 to-[#028697]/4 text-[#028697]',
-    dotClass: 'bg-[#028697]',
+    activeClass: 'border-[#00a090] bg-gradient-to-br from-[#00a090]/8 to-[#00a090]/4 text-[#00a090]',
+    dotClass: 'bg-[#00a090]',
   },
   {
     value: 'PREORDER' as const,
@@ -101,7 +101,7 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
           <Button
             variant={isCreate ? 'default' : 'ghost'}
             size={isCreate ? 'default' : 'sm'}
-            className={isCreate ? 'bg-[#028697] hover:bg-[#027080] shadow-sm' : ''}
+            className={isCreate ? 'bg-[#00a090] hover:bg-[#007868] shadow-sm' : ''}
           >
             {isCreate ? (
               <>
@@ -120,7 +120,7 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
         className="sm:max-w-[480px] p-0 gap-0 overflow-hidden border-0 shadow-2xl"
       >
         {/* Header band */}
-        <div className="relative bg-gradient-to-br from-[#028697] to-[#016d7a] px-6 pt-6 pb-8">
+        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8">
           {/* Decorative circles */}
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
@@ -206,7 +206,7 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
                   placeholder="Contoh: Kue Lapis, Tart Coklat"
                   disabled={loading}
                   maxLength={30}
-                  className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
+                  className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
                 />
               </div>
 
@@ -224,7 +224,7 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
                   placeholder="Contoh: KL-001"
                   disabled={loading}
                   maxLength={15}
-                  className="h-10 font-mono tracking-wider border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal uppercase"
+                  className="h-10 font-mono tracking-wider border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal uppercase"
                 />
               </div>
 
@@ -242,7 +242,7 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
                   placeholder="Deskripsi singkat produk..."
                   disabled={loading}
                   maxLength={150}
-                  className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
+                  className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
                 />
               </div>
             </div>
@@ -261,7 +261,7 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
             <Button
               type="submit"
               disabled={loading}
-              className="bg-[#028697] hover:bg-[#027080] text-white shadow-sm min-w-[110px] transition-all"
+              className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[110px] transition-all"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

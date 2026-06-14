@@ -162,7 +162,7 @@ export function SalesTable({ sales, currentPage, pageSize, totalItems, conversio
                   </span>
                   <span className="text-[11px] text-gray-500">{totalItems} pcs</span>
                 </div>
-                <div className="text-sm font-bold text-[#028697]">
+                <div className="text-sm font-bold text-[#00a090]">
                   {formatCurrency(sale.total)}
                 </div>
               </div>

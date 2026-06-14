@@ -130,20 +130,20 @@ export default function RegisterPage() {
   const selectClass = (unlocked: boolean, filled: boolean) =>
     [
       'w-full h-11 text-sm rounded-md border px-3 pr-8 appearance-none',
-      'focus:outline-none focus:ring-2 focus:ring-[#1ecbe1] transition-all duration-200',
+      'focus:outline-none focus:ring-2 focus:ring-[#2bbfb0] transition-all duration-200',
       !unlocked
         ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
         : !filled
-          ? 'border-[#1ecbe1] bg-[#e0f9fc] text-[#0fa8be] cursor-pointer'
+          ? 'border-[#2bbfb0] bg-[#e0f5f2] text-[#00a090] cursor-pointer'
           : 'border-input bg-background text-gray-700 cursor-pointer',
     ].join(' ');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f9fc] via-[#f0fdfe] to-[#d6f7fa] p-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f5f2] via-[#f0faf8] to-[#d0f0eb] p-4 py-12">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#1ecbe1] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#17a8bb] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob animation-delay-2000" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-[#0fa8be] rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-4000" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#2bbfb0] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#00a090] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob animation-delay-2000" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-[#00a090] rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-4000" />
       </div>
 
       <Card className="w-full max-w-md shadow-2xl border-0 relative z-10 backdrop-blur-sm bg-white/95">
@@ -157,7 +157,7 @@ export default function RegisterPage() {
               className="rounded-2xl shadow-lg" priority
             />
           </div>
-          <CardTitle className="text-2xl sm:text-3xl font-bold text-center text-[#028697]">
+          <CardTitle className="text-2xl sm:text-3xl font-bold text-center text-[#00a090]">
             Daftar Member
           </CardTitle>
           <CardDescription className="text-center text-sm">
@@ -167,9 +167,9 @@ export default function RegisterPage() {
 
         <CardContent className="space-y-6">
           {/* Benefits Banner */}
-          <div className="p-4 bg-[#e0f9fc] rounded-lg border border-[#a8f0f8]">
+          <div className="p-4 bg-[#e0f5f2] rounded-lg border border-[#90e0d8]">
             <p className="font-semibold mb-2 text-xs text-gray-700 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#1ecbe1]" />
+              <Sparkles className="w-4 h-4 text-[#2bbfb0]" />
               Keuntungan Member:
             </p>
             <ul className="space-y-1 text-xs text-gray-600">
@@ -191,7 +191,7 @@ export default function RegisterPage() {
                 placeholder="Nama Lengkap"
                 value={name} onChange={handleNameChange}
                 disabled={loading} maxLength={80}
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#2bbfb0]"
               />
             </div>
 
@@ -213,7 +213,7 @@ export default function RegisterPage() {
                 minLength={9} maxLength={19} inputMode="tel" required
                 placeholder="0812 3456 7890"
                 disabled={loading}
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#2bbfb0]"
               />
               <p className="text-xs text-muted-foreground">Diperlukan untuk login dan klaim poin</p>
             </div>
@@ -231,7 +231,7 @@ export default function RegisterPage() {
                 {[!!birthYear, !!birthMonth, !!birthDay].map((done, i) => (
                   <div
                     key={i}
-                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${done ? 'bg-[#1ecbe1]' : 'bg-gray-200'
+                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${done ? 'bg-[#2bbfb0]' : 'bg-gray-200'
                       }`}
                   />
                 ))}
@@ -255,7 +255,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <p className={`text-xs font-medium transition-colors duration-200 ${monthUnlocked ? 'text-[#1ecbe1]' : 'text-gray-300'}`}>
+                  <p className={`text-xs font-medium transition-colors duration-200 ${monthUnlocked ? 'text-[#2bbfb0]' : 'text-gray-300'}`}>
                     ② Bulan {monthUnlocked && !birthMonth && '👈'}
                   </p>
                   <div className="relative">
@@ -281,7 +281,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <p className={`text-xs font-medium transition-colors duration-200 ${dayUnlocked ? 'text-[#1ecbe1]' : 'text-gray-300'}`}>
+                  <p className={`text-xs font-medium transition-colors duration-200 ${dayUnlocked ? 'text-[#2bbfb0]' : 'text-gray-300'}`}>
                     ③ Tanggal {dayUnlocked && !birthDay && '👈'}
                   </p>
                   <div className="relative">
@@ -305,9 +305,9 @@ export default function RegisterPage() {
                     ✓ {birthDay} {months[Number(birthMonth) - 1]} {birthYear}
                   </p>
                 ) : dayUnlocked && !birthDay ? (
-                  <p className="text-xs text-[#1ecbe1]">Satu langkah lagi — pilih tanggal lahir</p>
+                  <p className="text-xs text-[#2bbfb0]">Satu langkah lagi — pilih tanggal lahir</p>
                 ) : monthUnlocked && !birthMonth ? (
-                  <p className="text-xs text-[#1ecbe1]">Sekarang pilih bulan lahir</p>
+                  <p className="text-xs text-[#2bbfb0]">Sekarang pilih bulan lahir</p>
                 ) : !birthYear ? (
                   <p className="text-xs text-gray-400">Mulai dengan memilih tahun lahir</p>
                 ) : null}
@@ -326,7 +326,7 @@ export default function RegisterPage() {
                 value={address} required
                 onChange={(e) => setAddress(e.target.value)}
                 disabled={loading} maxLength={250}
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#2bbfb0]"
               />
               <p className="text-xs text-gray-500 text-right">{address.length}/250 karakter</p>
             </div>
@@ -343,7 +343,7 @@ export default function RegisterPage() {
                 placeholder="you@example.com"
                 disabled={loading} onChange={handleEmailChange}
                 pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#2bbfb0]"
               />
               {emailError && <p className="text-xs text-red-500">{emailError}</p>}
             </div>
@@ -361,7 +361,7 @@ export default function RegisterPage() {
                     type={showPassword ? 'text' : 'password'}
                     required placeholder="Min. 6 characters"
                     minLength={6} disabled={loading}
-                    className="h-11 text-sm pr-10 focus-visible:ring-[#1ecbe1]"
+                    className="h-11 text-sm pr-10 focus-visible:ring-[#2bbfb0]"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
@@ -381,7 +381,7 @@ export default function RegisterPage() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     required placeholder="Re-enter password"
                     minLength={6} disabled={loading}
-                    className="h-11 text-sm pr-10 focus-visible:ring-[#1ecbe1]"
+                    className="h-11 text-sm pr-10 focus-visible:ring-[#2bbfb0]"
                   />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
@@ -400,7 +400,7 @@ export default function RegisterPage() {
 
             <Button
               type="submit"
-              className="w-full h-11 text-sm font-semibold bg-[#028697] hover:bg-[#17a8bb] text-white transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="w-full h-11 text-sm font-semibold bg-[#00a090] hover:bg-[#00a090] text-white transition-all duration-200 shadow-lg hover:shadow-xl"
               disabled={loading}
             >
               {loading ? (
@@ -429,7 +429,7 @@ export default function RegisterPage() {
           <Link href="/login" className="block">
             <Button
               variant="outline"
-              className="w-full h-11 text-sm font-semibold border-2 border-[#028697] text-[#028697] hover:bg-[#e0f9fc] transition-all duration-200"
+              className="w-full h-11 text-sm font-semibold border-2 border-[#00a090] text-[#00a090] hover:bg-[#e0f5f2] transition-all duration-200"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Login
@@ -439,7 +439,7 @@ export default function RegisterPage() {
           <Link href="/catalog" className="block">
             <Button
               variant="outline"
-              className="w-full h-7 font-normal border-[#a8f0f8] text-[#028697] hover:bg-[#e0f9fc]"
+              className="w-full h-7 font-normal border-[#90e0d8] text-[#00a090] hover:bg-[#e0f5f2]"
               style={{ textDecoration: 'underline' }}
             >
               <Notebook className="w-2 h-2 mr-0" />

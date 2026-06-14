@@ -21,7 +21,7 @@ export function AddCustomerMenu({ trigger }: AddCustomerMenuProps) {
   const [memberOpen, setMemberOpen] = useState(false);
 
   const defaultTrigger = (
-    <Button className="bg-[#028697] hover:bg-[#027080] shadow-sm">
+    <Button className="bg-[#00a090] hover:bg-[#007868] shadow-sm">
       <Plus className="w-4 h-4 mr-2" />
       Tambah Pelanggan
       <ChevronDown className="w-3.5 h-3.5 ml-2 opacity-70" />
@@ -40,8 +40,8 @@ export function AddCustomerMenu({ trigger }: AddCustomerMenuProps) {
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer focus:bg-gray-50"
             onSelect={() => setNonMemberOpen(true)}
           >
-            <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-[#028697]/10 flex items-center justify-center">
-              <UserPlus className="w-3.5 h-3.5 text-[#028697]" />
+            <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-[#00a090]/10 flex items-center justify-center">
+              <UserPlus className="w-3.5 h-3.5 text-[#00a090]" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-800 leading-tight">Non-Member</p>

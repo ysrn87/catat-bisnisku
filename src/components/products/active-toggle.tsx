@@ -44,7 +44,7 @@ export function ActiveToggle({ id, isActive, type }: ActiveToggleProps) {
       checked={active}
       onCheckedChange={handleToggle}
       disabled={loading}
-      className="data-[state=checked]:bg-[#028697]"
+      className="data-[state=checked]:bg-[#00a090]"
     />
   );
 }

@@ -88,29 +88,29 @@ export default async function LandingPage({
   const filterProps   = allProducts.map(p => ({ id: p.id, name: p.name }));
 
   return (
-    <div className="min-h-screen bg-[#f8fffe] text-slate-900 antialiased">
+    <div className="min-h-screen bg-[#f5faf9] text-slate-900 antialiased">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[#e0f9fc]">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-[#e0f5f2]">
         <div className="max-w-lg lg:max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/catalog" className="flex items-center gap-2 select-none">
-            <div className="w-8 h-8 rounded-xl bg-[#028697] flex items-center justify-center shadow-sm">
+            <div className="w-8 h-8 rounded-xl bg-[#00a090] flex items-center justify-center shadow-sm">
               <ShoppingBag className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-sm font-bold text-[#028697] leading-none">Catat Bisnisku</p>
+              <p className="text-sm font-bold text-[#00a090] leading-none">Catat Bisnisku</p>
               <p className="text-[9px] text-slate-400 leading-none tracking-wide mt-0.5">Homemade · Halal</p>
             </div>
           </Link>
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-6 text-sm text-slate-500">
-            <a href="#katalog" className="hover:text-[#028697] transition-colors">Katalog</a>
+            <a href="#katalog" className="hover:text-[#00a090] transition-colors">Katalog</a>
             <a
               href={waLink('Halo Catat Bisnisku! Saya ingin tahu lebih lanjut tentang produk.')}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-[#028697] transition-colors"
+              className="hover:text-[#00a090] transition-colors"
             >
               Hubungi Kami
             </a>
@@ -119,7 +119,7 @@ export default async function LandingPage({
       </header>
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <section className="relative bg-gradient-to-br from-[#028697] via-[#039aad] to-[#1ecbe1] overflow-hidden">
+      <section className="relative bg-gradient-to-br from-[#00a090] via-[#00a090] to-[#2bbfb0] overflow-hidden">
         <div className="absolute -top-10 -right-10 w-48 h-48 lg:w-96 lg:h-96 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute bottom-0 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute top-1/2 right-1/4 w-20 h-20 lg:w-40 lg:h-40 rounded-full bg-white/5 pointer-events-none" />
@@ -138,7 +138,7 @@ export default async function LandingPage({
             <a
               href={waLink('Halo Catat Bisnisku! Saya ingin tahu lebih lanjut tentang produk.')}
               target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-white text-[#028697] font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95"
+              className="flex items-center gap-2 bg-white text-[#00a090] font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-95"
             >
               <MessageCircle className="w-4 h-4" />
               Hubungi Kami
@@ -182,7 +182,7 @@ export default async function LandingPage({
                 <a
                   href={waLink('Halo Catat Bisnisku! Saya ingin tahu lebih lanjut tentang produk.')}
                   target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-2 bg-white text-[#028697] font-bold px-6 py-3 rounded-xl shadow-sm hover:shadow-md transition-all"
+                  className="flex items-center gap-2 bg-white text-[#00a090] font-bold px-6 py-3 rounded-xl shadow-sm hover:shadow-md transition-all"
                 >
                   <MessageCircle className="w-4 h-4" />
                   Hubungi via WhatsApp
@@ -214,7 +214,7 @@ export default async function LandingPage({
                 </div>
                 <a
                   href="#katalog"
-                  className="mt-5 flex items-center justify-center gap-2 bg-white text-[#028697] font-bold text-sm py-2.5 rounded-xl w-full hover:shadow-md transition-all"
+                  className="mt-5 flex items-center justify-center gap-2 bg-white text-[#00a090] font-bold text-sm py-2.5 rounded-xl w-full hover:shadow-md transition-all"
                 >
                   Jelajahi Katalog <ChevronRight className="w-4 h-4" />
                 </a>
@@ -223,7 +223,7 @@ export default async function LandingPage({
           </div>
         </div>
 
-        <div className="h-5 bg-[#f8fffe]" style={{ clipPath: 'ellipse(55% 100% at 50% 100%)' }} />
+        <div className="h-5 bg-[#f5faf9]" style={{ clipPath: 'ellipse(55% 100% at 50% 100%)' }} />
       </section>
 
       {/* ── Catalogue ───────────────────────────────────────────────────────── */}
@@ -248,8 +248,8 @@ export default async function LandingPage({
           <aside className="w-56 flex-shrink-0">
             <div className="sticky top-24 bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-                <div className="w-6 h-6 rounded-lg bg-[#028697]/10 flex items-center justify-center">
-                  <ShoppingBag className="w-3.5 h-3.5 text-[#028697]" />
+                <div className="w-6 h-6 rounded-lg bg-[#00a090]/10 flex items-center justify-center">
+                  <ShoppingBag className="w-3.5 h-3.5 text-[#00a090]" />
                 </div>
                 <p className="text-sm font-bold text-slate-700">Filter</p>
               </div>
@@ -298,7 +298,7 @@ export default async function LandingPage({
                         </div>
                         <div className="text-right flex-shrink-0">
                           <p className="text-xs text-slate-400">mulai dari</p>
-                          <p className="text-base font-bold text-[#028697]">{formatCurrency(minP)}</p>
+                          <p className="text-base font-bold text-[#00a090]">{formatCurrency(minP)}</p>
                           <p className="text-xs text-slate-400">{product.variants.length} varian</p>
                         </div>
                       </div>
@@ -344,7 +344,7 @@ export default async function LandingPage({
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="text-[10px] text-slate-400">mulai</p>
-                        <p className="text-sm font-bold text-[#028697]">{formatCurrency(minP)}</p>
+                        <p className="text-sm font-bold text-[#00a090]">{formatCurrency(minP)}</p>
                       </div>
                     </div>
                     <VariantGrid variants={product.variants} product={product} isPreorder={isPreorder} waLink={waLink} />
@@ -369,16 +369,16 @@ export default async function LandingPage({
       </div>
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-[#e0f9fc] bg-white">
+      <footer className="border-t border-[#e0f5f2] bg-white">
         <div className="max-w-lg lg:max-w-6xl mx-auto px-4 lg:px-8 h-14 flex items-center justify-between">
           {/* <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md bg-[#028697] flex items-center justify-center">
+            <div className="w-5 h-5 rounded-md bg-[#00a090] flex items-center justify-center">
               <ShoppingBag className="w-3 h-3 text-white" />
             </div>
-            <p className="text-xs font-semibold text-[#028697]">Catat Bisnisku</p>
+            <p className="text-xs font-semibold text-[#00a090]">Catat Bisnisku</p>
           </div> */}
           <p className="lg:block text-[11px] text-slate-400">© {new Date().getFullYear()} Catat Bisnisku. All rights reserved.</p>
-          <Link href="/login" className="text-[11px] text-slate-400 hover:text-[#028697] transition-colors">·-··</Link>
+          <Link href="/login" className="text-[11px] text-slate-400 hover:text-[#00a090] transition-colors">·-··</Link>
         </div>
       </footer>
     </div>
@@ -435,10 +435,10 @@ function VariantGrid({
             className={`relative flex flex-col bg-white border rounded-2xl overflow-hidden transition-all duration-200 ${
               isOutOfStock
                 ? 'border-slate-100 opacity-60'
-                : 'border-slate-200 hover:border-[#028697]/40 hover:shadow-md active:scale-[0.98]'
+                : 'border-slate-200 hover:border-[#00a090]/40 hover:shadow-md active:scale-[0.98]'
             }`}
           >
-            <div className={`h-1 w-full ${isPreorder ? 'bg-amber-300' : isOutOfStock ? 'bg-slate-200' : 'bg-gradient-to-r from-[#028697] to-[#1ecbe1]'}`} />
+            <div className={`h-1 w-full ${isPreorder ? 'bg-amber-300' : isOutOfStock ? 'bg-slate-200' : 'bg-gradient-to-r from-[#00a090] to-[#2bbfb0]'}`} />
             <div className="p-3 flex flex-col gap-2 flex-1">
               <div>
                 <p className="text-xs font-bold text-slate-900 leading-snug">{variant.name}</p>
@@ -449,7 +449,7 @@ function VariantGrid({
                 {stockBadge.label}
               </span>
               <div className="mt-auto">
-                <p className="text-base font-extrabold text-[#028697] leading-none">{formatCurrency(variant.price)}</p>
+                <p className="text-base font-extrabold text-[#00a090] leading-none">{formatCurrency(variant.price)}</p>
                 {variant.points > 0 && (
                   <p className="text-[10px] text-amber-600 flex items-center gap-0.5 mt-1">
                     <Star className="w-2.5 h-2.5" />+{variant.points} poin
@@ -464,7 +464,7 @@ function VariantGrid({
                 className={`mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl transition-all ${
                   isOutOfStock
                     ? 'bg-slate-100 text-slate-400 pointer-events-none'
-                    : 'bg-[#028697] text-white hover:bg-[#027080] active:scale-95'
+                    : 'bg-[#00a090] text-white hover:bg-[#007868] active:scale-95'
                 }`}
               >
                 <MessageCircle className="w-3.5 h-3.5" />

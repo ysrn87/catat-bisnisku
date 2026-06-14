@@ -30,7 +30,7 @@ export function PlanLimitBar({
     ? 'bg-red-500'
     : isNear
     ? 'bg-amber-400'
-    : 'bg-[#028697]';
+    : 'bg-[#00a090]';
 
   const textColor = isFull
     ? 'text-red-600'

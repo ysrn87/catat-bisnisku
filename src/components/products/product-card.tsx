@@ -75,7 +75,7 @@ export function ProductCard({ product, filterStatus }: ProductCardProps) {
                 SKU: {product.sku} •{' '}
                 <button
                   onClick={() => setVariantsOpen((v) => !v)}
-                  className="hover:text-[#028697] transition-colors"
+                  className="hover:text-[#00a090] transition-colors"
                 >
                   {totalCount} varian
                   {totalCount > 0 && (
@@ -124,7 +124,7 @@ export function ProductCard({ product, filterStatus }: ProductCardProps) {
               variant="ghost"
               size="sm"
               onClick={() => setVariantsOpen((v) => !v)}
-              className="text-[12px] sm:text-xs font-medium text-gray-700 hover:text-[#028697] hover:bg-transparent px-0 gap-1.5"
+              className="text-[12px] sm:text-xs font-medium text-gray-700 hover:text-[#00a090] hover:bg-transparent px-0 gap-1.5"
             >
               {variantsOpen ? (
                 <ChevronUp className="h-4 w-4" />
@@ -274,7 +274,7 @@ export function ProductCard({ product, filterStatus }: ProductCardProps) {
                       <div className="grid grid-cols-2 gap-2 mb-1">
                         <div>
                           <p className="text-[10px] text-gray-500">Harga</p>
-                          <p className="text-[12px] font-semibold text-[#028697]">
+                          <p className="text-[12px] font-semibold text-[#00a090]">
                             {formatCurrency(variant.price)}
                           </p>
                         </div>

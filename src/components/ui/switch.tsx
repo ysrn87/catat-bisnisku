@@ -26,7 +26,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
           'transition-colors duration-200 ease-in-out',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:ring-gray-400',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          checked ? 'bg-[#028697]' : 'bg-gray-200',
+          checked ? 'bg-[#00a090]' : 'bg-gray-200',
           className,
         ].join(' ')}
       >
