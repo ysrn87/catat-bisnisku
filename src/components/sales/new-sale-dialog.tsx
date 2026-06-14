@@ -374,8 +374,9 @@ export function NewSaleDialog({ variants, customers, nonMemberCustomers = [], co
       }
       setOpen(val);
     }}>
-      <DialogTrigger asChild>
-        {trigger || (
+      {trigger && <div onClick={() => setOpen(true)}>{trigger}</div>}
+    <DialogTrigger asChild>
+        {!trigger && (
           <Button className="gap-2 bg-[#00a090] hover:bg-[#007868] shadow-sm">
             <Plus className="w-4 h-4" />
             Penjualan Baru

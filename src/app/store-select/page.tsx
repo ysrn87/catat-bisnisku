@@ -59,11 +59,11 @@ export default async function StoreSelectPage() {
         <div className="space-y-3">
           {storeUsers.map(({ store, role }) => (
             <Link key={store.id} href={`/${store.slug}`}>
-              <Card className="hover:border-[#00a090] hover:shadow-md transition-all duration-200 cursor-pointer group">
+              <Card className="hover:border-[#028697] hover:shadow-md transition-all duration-200 cursor-pointer group">
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#e0f5f2] rounded-lg group-hover:bg-[#00a090]/10 transition-colors">
-                      <Store className="w-5 h-5 text-[#00a090]" />
+                    <div className="p-2 bg-[#e0f9fc] rounded-lg group-hover:bg-[#028697]/10 transition-colors">
+                      <Store className="w-5 h-5 text-[#028697]" />
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">{store.name}</p>
@@ -78,7 +78,7 @@ export default async function StoreSelectPage() {
                       </div>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-[#00a090] group-hover:translate-x-1 transition-all" />
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-[#028697] group-hover:translate-x-1 transition-all" />
                 </CardContent>
               </Card>
             </Link>
@@ -88,7 +88,7 @@ export default async function StoreSelectPage() {
         <div className="text-center">
           <Link
             href="/register"
-            className="text-sm text-[#00a090] hover:underline"
+            className="text-sm text-[#028697] hover:underline"
           >
             + Daftarkan toko baru
           </Link>

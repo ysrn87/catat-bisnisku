@@ -53,21 +53,21 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f5f2] via-[#f0faf8] to-[#d0f0eb] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f9fc] via-[#f0fdfe] to-[#d6f7fa] p-4">
       {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#2bbfb0] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#00a090] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#1ecbe1] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#17a8bb] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
       </div>
 
       <Card className="w-3/4 max-w-md shadow-2xl relative z-10 backdrop-blur-lg bg-white/95">
         <CardHeader className="space-y-3 pb-6">
-          <div className="mx-auto w-32 h-32 flex items-center justify-center">
-            <Image src="/icon-512x512.png" alt="Catat Bisnisku" width={128} height={128} className="rounded-2xl shadow-lg" priority />
+          <div className="mx-auto w-16 h-16 flex items-center justify-center">
+            <Image src="/icon-512x512.png" alt="Catat Bisnisku" width={64} height={64} className="rounded-2xl shadow-lg" priority />
           </div>
-          {/* <CardTitle className="text-xl font-bold text-center text-[#00a090]">
+          <CardTitle className="text-xl font-bold text-center text-[#028697]">
             Catat Bisnisku
-          </CardTitle> */}
+          </CardTitle>
           <CardDescription className="text-center text-base">
             Login untuk akses ke toko kamu
           </CardDescription>
@@ -99,7 +99,7 @@ function LoginForm() {
                 id="identifier" name="identifier" type="text" required
                 placeholder="you@example.com atau 08123456789"
                 disabled={loading}
-                className="h-11 text-sm focus-visible:ring-[#2bbfb0]"
+                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
               />
             </div>
 
@@ -114,7 +114,7 @@ function LoginForm() {
                   type={showPassword ? 'text' : 'password'}
                   required placeholder="••••••••"
                   disabled={loading}
-                  className="h-11 text-sm pr-10 focus-visible:ring-[#2bbfb0]"
+                  className="h-11 text-sm pr-10 focus-visible:ring-[#1ecbe1]"
                 />
                 <button
                   type="button"
@@ -135,7 +135,7 @@ function LoginForm() {
 
             <Button
               type="submit"
-              className="w-full h-11 text-base font-semibold bg-[#00a090] hover:bg-[#00a090] text-white transition-all duration-200 shadow-lg"
+              className="w-full h-11 text-base font-semibold bg-[#028697] hover:bg-[#17a8bb] text-white transition-all duration-200 shadow-lg"
               disabled={loading}
             >
               {loading ? (
@@ -148,7 +148,7 @@ function LoginForm() {
 
           <div className="text-center text-xs text-gray-500">
             Belum punya toko?{' '}
-            <Link href="/register-store" className="text-[#00a090] hover:underline font-medium">
+            <Link href="/register-store" className="text-[#028697] hover:underline font-medium">
               Daftar toko baru
             </Link>
           </div>
@@ -167,10 +167,10 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f5f2] via-[#f0faf8] to-[#d0f0eb]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f9fc] via-[#f0fdfe] to-[#d6f7fa]">
         <Card className="w-full max-w-md shadow-2xl border-0">
           <CardContent className="p-6 text-center flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-4 border-[#2bbfb0] border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-[#1ecbe1] border-t-transparent rounded-full animate-spin" />
             <p className="text-gray-600">Loading...</p>
           </CardContent>
         </Card>

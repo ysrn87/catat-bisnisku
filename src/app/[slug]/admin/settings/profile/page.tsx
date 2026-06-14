@@ -179,7 +179,7 @@ function ManagerModal({
         </div>
         <div className="flex justify-end gap-2 p-5 border-t">
           <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
-          <Button onClick={handleSubmit} disabled={loading} className="bg-[#00a090] hover:bg-[#00a090]">
+          <Button onClick={handleSubmit} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
             <Save className="w-4 h-4 mr-2" />{loading ? 'Menyimpan...' : 'Simpan'}
           </Button>
         </div>
@@ -281,7 +281,7 @@ export default function ProfileSettingsPage() {
             onClick={() => setActiveTab(key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               activeTab === key
-                ? 'border-[#00a090] text-[#00a090]'
+                ? 'border-[#028697] text-[#028697]'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -297,13 +297,13 @@ export default function ProfileSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <User className="w-5 h-5 text-[#00a090]" />Informasi Profil
+                <User className="w-5 h-5 text-[#028697]" />Informasi Profil
               </CardTitle>
               <CardDescription>Perbarui data pribadi akun admin</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#00a090] flex items-center justify-center shadow-md shrink-0">
+                <div className="w-14 h-14 rounded-2xl bg-[#028697] flex items-center justify-center shadow-md shrink-0">
                   <span className="text-white text-lg font-bold">{initials}</span>
                 </div>
                 <div>
@@ -331,7 +331,7 @@ export default function ProfileSettingsPage() {
                 </div>
               </div>
               <div className="flex justify-end pt-1">
-                <Button onClick={handleSaveProfile} disabled={loading} className="bg-[#00a090] hover:bg-[#00a090]">
+                <Button onClick={handleSaveProfile} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
                   <Save className="w-4 h-4 mr-2" />Simpan Profil
                 </Button>
               </div>
@@ -341,7 +341,7 @@ export default function ProfileSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Lock className="w-5 h-5 text-[#00a090]" />Ubah Password
+                <Lock className="w-5 h-5 text-[#028697]" />Ubah Password
               </CardTitle>
               <CardDescription>Perbarui password untuk keamanan akun</CardDescription>
             </CardHeader>
@@ -363,7 +363,7 @@ export default function ProfileSettingsPage() {
                 </div>
               </div>
               <div className="flex justify-end pt-1">
-                <Button onClick={handleChangePassword} disabled={loading} className="bg-[#00a090] hover:bg-[#00a090]">
+                <Button onClick={handleChangePassword} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
                   <Lock className="w-4 h-4 mr-2" />Ubah Password
                 </Button>
               </div>
@@ -380,7 +380,7 @@ export default function ProfileSettingsPage() {
               <p className="text-sm font-medium">Daftar Manager</p>
               <p className="text-xs text-gray-500">{managers.length} akun manager terdaftar</p>
             </div>
-            <Button onClick={() => setModalManager(null)} className="bg-[#00a090] hover:bg-[#00a090] h-9 text-sm">
+            <Button onClick={() => setModalManager(null)} className="bg-[#028697] hover:bg-[#17a8bb] h-9 text-sm">
               <Plus className="w-4 h-4 mr-1.5" />Tambah Manager
             </Button>
           </div>
@@ -403,13 +403,13 @@ export default function ProfileSettingsPage() {
                   <Card key={m.id}>
                     <CardContent className="py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#00a090]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#00a090] text-sm font-bold">{mInitials}</span>
+                        <div className="w-10 h-10 rounded-xl bg-[#028697]/10 flex items-center justify-center shrink-0">
+                          <span className="text-[#028697] text-sm font-bold">{mInitials}</span>
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-semibold text-sm truncate">{m.name}</p>
-                            <Badge variant="outline" className="text-[10px] text-[#00a090] border-[#00a090]/30 shrink-0">Manager</Badge>
+                            <Badge variant="outline" className="text-[10px] text-[#028697] border-[#028697]/30 shrink-0">Manager</Badge>
                           </div>
                           <p className="text-xs text-gray-500 truncate">
                             {m.phone}{m.email ? ` · ${m.email}` : ''}

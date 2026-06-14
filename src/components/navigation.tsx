@@ -190,14 +190,14 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
   return (
     <>
       {/* ── TOP NAV ── */}
-      <nav className="bg-white/95 border-b border-[#90e0d8] sticky top-0 z-40 shadow-md backdrop-blur-sm">
+      <nav className="bg-white/95 border-b border-[#a8f0f8] sticky top-0 z-40 shadow-md backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
 
             {/* Left – Logo + Desktop Nav */}
             <div className="flex items-center flex-1 min-w-0 gap-3 sm:gap-4 lg:gap-6">
               <div className="flex-shrink-0">
-                <Link href={`${base}/admin`} className="text-lg font-bold text-[#00a090] whitespace-nowrap hover:opacity-80 transition-opacity">
+                <Link href={`${base}/admin`} className="text-lg font-bold text-[#028697] whitespace-nowrap hover:opacity-80 transition-opacity">
                   {storeName ?? 'Catat Bisnisku'}
                 </Link>
               </div>
@@ -220,8 +220,8 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                           font-medium rounded-lg transition-all duration-500 ease-in-out
                           ${navStyles.gap} ${navStyles.padding}
                           ${isActive
-                            ? 'bg-[#00a090] text-white shadow-lg scale-105'
-                            : 'text-gray-600 hover:text-[#00a090] hover:bg-[#e0f5f2] hover:scale-105'
+                            ? 'bg-[#028697] text-white shadow-lg scale-105'
+                            : 'text-gray-600 hover:text-[#028697] hover:bg-[#e0f9fc] hover:scale-105'
                           }
                         `}
                       >
@@ -239,7 +239,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                         <span className={`
                           absolute inset-0 -z-10 rounded-lg
                           group-hover:opacity-100 transition-opacity duration-300
-                          ${isActive ? 'bg-white/10' : 'bg-[#00a090]/5'}
+                          ${isActive ? 'bg-white/10' : 'bg-[#028697]/5'}
                         `} />
                       </Link>
                     );
@@ -268,7 +268,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                 </p>
                 <span className={`
                   inline-flex items-center px-2 py-0.5 rounded-full font-medium
-                  bg-[#e0f5f2] text-[#00a090] whitespace-nowrap
+                  bg-[#e0f9fc] text-[#0fa8be] whitespace-nowrap
                   transition-all duration-300
                   ${compactLevel === 'medium' ? 'text-[10px]' : 'text-xs'}
                 `}>
@@ -284,7 +284,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                   type="submit"
                   className={`
                     group relative overflow-hidden whitespace-nowrap
-                    border-[#90e0d8] text-[#00a090]
+                    border-[#a8f0f8] text-[#028697]
                     hover:bg-red-50 hover:border-red-300 hover:text-red-600
                     transition-all duration-500 ease-in-out
                     ${compactLevel === 'icons-only' ? 'px-2' : 'px-3'}
@@ -312,7 +312,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                 <span className="text-xs font-semibold text-gray-700 max-w-[90px] truncate leading-tight">
                   {userName ?? 'User'}
                 </span>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-[#e0f5f2] text-[#00a090] leading-tight">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-[#e0f9fc] text-[#028697] leading-tight">
                   {role}
                 </span>
               </div>
@@ -333,7 +333,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
 
       {/* ── MOBILE BOTTOM NAV BAR ── */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
-        <div className="mx-3 mb-3 pointer-events-auto rounded-2xl bg-white/90 backdrop-blur-md border border-[#b0e8e0] shadow-[0_-4px_28px_rgba(2,134,151,0.15)]">
+        <div className="mx-3 mb-3 pointer-events-auto rounded-2xl bg-white/90 backdrop-blur-md border border-[#c8f4f9] shadow-[0_-4px_28px_rgba(2,134,151,0.15)]">
           <div className="flex items-stretch justify-around px-1 py-1.5">
             {navItems.map((item) => {
               const isActive = isNavItemActive(item);
@@ -344,20 +344,20 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                   className="relative flex flex-col items-center justify-center gap-1 flex-1 py-2 px-1 rounded-xl transition-all duration-200 group"
                 >
                   {isActive && (
-                    <span className="absolute inset-0 rounded-xl bg-[#00a090] shadow-md" />
+                    <span className="absolute inset-0 rounded-xl bg-[#028697] shadow-md" />
                   )}
                   {!isActive && (
-                    <span className="absolute inset-0 rounded-xl opacity-0 group-active:opacity-100 group-hover:opacity-100 bg-[#e0f5f2] transition-opacity duration-150" />
+                    <span className="absolute inset-0 rounded-xl opacity-0 group-active:opacity-100 group-hover:opacity-100 bg-[#e0f9fc] transition-opacity duration-150" />
                   )}
                   <span className={`relative z-10 transition-all duration-200 ${
                     isActive
                       ? 'text-white scale-110'
-                      : 'text-gray-400 group-hover:text-[#00a090] group-active:scale-110'
+                      : 'text-gray-400 group-hover:text-[#028697] group-active:scale-110'
                   }`}>
                     <span className="[&>svg]:w-5 [&>svg]:h-5">{item.icon}</span>
                   </span>
                   <span className={`relative z-10 text-[9px] font-semibold leading-none tracking-wide transition-colors duration-200 ${
-                    isActive ? 'text-white' : 'text-gray-400 group-hover:text-[#00a090]'
+                    isActive ? 'text-white' : 'text-gray-400 group-hover:text-[#028697]'
                   }`}>
                     {item.mobileLabel}
                   </span>

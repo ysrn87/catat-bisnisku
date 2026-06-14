@@ -6,7 +6,7 @@ import { NewSaleDialog } from '@/components/sales/new-sale-dialog';
 import { SalesTable } from '@/components/sales/sales-table';
 import { getPointsConversionRate } from '@/actions/settings';
 import { SearchFilterBar } from '@/components/filters/search-filter-bar';
-import { MobileFab } from '@/components/ui/mobile-fab';
+import { SalesActions } from '@/components/page-actions/sales-actions';
 
 async function getSales(storeId: string, params: {
   page?: number; limit?: number; search?: string;
@@ -133,30 +133,12 @@ export default async function SalesPage({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <div className="hidden sm:block">
-        <NewSaleDialog
-          variants={variants}
-          customers={members}
-          nonMemberCustomers={nonMembers}
-          conversionRate={conversionRate}
-        />
-      </div>
-      <MobileFab>
-        <NewSaleDialog
-          variants={variants}
-          customers={members}
-          nonMemberCustomers={nonMembers}
-          conversionRate={conversionRate}
-          trigger={
-            <button className="w-12 h-12 rounded-full bg-[#00a090] text-white shadow-lg flex items-center justify-center hover:bg-[#00a090]/90 active:scale-95 transition-all">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
-          }
-        />
-      </MobileFab>
+      <SalesActions
+        variants={variants}
+        customers={members}
+        nonMemberCustomers={nonMembers}
+        conversionRate={conversionRate}
+      />
 
       <Card>
         <CardHeader>

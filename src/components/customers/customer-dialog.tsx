@@ -202,7 +202,7 @@ export function CustomerDialog({
           <Button
             variant={isCreate ? 'default' : 'ghost'}
             size={isCreate ? 'default' : 'sm'}
-            className={isCreate ? 'bg-[#00a090] hover:bg-[#007868] shadow-sm' : 'group'}
+            className={isCreate ? 'bg-[#028697] hover:bg-[#027080] shadow-sm' : 'group'}
           >
             {isCreate ? (
               <><Plus className="w-4 h-4 mr-2" />Tambah Member</>
@@ -215,7 +215,7 @@ export function CustomerDialog({
 
       <DialogContent aria-describedby={undefined} className="sm:max-w-[500px] p-0 gap-0 overflow-hidden border-0 shadow-2xl">
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8">
+        <div className="relative bg-gradient-to-br from-[#028697] to-[#016d7a] px-6 pt-6 pb-8">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
           <div className="relative flex items-center gap-3">
@@ -307,7 +307,7 @@ export function CustomerDialog({
                     name="name" type="text" required
                     value={name} onChange={(e) => setName(toTitleCase(e.target.value))}
                     placeholder="Nama Lengkap" disabled={loading} maxLength={80}
-                    className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                    className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                   />
                 </div>
               )}
@@ -321,7 +321,7 @@ export function CustomerDialog({
                     onChange={handlePhoneChange} value={phone}
                     minLength={9} maxLength={19} inputMode="tel"
                     placeholder="0812 3456 7890" disabled={loading}
-                    className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 pr-8"
+                    className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 pr-8"
                   />
                   {phoneChecking && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-gray-400" />
@@ -360,7 +360,7 @@ export function CustomerDialog({
                       placeholder="contoh@email.com"
                       onChange={handleEmailChange}
                       disabled={loading}
-                      className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                      className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                     />
                     {emailError && <p className="text-[11px] text-red-500 mt-1">{emailError}</p>}
                   </div>
@@ -373,7 +373,7 @@ export function CustomerDialog({
                       placeholder="Nama Jalan, Kota, Kode Pos"
                       onChange={(e) => setAddress(toTitleCase(e.target.value))}
                       disabled={loading} maxLength={250} rows={3}
-                      className="resize-none border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                      className="resize-none border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                     />
                     <p className="text-[11px] text-gray-300 text-right mt-1">{address.length}/250</p>
                   </div>
@@ -386,7 +386,7 @@ export function CustomerDialog({
                       max={new Date().toISOString().split('T')[0]}
                       defaultValue={customer?.birthday ? new Date(customer.birthday).toISOString().split('T')[0] : ''}
                       disabled={loading}
-                      className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors"
+                      className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors"
                     />
                   </div>
                   <div>
@@ -394,7 +394,7 @@ export function CustomerDialog({
                     <div className="flex gap-3 items-center">
                       <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-gray-100">
                         <AvatarImage src={photoUrl || undefined} alt="Preview" className="object-cover object-center" />
-                        <AvatarFallback className="bg-gradient-to-br from-[#00a090] to-[#006558] text-white text-xs">
+                        <AvatarFallback className="bg-gradient-to-br from-[#028697] to-[#016d7a] text-white text-xs">
                           {name?.slice(0, 2).toUpperCase() || 'MR'}
                         </AvatarFallback>
                       </Avatar>
@@ -403,7 +403,7 @@ export function CustomerDialog({
                         onChange={(e) => setPhotoUrl(e.target.value)}
                         placeholder="https://example.com/photo.jpg"
                         disabled={loading}
-                        className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                        className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                       />
                     </div>
                   </div>
@@ -416,7 +416,7 @@ export function CustomerDialog({
                         name="password" type="password" required
                         placeholder="Min. 6 karakter" minLength={6}
                         disabled={loading}
-                        className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                        className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                       />
                     </div>
                   ) : (
@@ -426,7 +426,7 @@ export function CustomerDialog({
                         name="password" type="password"
                         placeholder="Biarkan kosong untuk tidak diubah"
                         minLength={6} disabled={loading}
-                        className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                        className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                       />
                       <p className="text-[11px] text-gray-400 mt-1">Min. 6 karakter</p>
                     </div>
@@ -443,7 +443,7 @@ export function CustomerDialog({
                           value={points}
                           onChange={(e) => setPoints(parseInt(e.target.value) || 0)}
                           disabled={loading}
-                          className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors"
+                          className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors"
                         />
                         <p className="text-[11px] text-gray-400 mt-1">Saat ini: {initialPoints} poin</p>
                       </div>
@@ -454,7 +454,7 @@ export function CustomerDialog({
                             name="pointsReason" type="text" required
                             placeholder="Contoh: Koreksi kesalahan, Bonus promosi..."
                             disabled={loading}
-                            className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                            className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                           />
                           <p className="text-[11px] text-gray-400 mt-1">
                             {points > initialPoints
@@ -480,7 +480,7 @@ export function CustomerDialog({
               <Button
                 type="submit"
                 disabled={loading || isAlreadyMember as boolean}
-                className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[130px] transition-all"
+                className="bg-[#028697] hover:bg-[#027080] text-white shadow-sm min-w-[130px] transition-all"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">

@@ -126,8 +126,9 @@ export function CashflowDialog({ mode = 'create', transaction, trigger }: Cashfl
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
+      {trigger && <div onClick={() => setOpen(true)}>{trigger}</div>}
       <DialogTrigger asChild>
-        {trigger || (
+        {!trigger && (
           <Button
             variant={isCreate ? 'default' : 'ghost'}
             size={isCreate ? 'default' : 'sm'}

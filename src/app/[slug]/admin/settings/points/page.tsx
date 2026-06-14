@@ -114,7 +114,7 @@ export default function PointsSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Coins className="w-5 h-5 text-[#00a090]" />
+            <Coins className="w-5 h-5 text-[#028697]" />
             Pengaturan Poin
           </CardTitle>
           <CardDescription>Atur aturan penukaran poin untuk member</CardDescription>
@@ -138,7 +138,7 @@ export default function PointsSettingsPage() {
                 placeholder="1000"
                 className="max-w-[140px]"
               />
-              <Button size="sm" onClick={handleSaveConversionRate} disabled={loading} className="bg-[#00a090] hover:bg-[#00a090]">
+              <Button size="sm" onClick={handleSaveConversionRate} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
                 <Save className="w-3.5 h-3.5 mr-1.5" />
                 Simpan
               </Button>
@@ -163,7 +163,7 @@ export default function PointsSettingsPage() {
                 className="max-w-[140px]"
               />
               <span className="text-sm text-gray-500">poin</span>
-              <Button size="sm" onClick={handleSaveMinPoints} disabled={loading} className="bg-[#00a090] hover:bg-[#00a090]">
+              <Button size="sm" onClick={handleSaveMinPoints} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
                 <Save className="w-3.5 h-3.5 mr-1.5" />
                 Simpan
               </Button>
@@ -187,7 +187,7 @@ export default function PointsSettingsPage() {
                 className="max-w-[140px]"
               />
               <span className="text-sm text-gray-500">poin</span>
-              <Button size="sm" onClick={handleSaveMaxPoints} disabled={loading} className="bg-[#00a090] hover:bg-[#00a090]">
+              <Button size="sm" onClick={handleSaveMaxPoints} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
                 <Save className="w-3.5 h-3.5 mr-1.5" />
                 Simpan
               </Button>
@@ -198,10 +198,10 @@ export default function PointsSettingsPage() {
       </Card>
 
       {/* Simulasi */}
-      <Card className="bg-gradient-to-br from-[#e0f5f2] to-[#f0faf8] border-[#2bbfb0]/30">
+      <Card className="bg-gradient-to-br from-[#e0f9fc] to-[#f0fdfe] border-[#1ecbe1]/30">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <ArrowRightLeft className="w-5 h-5 text-[#00a090]" />
+            <ArrowRightLeft className="w-5 h-5 text-[#028697]" />
             Simulasi Penukaran
           </CardTitle>
           <CardDescription>Contoh untuk member dengan 100 poin</CardDescription>
@@ -214,7 +214,7 @@ export default function PointsSettingsPage() {
             </div>
             <div className="bg-white rounded-xl p-4 text-center shadow-sm">
               <p className="text-xs text-gray-500 mb-1">Bisa Ditukar</p>
-              <p className="text-2xl font-bold text-[#00a090]">{redeemable}</p>
+              <p className="text-2xl font-bold text-[#028697]">{redeemable}</p>
               <p className="text-xs text-gray-400">poin</p>
             </div>
             <div className="bg-white rounded-xl p-4 text-center shadow-sm">
@@ -224,7 +224,7 @@ export default function PointsSettingsPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-start gap-2 mt-4 text-xs text-[#00a090]/80">
+          <div className="flex items-start gap-2 mt-4 text-xs text-[#028697]/80">
             <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
             <span>
               Batas penukaran dibatasi oleh <strong>maksimal {maxPoints} poin</strong> per transaksi.

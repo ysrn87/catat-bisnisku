@@ -96,8 +96,9 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
+      {trigger && <div onClick={() => setOpen(true)}>{trigger}</div>}
       <DialogTrigger asChild>
-        {trigger || (
+        {!trigger && (
           <Button
             variant={isCreate ? 'default' : 'ghost'}
             size={isCreate ? 'default' : 'sm'}

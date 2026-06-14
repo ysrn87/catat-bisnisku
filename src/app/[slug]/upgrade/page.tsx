@@ -52,7 +52,7 @@ export default async function UpgradePage({
         {/* Back */}
         <Link
           href={`/${slug}/admin`}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#00a090] transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#028697] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Kembali ke dasbor
         </Link>
@@ -72,7 +72,7 @@ export default async function UpgradePage({
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-[#00a090]" />
+              <Zap className="w-4 h-4 text-[#028697]" />
               Penggunaan Plan FREE Kamu
             </CardTitle>
           </CardHeader>
@@ -142,7 +142,7 @@ export default async function UpgradePage({
                   href="https://wa.me/6281234567890?text=Halo,%20saya%20ingin%20upgrade%20toko%20ke%20PRO"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#00a090] font-medium hover:underline"
+                  className="text-[#028697] font-medium hover:underline"
                 >
                   Chat via WhatsApp
                 </a>
