@@ -40,11 +40,13 @@ interface ProductCardProps {
     isActive: boolean;
     type: string;
     variants: Variant[];
+    category?: { id: string; name: string; color: string | null; icon: string | null } | null;
   };
   filterStatus: string;
+  categories?: { id: string; name: string; color: string | null; icon: string | null }[];
 }
 
-export function ProductCard({ product, filterStatus }: ProductCardProps) {
+export function ProductCard({ product, filterStatus, categories = [] }: ProductCardProps) {
   const [variantsOpen, setVariantsOpen] = useState(true);
   const isPreorder = product.type === 'PREORDER';
 
@@ -68,6 +70,19 @@ export function ProductCard({ product, filterStatus }: ProductCardProps) {
                 {!product.isActive && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
                     Nonaktif
+                  </span>
+                )}
+                {product.category && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    style={{
+                      backgroundColor: (product.category.color ?? '#00a090') + '18',
+                      color: product.category.color ?? '#00a090',
+                      border: `1px solid ${(product.category.color ?? '#00a090')}40`,
+                    }}
+                  >
+                    {product.category.icon && <span className="text-[10px]">{product.category.icon}</span>}
+                    {product.category.name}
                   </span>
                 )}
               </div>
@@ -103,12 +118,14 @@ export function ProductCard({ product, filterStatus }: ProductCardProps) {
 
             <ProductDialog
               mode="edit"
+              categories={categories}
               product={{
                 id: product.id,
                 name: product.name,
                 description: product.description,
                 sku: product.sku,
                 type: product.type,
+                categoryId: product.category?.id ?? null,
               }}
             />
             <ProductDeleteButton productId={product.id} />

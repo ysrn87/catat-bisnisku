@@ -10,14 +10,15 @@ datasource db {
 // ─── SaaS: Store (tenant) ─────────────────────────────────────────────────────
 
 model Store {
-  id             String          @id @default(cuid())
-  name           String
-  slug           String          @unique
-  plan           Plan            @default(FREE)
-  ownerId        String
-  logoUrl        String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id                    String    @id @default(cuid())
+  name                  String
+  slug                  String    @unique
+  plan                  Plan      @default(FREE)
+  ownerId               String
+  logoUrl               String?
+  subscriptionExpiresAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   owner          User            @relation("StoreOwner", fields: [ownerId], references: [id])
   members        StoreUser[]
@@ -28,6 +29,7 @@ model Store {
   cashflows      Cashflow[]
   settings       Settings[]
   stockMovements StockMovement[]
+  categories     Category[]
 
   @@map("stores")
 }
@@ -84,12 +86,14 @@ model Product {
   sku         String
   type        ProductType      @default(READY_STOCK)
   isActive    Boolean          @default(true)
+  categoryId  String?
   createdById String
   updatedById String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category    Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   variants    ProductVariant[]
   createdBy   User             @relation("CreatedBy", fields: [createdById], references: [id])
   updatedBy   User?            @relation("UpdatedBy", fields: [updatedById], references: [id])
@@ -122,6 +126,25 @@ model ProductVariant {
   @@unique([storeId, sku])
   @@unique([storeId, barcode])
   @@map("product_variants")
+}
+
+
+// ─── Category ─────────────────────────────────────────────────────────────────
+
+model Category {
+  id        String    @id @default(cuid())
+  storeId   String
+  name      String
+  color     String?   // hex color, e.g. "#f08020"
+  icon      String?   // emoji atau nama icon, e.g. "🍔"
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@unique([storeId, name])
+  @@map("categories")
 }
 
 // ─── Stock ────────────────────────────────────────────────────────────────────

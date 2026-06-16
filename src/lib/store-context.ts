@@ -12,35 +12,54 @@ export interface StoreContext {
 }
 
 /**
- * Resolve store dari slug yang diinjeksi middleware.
+ * Resolve store dari slug, dengan lazy expiry check.
+ * Kalau plan PRO sudah expired → otomatis downgrade ke FREE di DB.
  * Di-cache per request dengan React cache() agar tidak query DB berkali-kali.
  */
 const resolveStore = cache(async (slug: string): Promise<StoreContext> => {
   const store = await db.store.findUnique({
     where: { slug },
-    select: { id: true, slug: true, plan: true },
+    select: { id: true, slug: true, plan: true, subscriptionExpiresAt: true },
   });
 
   if (!store) {
     throw new Error(`[getStoreContext] Store dengan slug "${slug}" tidak ditemukan.`);
   }
 
+  // ── Lazy expiry check ───────────────────────────────────────────────────────
+  // Kalau plan PRO tapi subscriptionExpiresAt sudah lewat → downgrade ke FREE
+  let effectivePlan = store.plan as StorePlan;
+
+  if (
+    store.plan === 'PRO' &&
+    store.subscriptionExpiresAt !== null &&
+    store.subscriptionExpiresAt < new Date()
+  ) {
+    effectivePlan = 'FREE';
+
+    // Simpan downgrade ke DB (fire and forget — tidak perlu await)
+    db.store.update({
+      where: { id: store.id },
+      data: {
+        plan: 'FREE',
+        subscriptionExpiresAt: null,
+        updatedAt: new Date(),
+      },
+    }).catch((err) => {
+      console.error('[getStoreContext] Gagal auto-downgrade store:', err);
+    });
+  }
+
   return {
     storeId:   store.id,
     storeSlug: store.slug,
-    storePlan: store.plan as StorePlan,
+    storePlan: effectivePlan,
   };
 });
 
 /**
  * Ambil store context dari header yang diinjeksi middleware.
  * Gunakan di Server Components dan Server Actions.
- *
- * Throws jika slug tidak ada atau store tidak ditemukan.
- *
- * Contoh:
- *   const { storeId } = await getStoreContext();
- *   const products = await db.product.findMany({ where: { storeId } });
  */
 export async function getStoreContext(): Promise<StoreContext> {
   const headersList = await headers();
@@ -59,8 +78,6 @@ export async function getStoreContext(): Promise<StoreContext> {
 /**
  * Verifikasi bahwa user yang sedang login adalah member dari store ini.
  * Gunakan di Server Actions yang mengubah data (create, update, delete).
- *
- * Throws jika user tidak punya akses ke store.
  */
 export async function requireStoreAccess(): Promise<{
   storeId: string;

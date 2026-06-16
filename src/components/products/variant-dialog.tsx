@@ -329,11 +329,11 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, i
       setSkuOverride(false);
       setBarcode(variant?.barcode || '');
       setShowBarcodeScanner(false);
-      setPrice(variant?.price?.toString() || '');
-      setCost(variant?.cost?.toString() || '');
-      setPoints(variant?.points?.toString() || '0');
+      setPrice(formatNumber(variant?.price?.toString() || ''));
+      setCost(formatNumber(variant?.cost?.toString() || ''));
+      setPoints(formatNumber(variant?.points?.toString() || '0'));
       setStock('0');
-      setLowStock(variant?.lowStock?.toString() || '10');
+      setLowStock(formatNumber(variant?.lowStock?.toString() || '10'));
     } else {
       setShowBarcodeScanner(false);
     }

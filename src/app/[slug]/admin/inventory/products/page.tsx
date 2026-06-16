@@ -12,10 +12,14 @@ async function getProducts(storeId: string, params: {
   search?: string;
   status?: string;
   sort?: string;
+  category?: string;
 }) {
   const { search = '', status = 'all', sort = 'name_asc' } = params;
 
+  const { category = 'all' } = params;
+
   const where: any = { storeId };
+  if (category !== 'all') where.categoryId = category === 'none' ? null : category;
 
   if (search) {
     where.OR = [
@@ -42,6 +46,7 @@ async function getProducts(storeId: string, params: {
     include: {
       variants: true,
       createdBy: { select: { name: true } },
+      category: { select: { id: true, name: true, color: true, icon: true } },
     },
     orderBy,
   });
@@ -59,25 +64,29 @@ async function getProducts(storeId: string, params: {
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string; sort?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; sort?: string; category?: string }>;
 }) {
   const params = await searchParams;
-  const search = params.search || '';
-  const status = params.status || 'all';
-  const sort   = params.sort   || 'name_asc';
+  const search   = params.search   || '';
+  const status   = params.status   || 'all';
+  const sort     = params.sort     || 'name_asc';
+  const category = params.category || 'all';
 
   const [{ storeId }, session] = await Promise.all([
     getStoreContext(),
     auth(),
   ]);
 
-  const products = await getProducts(storeId, { search, status, sort });
+  const [products, categories] = await Promise.all([
+    getProducts(storeId, { search, status, sort, category }),
+    db.category.findMany({ where: { storeId }, orderBy: { name: 'asc' }, select: { id: true, name: true, color: true, icon: true } }),
+  ]);
 
   const isAdmin = session?.user?.role === 'ADMINISTRATOR';
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <ProductActions isAdmin={isAdmin} />
+      <ProductActions isAdmin={isAdmin} categories={categories} />
 
       <SearchFilterBar
         searchPlaceholder="Cari produk berdasarkan nama, SKU, atau varian..."
@@ -92,6 +101,16 @@ export default async function ProductsPage({
               { value: 'inactive', label: 'Nonaktif' },
             ],
           },
+          ...(categories.length > 0 ? [{
+            key: 'category',
+            label: 'Kategori',
+            defaultValue: 'all',
+            options: [
+              { value: 'all',  label: 'Semua Kategori' },
+              { value: 'none', label: 'Tanpa Kategori' },
+              ...categories.map((c) => ({ value: c.id, label: `${c.icon ?? ''} ${c.name}`.trim() })),
+            ],
+          }] : []),
         ]}
         sortOptions={[
           { value: 'name_asc',  label: 'Nama (A-Z)' },
@@ -115,7 +134,7 @@ export default async function ProductsPage({
           </Card>
         ) : (
           products.map((product: typeof products[number]) => (
-            <ProductCard key={product.id} product={product} filterStatus={status} />
+            <ProductCard key={product.id} product={product} filterStatus={status} categories={categories} />
           ))
         )}
       </div>

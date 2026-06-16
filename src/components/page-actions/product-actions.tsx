@@ -4,8 +4,16 @@ import { ProductDialog } from '@/components/products/product-dialog';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
+interface CategoryOption {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+}
+
 interface ProductActionsProps {
   isAdmin: boolean;
+  categories?: CategoryOption[];
 }
 
 const FAB_CLASS = [
@@ -15,21 +23,20 @@ const FAB_CLASS = [
   'hover:bg-[#007868] active:scale-95 transition-all',
 ].join(' ');
 
-export function ProductActions({ isAdmin }: ProductActionsProps) {
+export function ProductActions({ isAdmin, categories = [] }: ProductActionsProps) {
   if (!isAdmin) return null;
 
   return (
     <ProductDialog
       mode="create"
+      categories={categories}
       trigger={
         <div>
-          {/* Desktop */}
           <Button className="hidden sm:inline-flex bg-[#00a090] hover:bg-[#007868] text-white shadow-sm">
             <Plus className="w-4 h-4 mr-2" />
             Tambah Produk
           </Button>
 
-          {/* Mobile FAB */}
           <button type="button" aria-label="Tambah Produk" className={FAB_CLASS}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
               viewBox="0 0 24 24" fill="none" stroke="currentColor"

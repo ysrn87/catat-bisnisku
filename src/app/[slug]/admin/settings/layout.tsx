@@ -12,10 +12,11 @@ export default async function SettingsLayout({
   return (
     <TabLayout
       title="Pengaturan"
-      description="Kelola sistem poin dan profil admin"
+      description="Kelola sistem poin, kategori produk, dan profil admin"
       tabs={[
-        { value: 'points',  label: 'Sistem Poin',  href: `/${slug}/admin/settings/points` },
-        { value: 'profile', label: 'Profil Admin', href: `/${slug}/admin/settings/profile` },
+        { value: 'points',     label: 'Sistem Poin',  href: `/${slug}/admin/settings/points` },
+        { value: 'categories', label: 'Kategori',     href: `/${slug}/admin/settings/categories` },
+        { value: 'profile',    label: 'Profil Admin', href: `/${slug}/admin/settings/profile` },
       ]}
     >
       {children}

@@ -8,6 +8,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { createProductAction, updateProductAction } from '@/actions/products';
 import { Plus, Pencil, Package, Clock, Loader2, Box, Tag, AlignLeft } from 'lucide-react';
 
+interface CategoryOption {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+}
+
 interface ProductDialogProps {
   mode: 'create' | 'edit';
   product?: {
@@ -16,8 +23,12 @@ interface ProductDialogProps {
     description: string | null;
     sku: string;
     type?: string;
+    categoryId?: string | null;
   };
+  categories?: CategoryOption[];
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const TYPE_OPTIONS = [
@@ -41,13 +52,23 @@ const TYPE_OPTIONS = [
 
 const toTitleCase = (val: string) => val.replace(/\b\w/g, (c) => c.toUpperCase());
 
-export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
-  const [open, setOpen] = useState(false);
+export function ProductDialog({ mode, product, categories = [], trigger, open: controlledOpen, onOpenChange }: ProductDialogProps) {
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen! : internalOpen;
+  const setOpen = (v: boolean) => {
+    if (!isControlled) setInternalOpen(v);
+    onOpenChange?.(v);
+  };
+
   const [loading, setLoading] = useState(false);
   const [productName, setProductName] = useState(product?.name || '');
   const [productType, setProductType] = useState<'READY_STOCK' | 'PREORDER'>(
     (product?.type as 'READY_STOCK' | 'PREORDER') || 'READY_STOCK'
   );
+  const [selectedCategory, setSelectedCategory] = useState<string>(product?.categoryId ?? '');
+  const [productSku, setProductSku] = useState(product?.sku || '');
+  const [productDesc, setProductDesc] = useState(product?.description || '');
   const { toast } = useToast();
 
   const isCreate = mode === 'create';
@@ -55,6 +76,7 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
   const handleSubmit = async (formData: FormData) => {
     setLoading(true);
     formData.set('type', productType);
+    if (selectedCategory) formData.set('categoryId', selectedCategory);
     try {
       const result = isCreate
         ? await createProductAction(formData)
@@ -91,6 +113,9 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
     if (isOpen) {
       setProductType((product?.type as 'READY_STOCK' | 'PREORDER') || 'READY_STOCK');
       setProductName(product?.name || '');
+      setProductSku(product?.sku || '');
+      setProductDesc(product?.description || '');
+      setSelectedCategory(product?.categoryId ?? '');
     }
   };
 
@@ -221,13 +246,58 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
                   id="sku"
                   name="sku"
                   required
-                  defaultValue={product?.sku}
+                  value={productSku}
+                  onChange={(e) => setProductSku(e.target.value.toUpperCase())}
                   placeholder="Contoh: KL-001"
                   disabled={loading}
                   maxLength={15}
                   className="h-10 font-mono tracking-wider border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal uppercase"
                 />
               </div>
+
+
+              {/* Kategori */}
+              {categories.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-widest">
+                    <Tag className="w-3 h-3" />
+                    Kategori
+                    <span className="ml-auto font-normal normal-case tracking-normal text-gray-300 text-[11px]">Opsional</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                        !selectedCategory
+                          ? 'bg-gray-100 border-gray-400 text-gray-700'
+                          : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                      }`}
+                    >
+                      Tanpa Kategori
+                    </button>
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategory(selectedCategory === cat.id ? '' : cat.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border flex items-center gap-1.5 ${
+                          selectedCategory === cat.id
+                            ? 'border-2'
+                            : 'border hover:opacity-80'
+                        }`}
+                        style={selectedCategory === cat.id
+                          ? { backgroundColor: (cat.color ?? '#00a090') + '20', borderColor: cat.color ?? '#00a090', color: cat.color ?? '#00a090' }
+                          : { backgroundColor: (cat.color ?? '#00a090') + '10', borderColor: (cat.color ?? '#00a090') + '40', color: cat.color ?? '#00a090' }
+                        }
+                      >
+                        {cat.icon && <span>{cat.icon}</span>}
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Description */}
               <div className="space-y-1.5">
@@ -239,7 +309,8 @@ export function ProductDialog({ mode, product, trigger }: ProductDialogProps) {
                 <Input
                   id="description"
                   name="description"
-                  defaultValue={product?.description || ''}
+                  value={productDesc}
+                  onChange={(e) => setProductDesc(e.target.value)}
                   placeholder="Deskripsi singkat produk..."
                   disabled={loading}
                   maxLength={150}

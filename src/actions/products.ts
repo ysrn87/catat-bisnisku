@@ -25,6 +25,7 @@ export async function createProductAction(formData: FormData) {
     const description = formData.get('description') as string;
     const sku         = formData.get('sku')         as string;
     const type        = (formData.get('type') as string) || 'READY_STOCK';
+    const categoryId  = (formData.get('categoryId') as string) || null;
 
     if (!name || !sku) return { success: false, error: 'Nama dan SKU wajib diisi' };
 
@@ -32,7 +33,7 @@ export async function createProductAction(formData: FormData) {
     if (existingSKU) return { success: false, error: 'SKU sudah digunakan' };
 
     await db.product.create({
-      data: { storeId, name, description: description || null, sku, type: type as 'READY_STOCK' | 'PREORDER', createdById: userId },
+      data: { storeId, name, description: description || null, sku, type: type as 'READY_STOCK' | 'PREORDER', createdById: userId, categoryId },
     });
 
     revalidatePath(`/${storeSlug}/admin/inventory/products`);
@@ -56,6 +57,7 @@ export async function updateProductAction(id: string, formData: FormData) {
     const description = formData.get('description') as string;
     const sku         = formData.get('sku')         as string;
     const type        = (formData.get('type') as string) || 'READY_STOCK';
+    const categoryId  = (formData.get('categoryId') as string) || null;
 
     if (!name || !sku) return { success: false, error: 'Nama dan SKU wajib diisi' };
 
@@ -63,12 +65,12 @@ export async function updateProductAction(id: string, formData: FormData) {
     const product = await db.product.findFirst({ where: { id, storeId } });
     if (!product) return { success: false, error: 'Produk tidak ditemukan' };
 
-    const existingSKU = await db.product.findFirst({ where: { storeId_sku: { storeId, sku }, NOT: { id } } });
+    const existingSKU = await db.product.findFirst({ where: { storeId, sku, NOT: { id } } });
     if (existingSKU) return { success: false, error: 'SKU sudah digunakan' };
 
     await db.product.update({
       where: { id },
-      data: { name, description: description || null, sku, type: type as 'READY_STOCK' | 'PREORDER', updatedById: userId },
+      data: { name, description: description || null, sku, type: type as 'READY_STOCK' | 'PREORDER', categoryId, updatedById: userId },
     });
 
     revalidatePath(`/${storeSlug}/admin/inventory/products`);
