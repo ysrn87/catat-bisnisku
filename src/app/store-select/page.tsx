@@ -5,9 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import Link from 'next/link';
 import { Store, ArrowRight, Crown, ShieldCheck, Users } from 'lucide-react';
 
-const session = await auth();
-if (!session) redirect('/login');
-
 const roleIcon: Record<string, React.ReactNode> = {
   OWNER:         <Crown      className="w-4 h-4 text-amber-500" />,
   ADMINISTRATOR: <ShieldCheck className="w-4 h-4 text-blue-500" />,
