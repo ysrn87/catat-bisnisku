@@ -2,14 +2,17 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { db } from './lib/db';
 import bcrypt from 'bcryptjs';
-import { authConfig } from './auth.config';
+import { Role } from '@prisma/client';
 
-/**
- * Auth utama — berjalan di Node.js runtime (bukan Edge).
- * Boleh import Prisma, bcrypt, dll.
- */
+// Validasi konfigurasi kritis saat startup — gagal cepat daripada silent misconfiguration
+if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
+  throw new Error(
+    '[auth] NEXTAUTH_SECRET tidak diset atau terlalu pendek (min 32 karakter). ' +
+    'Generate dengan: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+  );
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -46,4 +49,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id   = user.id;
+        token.role = user.role as Role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token && session.user) {
+        session.user.id   = token.id as string;
+        session.user.role = token.role as Role;
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: '/login',
+  },
+  session: {
+    strategy: 'jwt',
+  },
 });

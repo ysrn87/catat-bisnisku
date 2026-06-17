@@ -14,11 +14,12 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https://i0.wp.com https://i1.wp.com https://i2.wp.com",
-      "connect-src 'self'",
+      "connect-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://api.sandbox.midtrans.com https://api.midtrans.com",
+      "frame-src https://app.sandbox.midtrans.com https://app.midtrans.com",
       "frame-ancestors 'none'",
     ].join('; '),
   },
@@ -35,13 +36,12 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      // Default 1mb cukup untuk semua action kecuali upload logo
+      // Upload logo ditangani via API route khusus
+      bodySizeLimit: '1mb',
     },
   },
-  // Expose INTERNAL_API_SECRET ke middleware (edge runtime)
-  env: {
-    INTERNAL_API_SECRET: process.env.INTERNAL_API_SECRET ?? 'internal',
-  },
+  // INTERNAL_API_SECRET tidak di-expose ke client — cukup pakai process.env di server
   turbopack: {},
 };
 
