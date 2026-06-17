@@ -41,7 +41,7 @@ export async function createSnapToken(storeSlug: string): Promise<
     if (!user) return { success: false, error: 'User tidak ditemukan' };
 
     const serverKey = process.env.MIDTRANS_SERVER_KEY;
-    if (!serverKey) return { success: false, error: 'Mohon maaf atas ketidaknyamannya. Saat ini konfigurasi payment belum diatur, silahkan hubungi kami untuk upgrade secara manual' };
+    if (!serverKey) return { success: false, error: 'Mohon maaf, saat ini konfigurasi payment belum diatur, silahkan hubungi kami untuk upgrade.' };
 
     const isProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
     const baseUrl = isProduction

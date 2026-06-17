@@ -132,6 +132,15 @@ export async function createVariantAction(formData: FormData) {
     const product = await db.product.findFirst({ where: { id: productId, storeId } });
     if (!product) return { success: false, error: 'Produk tidak ditemukan' };
 
+    // Cek plan limit: maks varian per produk (FREE = 3, PRO = 10)
+    const limit = await checkPlanLimit('variantsPerProduct', productId);
+    if (!limit.allowed) {
+      return {
+        success: false,
+        error: `Batas varian per produk tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk hingga 10 varian per produk.`,
+      };
+    }
+
     const existingSKU = await db.productVariant.findUnique({ where: { storeId_sku: { storeId, sku } } });
     if (existingSKU) return { success: false, error: 'SKU varian sudah digunakan' };
 
