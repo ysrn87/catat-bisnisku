@@ -1,7 +1,14 @@
+import NextAuth from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import { authConfig } from '@/auth.config';
 
-// ─── Route publik — tidak butuh session ───────────────────────────────────────
+/**
+ * Middleware berjalan di Edge Runtime.
+ * Gunakan authConfig (tanpa Prisma/bcrypt) agar bundle tetap kecil.
+ */
+const { auth } = NextAuth(authConfig);
+
+// ─── Route publik — tidak butuh session ──────────────────────────────────────
 const PUBLIC_ROUTES = [
   '/',
   '/login',
@@ -10,10 +17,10 @@ const PUBLIC_ROUTES = [
   '/unauthorized',
   '/offline',
   '/api/auth',
-  '/api/store',   // internal API — skip auth di middleware
+  '/api/store',
 ];
 
-// ─── Route yang butuh session tapi tidak butuh store context ──────────────────
+// ─── Route yang butuh session tapi tidak butuh store context ─────────────────
 const AUTH_ONLY_ROUTES = [
   '/store-select',
 ];
@@ -21,7 +28,7 @@ const AUTH_ONLY_ROUTES = [
 // ─── File statis ──────────────────────────────────────────────────────────────
 const STATIC_EXT = /\.(?:ico|png|jpg|jpeg|svg|gif|webp|css|js|woff2?|ttf|map)$/;
 
-export async function middleware(request: NextRequest) {
+export default auth(function middleware(request: NextRequest & { auth: any }) {
   const { pathname } = request.nextUrl;
 
   // Skip: next internals & statis
@@ -39,7 +46,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ─── Cek session ──────────────────────────────────────────────────────────
-  const session = await auth();
+  const session = request.auth;
 
   if (!session) {
     const loginUrl = new URL('/login', request.url);
@@ -52,7 +59,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ─── Extract slug dari path ───────────────────────────────────────────────
+  // ─── Extract slug dan inject ke header ───────────────────────────────────
   // Pattern: /[slug]/admin/..., /[slug]/manager/..., /[slug]/member/..., /[slug]/upgrade
   const slugMatch = pathname.match(/^\/([^/]+)\/(admin|manager|member|upgrade)(\/|$)/);
 
@@ -62,15 +69,13 @@ export async function middleware(request: NextRequest) {
 
   const slug = slugMatch[1];
 
-  // Inject slug ke header — layout yang akan query DB untuk resolve storeId
-  // Ini menghindari masalah Prisma/fetch di edge runtime middleware
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-store-slug', slug);
 
   return NextResponse.next({
     request: { headers: requestHeaders },
   });
-}
+});
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
