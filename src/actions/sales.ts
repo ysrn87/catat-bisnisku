@@ -3,7 +3,7 @@
 import { db } from '@/lib/db';
 import { PaymentStatus } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
-import { requireStoreAccess } from '@/lib/store-context';
+import { requireStoreAccess, checkPlanLimit } from '@/lib/store-context';
 import { generateSaleNumber } from '@/lib/utils';
 import { getAvailablePoints, getPointsExpiryDate } from '@/lib/points-utils';
 import { getPointsConversionRate } from './settings';
@@ -45,6 +45,15 @@ export async function createSaleAction(input: CreateSaleInput) {
     if (!items?.length) return { success: false, error: 'Tidak ada item dalam penjualan' };
     if (notes && notes.length > 500) return { success: false, error: 'Catatan maksimal 500 karakter' };
     if (customerId && nonMemberCustomerId) return { success: false, error: 'Tidak bisa memilih dua tipe customer sekaligus' };
+
+    // Cek limit transaksi harian
+    const txLimit = await checkPlanLimit('dailyTransactions');
+    if (!txLimit.allowed) {
+      return {
+        success: false,
+        error: `Batas transaksi harian tercapai (${txLimit.current}/${txLimit.limit}). Upgrade ke PRO untuk transaksi unlimited.`,
+      };
+    }
 
     if (pointsRedeemed > 0 && customerId) {
       const available = await getAvailablePoints(customerId);

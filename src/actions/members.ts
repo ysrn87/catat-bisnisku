@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, getStoreContext } from '@/lib/store-context';
+import bcrypt from 'bcryptjs';
 
 const normalizePhone = (phone: string): string =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -243,7 +244,6 @@ export async function createCustomerAction(formData: FormData) {
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
     }
 
-    const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await db.$transaction(async (tx) => {
@@ -312,7 +312,6 @@ export async function updateCustomerAction(id: string, formData: FormData) {
     const updateData: any = { name, phone, email, address: address || null, birthday: birthday ? new Date(birthday) : null, photoUrl: photoUrl || null };
 
     if (newPassword?.trim()) {
-      const bcrypt = require('bcryptjs');
       updateData.password = await bcrypt.hash(newPassword, 10);
     }
 

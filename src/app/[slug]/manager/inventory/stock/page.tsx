@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
-import { getStoreContext } from '@/lib/store-context';
+import { getStoreContext, PLAN_LIMITS } from '@/lib/store-context';
+import { PlanGate } from '@/components/plan/plan-gate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, AlertTriangle } from 'lucide-react';
 import { StockTable } from '@/components/stock/stock-table';
@@ -80,11 +81,12 @@ async function getStockMovements(storeId: string, params: { page?: number; limit
   };
 }
 
-export default async function StockPage({ searchParams }: {
+export default async function StockPage({ params, searchParams }: {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ page?: string; limit?: string; search?: string; stockLevel?: string; sort?: string; movementPage?: string; movementLimit?: string; movementSearch?: string; movementType?: string; movementSort?: string }>;
 }) {
-  const p = await searchParams;
-  const { storeId } = await getStoreContext();
+  const [{ slug }, p] = await Promise.all([params, searchParams]);
+  const { storeId, storePlan } = await getStoreContext();
 
   const [stats, { items, total }, { movements, total: movTotal }] = await Promise.all([
     getStockData(storeId),
@@ -146,21 +148,28 @@ export default async function StockPage({ searchParams }: {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-lg md:text-xl">Riwayat Sirkulasi Barang</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <SearchFilterBar
-            searchPlaceholder="Cari riwayat stok..."
-            filters={[{ key: 'movementType', label: 'Tipe', defaultValue: 'all', options: [
-              { value: 'all', label: 'Semua' }, { value: 'IN', label: 'Masuk' },
-              { value: 'OUT', label: 'Keluar' }, { value: 'ADJUSTMENT', label: 'Penyesuaian' },
-            ]}]}
-            sortOptions={[{ value: 'date_desc', label: 'Terbaru' }, { value: 'date_asc', label: 'Terlama' }]}
-            defaultSort="date_desc"
-          />
-          <StockMovementsTable movements={movements} currentPage={Number(p.movementPage) || 1} pageSize={Number(p.movementLimit) || 10} totalItems={movTotal} />
-        </CardContent>
-      </Card>
+      <PlanGate
+        plan={storePlan}
+        storeSlug={slug}
+        feature="Riwayat Stok Masuk-Keluar"
+        description="Upgrade ke PRO untuk melihat riwayat lengkap sirkulasi barang"
+      >
+        <Card>
+          <CardHeader><CardTitle className="text-lg md:text-xl">Riwayat Sirkulasi Barang</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <SearchFilterBar
+              searchPlaceholder="Cari riwayat stok..."
+              filters={[{ key: 'movementType', label: 'Tipe', defaultValue: 'all', options: [
+                { value: 'all', label: 'Semua' }, { value: 'IN', label: 'Masuk' },
+                { value: 'OUT', label: 'Keluar' }, { value: 'ADJUSTMENT', label: 'Penyesuaian' },
+              ]}]}
+              sortOptions={[{ value: 'date_desc', label: 'Terbaru' }, { value: 'date_asc', label: 'Terlama' }]}
+              defaultSort="date_desc"
+            />
+            <StockMovementsTable movements={movements} currentPage={Number(p.movementPage) || 1} pageSize={Number(p.movementLimit) || 10} totalItems={movTotal} />
+          </CardContent>
+        </Card>
+      </PlanGate>
     </div>
   );
 }

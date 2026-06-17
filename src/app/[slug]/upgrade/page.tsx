@@ -9,14 +9,15 @@ import {
   Users, FileDown, Palette, ArrowLeft,
 } from 'lucide-react';
 import { PlanLimitBar } from '@/components/plan/plan-limit-bar';
+import { UpgradeButton } from '@/components/plan/upgrade-button';
 import { PLAN_LIMITS } from '@/lib/store-context';
 
 const proFeatures = [
-  { icon: Package,  label: 'Produk unlimited',       desc: 'Tidak ada batas jumlah produk' },
-  { icon: Users,    label: 'Manager unlimited',      desc: 'Tambah manager sebanyak yang dibutuhkan' },
-  { icon: FileDown, label: 'Export laporan (Excel)', desc: 'Download semua laporan dalam format Excel' },
-  { icon: Palette,  label: 'Custom branding',        desc: 'Logo dan warna toko sesuai brand kamu' },
-  { icon: Crown,    label: 'Prioritas support',      desc: 'Response lebih cepat dari tim kami' },
+  { icon: Package,  label: 'Hingga 1.000 produk',        desc: 'Maksimal 10 varian per produk' },
+  { icon: Users,    label: 'Hingga 5 manager',           desc: 'Kelola toko dengan lebih banyak staf' },
+  { icon: FileDown, label: 'Export laporan (Excel)',      desc: 'Download semua laporan dalam format Excel' },
+  { icon: Palette,  label: 'Custom branding',            desc: 'Upload logo toko sesuai brand kamu' },
+  { icon: Crown,    label: 'Transaksi harian unlimited', desc: 'Tidak ada batas jumlah transaksi per hari' },
 ];
 
 export default async function UpgradePage({
@@ -40,9 +41,13 @@ export default async function UpgradePage({
   if (store.plan === 'PRO') redirect(`/${slug}/admin`);
 
   // Ambil usage stats
-  const [productCount, managerCount] = await Promise.all([
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const [productCount, managerCount, todayTxCount] = await Promise.all([
     db.product.count({ where: { storeId: store.id } }),
     db.storeUser.count({ where: { storeId: store.id, role: 'MANAGER' } }),
+    db.sale.count({ where: { storeId: store.id, createdAt: { gte: startOfDay } } }),
   ]);
 
   return (
@@ -83,7 +88,7 @@ export default async function UpgradePage({
               limit={PLAN_LIMITS.FREE.products}
               plan="FREE"
               storeSlug={slug}
-              upgradeText="Upgrade untuk produk unlimited"
+              upgradeText={`Upgrade ke PRO untuk hingga ${PLAN_LIMITS.PRO.products} produk`}
             />
             <PlanLimitBar
               label="Manager"
@@ -91,7 +96,15 @@ export default async function UpgradePage({
               limit={PLAN_LIMITS.FREE.managers}
               plan="FREE"
               storeSlug={slug}
-              upgradeText="Upgrade untuk manager unlimited"
+              upgradeText={`Upgrade ke PRO untuk hingga ${PLAN_LIMITS.PRO.managers} manager`}
+            />
+            <PlanLimitBar
+              label="Transaksi Hari Ini"
+              current={todayTxCount}
+              limit={PLAN_LIMITS.FREE.dailyTransactions}
+              plan="FREE"
+              storeSlug={slug}
+              upgradeText="Upgrade ke PRO untuk transaksi unlimited"
             />
           </CardContent>
         </Card>
@@ -127,26 +140,9 @@ export default async function UpgradePage({
               ))}
             </ul>
 
-            {/* CTA — sementara placeholder, nanti diintegrasikan ke payment gateway */}
-            <div className="pt-2 space-y-3">
-              <Button
-                className="w-full h-12 text-base font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-lg"
-                disabled
-              >
-                <Crown className="w-4 h-4 mr-2" />
-                Hubungi Kami untuk Upgrade
-              </Button>
-              <p className="text-center text-xs text-gray-400">
-                Saat ini upgrade dilakukan secara manual.{' '}
-                <a
-                  href="https://wa.me/6281234567890?text=Halo,%20saya%20ingin%20upgrade%20toko%20ke%20PRO"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#028697] font-medium hover:underline"
-                >
-                  Chat via WhatsApp
-                </a>
-              </p>
+            {/* CTA — Midtrans Snap */}
+            <div className="pt-2">
+              <UpgradeButton storeSlug={slug} />
             </div>
           </CardContent>
         </Card>

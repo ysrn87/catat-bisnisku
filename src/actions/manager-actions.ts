@@ -48,10 +48,10 @@ export async function createManager(data: {
     throw new Error('Unauthorized');
   }
 
-  // Cek plan limit FREE: maks 2 manager
-  const limit = await checkPlanLimit('managers', PLAN_LIMITS.FREE.managers);
+  // Cek limit manager
+  const limit = await checkPlanLimit('managers');
   if (!limit.allowed) {
-    throw new Error(`Batas plan FREE tercapai (${limit.current}/${limit.limit} manager). Upgrade ke PRO untuk manager unlimited.`);
+    throw new Error(`Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak manager.`);
   }
 
   if (!data.name.trim())        throw new Error('Nama wajib diisi');

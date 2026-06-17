@@ -7,6 +7,8 @@ import { TrendingUp, Package, DollarSign } from 'lucide-react';
 import { SalesReportTable } from '@/components/reports/sales-report-table';
 import { InventoryReportTable } from '@/components/reports/inventory-report-table';
 import { FinancialSummary } from '@/components/reports/financial-summary';
+import { PlanGate } from '@/components/plan/plan-gate';
+import { ExportButton } from '@/components/reports/export-button';
 
 async function getSalesReport(storeId: string, page = 1, limit = 10) {
   const skip = (page - 1) * limit;
@@ -60,11 +62,12 @@ async function getFinancialReport(storeId: string) {
   return { totalIncome, totalExpenses, totalSalesRevenue, netProfit: totalIncome - totalExpenses };
 }
 
-export default async function FinanceReportsPage({ searchParams }: {
+export default async function FinanceReportsPage({ params, searchParams }: {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ salesPage?: string; salesLimit?: string; page?: string; limit?: string }>;
 }) {
-  const p = await searchParams;
-  const { storeId } = await getStoreContext();
+  const [{ slug }, p] = await Promise.all([params, searchParams]);
+  const { storeId, storePlan } = await getStoreContext();
 
   const [salesData, inventoryData, financialData] = await Promise.all([
     getSalesReport(storeId, Number(p.salesPage) || 1, Number(p.salesLimit) || 10),
@@ -115,10 +118,22 @@ export default async function FinanceReportsPage({ searchParams }: {
           <TabsTrigger value="sales">Penjualan</TabsTrigger>
           <TabsTrigger value="inventory">Inventori</TabsTrigger>
         </TabsList>
-        <TabsContent value="financial"><FinancialSummary data={financialData} /></TabsContent>
+        <TabsContent value="financial">
+          <div className="flex justify-end mb-3">
+            <PlanGate plan={storePlan} storeSlug={slug} feature="Export Excel" description="Upgrade ke PRO untuk export laporan">
+              <ExportButton type="cashflow" label="Export Cashflow" />
+            </PlanGate>
+          </div>
+          <FinancialSummary data={financialData} />
+        </TabsContent>
         <TabsContent value="sales">
           <Card>
-            <CardHeader><CardTitle>Transaksi Penjualan Terbaru</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Transaksi Penjualan Terbaru</CardTitle>
+              <PlanGate plan={storePlan} storeSlug={slug} feature="Export Excel" description="Upgrade ke PRO untuk export laporan">
+                <ExportButton type="sales" />
+              </PlanGate>
+            </CardHeader>
             <CardContent>
               <SalesReportTable sales={salesData.sales} currentPage={Number(p.salesPage) || 1} pageSize={Number(p.salesLimit) || 10} totalItems={salesData.totalTransactions} />
             </CardContent>
@@ -126,7 +141,12 @@ export default async function FinanceReportsPage({ searchParams }: {
         </TabsContent>
         <TabsContent value="inventory">
           <Card>
-            <CardHeader><CardTitle>Status Inventori</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Status Inventori</CardTitle>
+              <PlanGate plan={storePlan} storeSlug={slug} feature="Export Excel" description="Upgrade ke PRO untuk export laporan">
+                <ExportButton type="inventory" />
+              </PlanGate>
+            </CardHeader>
             <CardContent>
               <InventoryReportTable inventory={inventoryData.inventory} currentPage={Number(p.page) || 1} pageSize={Number(p.limit) || 10} totalItems={inventoryData.totalProducts} />
             </CardContent>

@@ -125,23 +125,44 @@ export async function requireStoreAccess(): Promise<{
  * Gunakan sebelum create resource baru.
  */
 export async function checkPlanLimit(
-  resource: 'products' | 'managers',
-  limit: number
+  resource: 'products' | 'variantsPerProduct' | 'managers' | 'dailyTransactions',
+  extra?: string
 ): Promise<{ allowed: boolean; current: number; limit: number }> {
   const { storeId, storePlan } = await getStoreContext();
-
-  if (storePlan === 'PRO') {
-    return { allowed: true, current: 0, limit: Infinity };
-  }
+  const limits = PLAN_LIMITS[storePlan];
 
   let current = 0;
+  let limit   = 0;
+
   switch (resource) {
     case 'products':
+      limit   = limits.products;
       current = await db.product.count({ where: { storeId } });
       break;
+
+    case 'variantsPerProduct':
+      // extra = productId
+      limit   = limits.variantsPerProduct;
+      current = extra
+        ? await db.productVariant.count({ where: { storeId, productId: extra } })
+        : 0;
+      break;
+
     case 'managers':
+      limit   = limits.managers;
       current = await db.storeUser.count({ where: { storeId, role: 'MANAGER' } });
       break;
+
+    case 'dailyTransactions': {
+      limit = limits.dailyTransactions;
+      if (limit === Infinity) return { allowed: true, current: 0, limit: Infinity };
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      current = await db.sale.count({
+        where: { storeId, createdAt: { gte: startOfDay } },
+      });
+      break;
+    }
   }
 
   return { allowed: current < limit, current, limit };
@@ -150,15 +171,21 @@ export async function checkPlanLimit(
 // ─── Plan limits ──────────────────────────────────────────────────────────────
 export const PLAN_LIMITS = {
   FREE: {
-    products: 50,
-    managers: 2,
-    exportReports: false,
-    customBranding: false,
+    products:          15,
+    variantsPerProduct: 3,
+    managers:           1,
+    dailyTransactions: 100,
+    stockHistory:      false,
+    exportReports:     false,
+    customBranding:    false,
   },
   PRO: {
-    products: Infinity,
-    managers: Infinity,
-    exportReports: true,
-    customBranding: true,
+    products:           1000,
+    variantsPerProduct: 10,
+    managers:           5,
+    dailyTransactions:  Infinity,
+    stockHistory:       true,
+    exportReports:      true,
+    customBranding:     true,
   },
 } as const;

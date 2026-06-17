@@ -2,6 +2,8 @@
 
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { headers } from 'next/headers';
+import { checkRegisterStoreLimit, getIP } from '@/lib/ratelimit';
 
 function slugify(text: string): string {
   return text
@@ -24,8 +26,14 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
     const ownerPhone    = (formData.get('ownerPhone')    as string)?.trim();
     const ownerEmail    = (formData.get('ownerEmail')    as string)?.trim().toLowerCase() || null;
     const ownerPassword = (formData.get('ownerPassword') as string);
-    // Flag: user existing yang sudah konfirmasi dengan password
     const isExistingUser = formData.get('isExistingUser') === 'true';
+
+    // Rate limit: max 3 registrasi toko per jam per IP
+    const ip          = getIP(await headers());
+    const rateLimited = await checkRegisterStoreLimit(ip);
+    if (!rateLimited.success) {
+      return { success: false, error: rateLimited.error };
+    }
 
     // ─── Validasi wajib ───────────────────────────────────────────────────────
     if (!storeName)     return { success: false, error: 'Nama toko wajib diisi' };

@@ -2,6 +2,8 @@
 
 import { signIn, signOut } from '@/auth';
 import { AuthError } from 'next-auth';
+import { headers } from 'next/headers';
+import { checkLoginLimit, checkRegisterMemberLimit, getIP } from '@/lib/ratelimit';
 
 const normalizePhone = (phone: string): string =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -14,6 +16,13 @@ const normalizeEmail = (email: string | null | undefined): string | null => {
 export async function loginAction(formData: FormData) {
   const identifier = formData.get('identifier') as string;
   const password   = formData.get('password')   as string;
+
+  // Rate limit: max 5 percobaan per 15 menit per IP
+  const ip          = getIP(await headers());
+  const rateLimited = await checkLoginLimit(ip);
+  if (!rateLimited.success) {
+    return { success: false, error: rateLimited.error };
+  }
 
   try {
     await signIn('credentials', {
@@ -51,7 +60,14 @@ export async function registerMemberAction(formData: FormData) {
     const address  = formData.get('address')  as string;
     const password = formData.get('password') as string;
     const birthday = formData.get('birthday') as string;
-    const storeId  = formData.get('storeId')  as string; // ← wajib ada di form
+    const storeId  = formData.get('storeId')  as string;
+
+    // Rate limit: max 10 register member per jam per IP
+    const ip          = getIP(await headers());
+    const rateLimited = await checkRegisterMemberLimit(ip);
+    if (!rateLimited.success) {
+      return { success: false, error: rateLimited.error };
+    }
 
     const phone = normalizePhone(rawPhone);
     const email = normalizeEmail(rawEmail);

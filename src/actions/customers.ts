@@ -3,6 +3,7 @@
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess } from '@/lib/store-context';
+import bcrypt from 'bcryptjs';
 
 const normalizePhone = (phone: string) =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -134,8 +135,7 @@ export async function upgradeToMemberAction(customerId: string, formData: FormDa
       const existingEmail = await db.user.findFirst({ where: { email: email.trim().toLowerCase() } });
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
     }
-
-    const bcrypt = require('bcryptjs');
+    
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await db.$transaction(async (tx) => {

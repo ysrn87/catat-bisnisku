@@ -173,3 +173,52 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
 
   revalidatePath(`/${storeSlug}/admin/settings`);
 }
+
+// ─── Branding ─────────────────────────────────────────────────────────────────
+
+/**
+ * Update logo toko — hanya PRO.
+ * Menerima base64 string dari client (max ~100KB setelah kompresi).
+ * Disimpan langsung di kolom logoUrl sebagai data URL.
+ */
+export async function updateStoreBrandingAction(logoBase64: string | null): Promise<
+  { success: true } | { success: false; error: string }
+> {
+  try {
+    const { storeId, storeSlug, storePlan } = await requireStoreAccess();
+
+    if (storePlan !== 'PRO') {
+      return { success: false, error: 'Fitur custom branding hanya tersedia untuk plan PRO.' };
+    }
+
+    // Validasi ukuran: base64 ≈ 4/3 ukuran asli, 150KB base64 ≈ 112KB file
+    if (logoBase64 && logoBase64.length > 150_000) {
+      return { success: false, error: 'Ukuran logo maksimal 100KB. Kompres gambar terlebih dahulu.' };
+    }
+
+    await db.store.update({
+      where: { id: storeId },
+      data: { logoUrl: logoBase64 },
+    });
+
+    revalidatePath(`/${storeSlug}/admin`);
+    revalidatePath(`/${storeSlug}/admin/settings/profile`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('updateStoreBranding error:', error);
+    return { success: false, error: 'Gagal menyimpan logo.' };
+  }
+}
+
+/**
+ * Ambil data branding toko saat ini.
+ */
+export async function getStoreBranding(): Promise<{ logoUrl: string | null; storeName: string }> {
+  const { storeId } = await requireStoreAccess();
+  const store = await db.store.findUnique({
+    where: { id: storeId },
+    select: { name: true, logoUrl: true },
+  });
+  return { logoUrl: store?.logoUrl ?? null, storeName: store?.name ?? '' };
+}

@@ -12,12 +12,12 @@ export async function createProductAction(formData: FormData) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Cek plan limit FREE: maks 50 produk
-    const limit = await checkPlanLimit('products', PLAN_LIMITS.FREE.products);
+    // Cek plan limit produk
+    const limit = await checkPlanLimit('products');
     if (!limit.allowed) {
       return {
         success: false,
-        error: `Batas plan FREE tercapai (${limit.current}/${limit.limit} produk). Upgrade ke PRO untuk produk unlimited.`,
+        error: `Batas produk tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak produk.`,
       };
     }
 
@@ -130,6 +130,15 @@ export async function createVariantAction(formData: FormData) {
     // Pastikan product milik store ini
     const product = await db.product.findFirst({ where: { id: productId, storeId } });
     if (!product) return { success: false, error: 'Produk tidak ditemukan' };
+
+    // Cek limit varian per produk
+    const variantLimit = await checkPlanLimit('variantsPerProduct', productId);
+    if (!variantLimit.allowed) {
+      return {
+        success: false,
+        error: `Batas varian tercapai (${variantLimit.current}/${variantLimit.limit} varian per produk). Upgrade ke PRO untuk lebih banyak varian.`,
+      };
+    }
 
     const existingSKU = await db.productVariant.findUnique({ where: { storeId_sku: { storeId, sku } } });
     if (existingSKU) return { success: false, error: 'SKU varian sudah digunakan' };

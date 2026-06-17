@@ -33,21 +33,21 @@ export function PlanGate({ plan, storeSlug, feature, description, children }: Pl
       </div>
 
       {/* Overlay upgrade */}
-      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80 backdrop-blur-[1px] border border-amber-200">
+      <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/50 backdrop-blur-[1px] border border-amber-200">
         <div className="text-center space-y-2 px-4">
           <div className="mx-auto w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
             <Lock className="w-4 h-4 text-amber-600" />
           </div>
-          <p className="text-sm font-semibold text-gray-800">{feature}</p>
-          {description && (
-            <p className="text-xs text-gray-500 max-w-[180px]">{description}</p>
-          )}
           <Link href={`/${storeSlug}/upgrade`}>
             <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white gap-1.5 mt-1">
               <Crown className="w-3.5 h-3.5" />
               Upgrade ke PRO
             </Button>
           </Link>
+          <p className="text-sm font-semibold text-gray-800">{feature}</p>
+          {description && (
+            <p className="text-xs text-gray-500 max-w-[180px]">{description}</p>
+          )}
         </div>
       </div>
     </div>
