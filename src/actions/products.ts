@@ -3,7 +3,7 @@
 import { db } from '@/lib/db';
 import { sanitizeName, sanitizeText, sanitizeSku } from '@/lib/sanitize';
 import { revalidatePath } from 'next/cache';
-import { requireStoreAccess, checkPlanLimit, PLAN_LIMITS } from '@/lib/store-context';
+import { requireStoreAccess, checkPlanLimit } from '@/lib/store-context';
 
 export async function createProductAction(formData: FormData) {
   try {
@@ -14,7 +14,7 @@ export async function createProductAction(formData: FormData) {
     }
 
     // Cek plan limit FREE: maks 50 produk
-    const limit = await checkPlanLimit('products', PLAN_LIMITS.FREE.products);
+    const limit = await checkPlanLimit('products');
     if (!limit.allowed) {
       return {
         success: false,
