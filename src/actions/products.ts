@@ -18,7 +18,7 @@ export async function createProductAction(formData: FormData) {
     if (!limit.allowed) {
       return {
         success: false,
-        error: `Batas plan FREE tercapai (${limit.current}/${limit.limit} produk). Upgrade ke PRO untuk produk unlimited.`,
+        error: `Batas plan FREE tercapai (${limit.current}/${limit.limit} produk). Upgrade ke PRO untuk daftarkan hingga 1000 produk.`,
       };
     }
 

@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, getStoreContext } from '@/lib/store-context';
+import { sanitizeName, sanitizeText } from '@/lib/sanitize';
 
 const normalizePhone = (phone: string): string =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');

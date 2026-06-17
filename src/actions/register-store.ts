@@ -3,6 +3,7 @@
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
