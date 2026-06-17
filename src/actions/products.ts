@@ -1,6 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
+import { sanitizeName, sanitizeText, sanitizeSku } from '@/lib/sanitize';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, checkPlanLimit, PLAN_LIMITS } from '@/lib/store-context';
 
@@ -12,18 +13,18 @@ export async function createProductAction(formData: FormData) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Cek plan limit produk
-    const limit = await checkPlanLimit('products');
+    // Cek plan limit FREE: maks 50 produk
+    const limit = await checkPlanLimit('products', PLAN_LIMITS.FREE.products);
     if (!limit.allowed) {
       return {
         success: false,
-        error: `Batas produk tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak produk.`,
+        error: `Batas plan FREE tercapai (${limit.current}/${limit.limit} produk). Upgrade ke PRO untuk produk unlimited.`,
       };
     }
 
-    const name        = formData.get('name')        as string;
-    const description = formData.get('description') as string;
-    const sku         = formData.get('sku')         as string;
+    const name        = sanitizeName(formData.get('name') as string, 100);
+    const description = sanitizeText(formData.get('description') as string, 500);
+    const sku         = sanitizeSku(formData.get('sku') as string);
     const type        = (formData.get('type') as string) || 'READY_STOCK';
     const categoryId  = (formData.get('categoryId') as string) || null;
 
@@ -53,9 +54,9 @@ export async function updateProductAction(id: string, formData: FormData) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const name        = formData.get('name')        as string;
-    const description = formData.get('description') as string;
-    const sku         = formData.get('sku')         as string;
+    const name        = sanitizeName(formData.get('name') as string, 100);
+    const description = sanitizeText(formData.get('description') as string, 500);
+    const sku         = sanitizeSku(formData.get('sku') as string);
     const type        = (formData.get('type') as string) || 'READY_STOCK';
     const categoryId  = (formData.get('categoryId') as string) || null;
 
@@ -131,15 +132,6 @@ export async function createVariantAction(formData: FormData) {
     const product = await db.product.findFirst({ where: { id: productId, storeId } });
     if (!product) return { success: false, error: 'Produk tidak ditemukan' };
 
-    // Cek limit varian per produk
-    const variantLimit = await checkPlanLimit('variantsPerProduct', productId);
-    if (!variantLimit.allowed) {
-      return {
-        success: false,
-        error: `Batas varian tercapai (${variantLimit.current}/${variantLimit.limit} varian per produk). Upgrade ke PRO untuk lebih banyak varian.`,
-      };
-    }
-
     const existingSKU = await db.productVariant.findUnique({ where: { storeId_sku: { storeId, sku } } });
     if (existingSKU) return { success: false, error: 'SKU varian sudah digunakan' };
 
@@ -208,11 +200,11 @@ export async function updateVariantAction(id: string, formData: FormData) {
     const variant = await db.productVariant.findFirst({ where: { id, storeId } });
     if (!variant) return { success: false, error: 'Varian tidak ditemukan' };
 
-    const existingSKU = await db.productVariant.findFirst({ where: { storeId, sku, NOT: { id } } });
+    const existingSKU = await db.productVariant.findFirst({ where: { storeId_sku: { storeId, sku }, NOT: { id } } });
     if (existingSKU) return { success: false, error: 'SKU varian sudah digunakan' };
 
     if (barcode) {
-      const existingBarcode = await db.productVariant.findFirst({ where: { storeId, barcode, NOT: { id } } });
+      const existingBarcode = await db.productVariant.findFirst({ where: { storeId_barcode: { storeId, barcode }, NOT: { id } } });
       if (existingBarcode) return { success: false, error: 'Barcode sudah digunakan oleh varian lain' };
     }
 

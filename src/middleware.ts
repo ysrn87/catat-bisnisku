@@ -1,14 +1,7 @@
-import NextAuth from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
-import { authConfig } from '@/auth.config';
+import { auth } from '@/auth';
 
-/**
- * Middleware berjalan di Edge Runtime.
- * Gunakan authConfig (tanpa Prisma/bcrypt) agar bundle tetap kecil.
- */
-const { auth } = NextAuth(authConfig);
-
-// ─── Route publik — tidak butuh session ──────────────────────────────────────
+// ─── Route publik — tidak butuh session ───────────────────────────────────────
 const PUBLIC_ROUTES = [
   '/',
   '/login',
@@ -17,10 +10,10 @@ const PUBLIC_ROUTES = [
   '/unauthorized',
   '/offline',
   '/api/auth',
-  '/api/store',
+  '/api/store',   // internal API — skip auth di middleware
 ];
 
-// ─── Route yang butuh session tapi tidak butuh store context ─────────────────
+// ─── Route yang butuh session tapi tidak butuh store context ──────────────────
 const AUTH_ONLY_ROUTES = [
   '/store-select',
 ];
@@ -28,7 +21,7 @@ const AUTH_ONLY_ROUTES = [
 // ─── File statis ──────────────────────────────────────────────────────────────
 const STATIC_EXT = /\.(?:ico|png|jpg|jpeg|svg|gif|webp|css|js|woff2?|ttf|map)$/;
 
-export default auth(function middleware(request: NextRequest & { auth: any }) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip: next internals & statis
@@ -46,7 +39,7 @@ export default auth(function middleware(request: NextRequest & { auth: any }) {
   }
 
   // ─── Cek session ──────────────────────────────────────────────────────────
-  const session = request.auth;
+  const session = await auth();
 
   if (!session) {
     const loginUrl = new URL('/login', request.url);
@@ -59,7 +52,7 @@ export default auth(function middleware(request: NextRequest & { auth: any }) {
     return NextResponse.next();
   }
 
-  // ─── Extract slug dan inject ke header ───────────────────────────────────
+  // ─── Extract slug dari path ───────────────────────────────────────────────
   // Pattern: /[slug]/admin/..., /[slug]/manager/..., /[slug]/member/..., /[slug]/upgrade
   const slugMatch = pathname.match(/^\/([^/]+)\/(admin|manager|member|upgrade)(\/|$)/);
 
@@ -69,13 +62,20 @@ export default auth(function middleware(request: NextRequest & { auth: any }) {
 
   const slug = slugMatch[1];
 
+  // Validasi format slug — hanya boleh a-z, 0-9, dash, panjang 3-50
+  // Cegah path traversal dan karakter berbahaya di header
+  const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
+  if (!SLUG_REGEX.test(slug)) {
+    return NextResponse.redirect(new URL('/unauthorized', request.url));
+  }
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-store-slug', slug);
 
   return NextResponse.next({
     request: { headers: requestHeaders },
   });
-});
+}
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],

@@ -4,7 +4,6 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, getStoreContext } from '@/lib/store-context';
-import bcrypt from 'bcryptjs';
 
 const normalizePhone = (phone: string): string =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -180,11 +179,11 @@ export async function createCustomerAction(formData: FormData) {
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    const name      = formData.get('name')         as string;
+    const name      = sanitizeName(formData.get('name') as string, 100);
     const rawPhone  = formData.get('phone')         as string;
     const rawEmail  = formData.get('email')         as string;
     const password  = formData.get('password')      as string;
-    const address   = formData.get('address')       as string;
+    const address   = sanitizeText(formData.get('address') as string, 200);
     const birthday  = formData.get('birthday')      as string;
     const photoUrl  = formData.get('photoUrl')      as string;
     // Flag yang dikirim dari dialog ketika user memilih "link user existing"
@@ -244,6 +243,7 @@ export async function createCustomerAction(formData: FormData) {
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
     }
 
+    const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await db.$transaction(async (tx) => {
@@ -277,10 +277,10 @@ export async function updateCustomerAction(id: string, formData: FormData) {
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    const name        = formData.get('name')        as string;
+    const name        = sanitizeName(formData.get('name') as string, 100);
     const rawPhone    = formData.get('phone')        as string;
     const rawEmail    = formData.get('email')        as string;
-    const address     = formData.get('address')      as string;
+    const address     = sanitizeText(formData.get('address') as string, 200);
     const birthday    = formData.get('birthday')     as string;
     const photoUrl    = formData.get('photoUrl')     as string;
     const newPassword = formData.get('password')     as string;
@@ -312,6 +312,7 @@ export async function updateCustomerAction(id: string, formData: FormData) {
     const updateData: any = { name, phone, email, address: address || null, birthday: birthday ? new Date(birthday) : null, photoUrl: photoUrl || null };
 
     if (newPassword?.trim()) {
+      const bcrypt = require('bcryptjs');
       updateData.password = await bcrypt.hash(newPassword, 10);
     }
 

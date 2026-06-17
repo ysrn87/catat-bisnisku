@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { sanitizeText, sanitizeCategory } from '@/lib/sanitize';
 import { requireStoreAccess } from '@/lib/store-context';
 
 export async function createCashflowAction(formData: FormData) {

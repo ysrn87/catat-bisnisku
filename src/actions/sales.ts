@@ -7,11 +7,12 @@ import { requireStoreAccess } from '@/lib/store-context';
 import { generateSaleNumber } from '@/lib/utils';
 import { getAvailablePoints, getPointsExpiryDate } from '@/lib/points-utils';
 import { getPointsConversionRate } from './settings';
+import { sanitizeText } from '@/lib/sanitize';
 
 interface SaleItemInput {
   variantId: string;
   quantity: number;
-  // price sengaja tidak diterima dari client — diambil dari DB untuk cegah manipulasi
+  price: number;
 }
 
 interface CreateSaleInput {
@@ -43,7 +44,8 @@ export async function createSaleAction(input: CreateSaleInput) {
     } = input;
 
     if (!items?.length) return { success: false, error: 'Tidak ada item dalam penjualan' };
-    if (notes && notes.length > 500) return { success: false, error: 'Catatan maksimal 500 karakter' };
+    const notesSanitized = sanitizeText(notes, 500);
+    if (notesSanitized.length > 500) return { success: false, error: 'Catatan maksimal 500 karakter' };
     if (customerId && nonMemberCustomerId) return { success: false, error: 'Tidak bisa memilih dua tipe customer sekaligus' };
 
     if (pointsRedeemed > 0 && customerId) {
@@ -55,9 +57,6 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     let pointsEarned = 0;
-    // Map harga dari DB — tidak percaya harga dari client
-    const variantPriceMap = new Map<string, number>();
-
     for (const item of items) {
       const variant = await db.productVariant.findFirst({
         where: { id: item.variantId, storeId },
@@ -69,16 +68,12 @@ export async function createSaleAction(input: CreateSaleInput) {
         return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
       }
 
-      // Simpan harga dari DB
-      variantPriceMap.set(item.variantId, Number(variant.price));
-
       if (customerId && pointsRedeemed === 0 && paymentStatus === 'PAID') {
         pointsEarned += variant.points * item.quantity;
       }
     }
 
-    // Hitung subtotal dari harga DB — bukan dari input client
-    const subtotal      = items.reduce((sum, i) => sum + (variantPriceMap.get(i.variantId) ?? 0) * i.quantity, 0);
+    const subtotal      = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const conversionRate = await getPointsConversionRate();
     const pointDiscount  = pointsRedeemed * conversionRate;
     const totalDiscount  = discount + pointDiscount;
@@ -101,15 +96,15 @@ export async function createSaleAction(input: CreateSaleInput) {
           subtotal, discount, tax, ongkir, total,
           paymentMethod,
           paymentStatus: paymentStatus as PaymentStatus,
-          notes,
+          notes: notesSanitized,
           pointsEarned:  customerId && pointsRedeemed === 0 && paymentStatus === 'PAID' ? pointsEarned : 0,
           pointsRedeemed: customerId ? pointsRedeemed : 0,
           items: {
             create: items.map((i) => ({
               variantId: i.variantId,
               quantity:  i.quantity,
-              price:     variantPriceMap.get(i.variantId) ?? 0,
-              subtotal:  (variantPriceMap.get(i.variantId) ?? 0) * i.quantity,
+              price:     i.price,
+              subtotal:  i.price * i.quantity,
             })),
           },
         },
@@ -204,15 +199,14 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
     } = input;
 
     if (!items?.length) return { success: false, error: 'Tidak ada item dalam penjualan' };
-    if (notes && notes.length > 500) return { success: false, error: 'Catatan maksimal 500 karakter' };
+    const notesSanitized = sanitizeText(notes, 500);
+    if (notesSanitized.length > 500) return { success: false, error: 'Catatan maksimal 500 karakter' };
 
     const originalSale = await db.sale.findFirst({ where: { id, storeId }, include: { items: true } });
     if (!originalSale) return { success: false, error: 'Penjualan tidak ditemukan' };
 
     let pointsEarned = 0;
     const shouldEarnPoints = Number(originalSale.pointsRedeemed) === 0 && paymentStatus === 'PAID';
-    // Map harga dari DB — tidak percaya harga dari client
-    const variantPriceMap = new Map<string, number>();
 
     for (const item of items) {
       const variant = await db.productVariant.findFirst({
@@ -220,9 +214,6 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
         include: { product: { select: { type: true } } },
       });
       if (!variant) return { success: false, error: 'Varian produk tidak ditemukan' };
-
-      // Simpan harga dari DB
-      variantPriceMap.set(item.variantId, Number(variant.price));
 
       const originalQty = originalSale.items.find((i) => i.variantId === item.variantId)?.quantity ?? 0;
       const diff = item.quantity - originalQty;
@@ -234,8 +225,7 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
       if (shouldEarnPoints) pointsEarned += variant.points * item.quantity;
     }
 
-    // Hitung subtotal dari harga DB — bukan dari input client
-    const subtotal       = items.reduce((sum, i) => sum + (variantPriceMap.get(i.variantId) ?? 0) * i.quantity, 0);
+    const subtotal       = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const conversionRate = await getPointsConversionRate();
     const pointDiscount  = pointsRedeemed * conversionRate;
     const total          = subtotal - discount - pointDiscount + tax + ongkir;
@@ -255,10 +245,10 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
         where: { id },
         data: {
           customerId, subtotal, discount, tax, ongkir, total,
-          paymentMethod, paymentStatus: paymentStatus as PaymentStatus, notes,
+          paymentMethod, paymentStatus: paymentStatus as PaymentStatus, notes: notesSanitized,
           pointsEarned:  customerId && paymentStatus === 'PAID' ? pointsEarned : 0,
           pointsRedeemed,
-          items: { create: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: variantPriceMap.get(i.variantId) ?? 0, subtotal: (variantPriceMap.get(i.variantId) ?? 0) * i.quantity })) },
+          items: { create: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.price, subtotal: i.price * i.quantity })) },
         },
       });
 

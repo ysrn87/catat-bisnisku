@@ -2,8 +2,8 @@
 
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { sanitizeName, sanitizeText } from '@/lib/sanitize';
 import { requireStoreAccess } from '@/lib/store-context';
-import bcrypt from 'bcryptjs';
 
 const normalizePhone = (phone: string) =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -116,9 +116,9 @@ export async function upgradeToMemberAction(customerId: string, formData: FormDa
     const email    = formData.get('email')    as string;
     const birthday = formData.get('birthday') as string;
     const photoUrl = formData.get('photoUrl') as string;
-    const name     = (formData.get('name')    as string)?.trim();
-    const phone    = (formData.get('phone')   as string)?.trim();
-    const address  = (formData.get('address') as string)?.trim();
+    const name     = sanitizeName(formData.get('name') as string, 100);
+    const phone    = (formData.get('phone') as string)?.trim();
+    const address  = sanitizeText(formData.get('address') as string, 200);
 
     if (!password || password.length < 6) return { success: false, error: 'Password wajib diisi (min. 6 karakter)' };
     if (!name)    return { success: false, error: 'Nama wajib diisi' };
@@ -135,7 +135,8 @@ export async function upgradeToMemberAction(customerId: string, formData: FormDa
       const existingEmail = await db.user.findFirst({ where: { email: email.trim().toLowerCase() } });
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
     }
-    
+
+    const bcrypt = require('bcryptjs');
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await db.$transaction(async (tx) => {
@@ -195,7 +196,7 @@ export async function updateNonMemberCustomerAction(customerId: string, formData
     if (!customer) return { success: false, error: 'Customer tidak ditemukan' };
 
     const existing = await db.customer.findFirst({
-      where: { storeId, phone, NOT: { id: customerId } },
+      where: { storeId_phone: { storeId, phone }, NOT: { id: customerId } },
     });
     if (existing) return { success: false, error: 'Nomor telepon sudah digunakan customer lain' };
 
