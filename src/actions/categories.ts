@@ -93,7 +93,7 @@ export async function updateCategoryAction(id: string, formData: FormData): Prom
 
     // Cek duplikat nama (kecuali diri sendiri)
     const existing = await db.category.findFirst({
-      where: { storeId_name: { storeId, name }, NOT: { id } },
+      where: { storeId, name, NOT: { id } },
     });
     if (existing) return { success: false, error: `Kategori "${name}" sudah ada` };
 
