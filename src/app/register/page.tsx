@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { registerMemberAction } from '@/actions/auth';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { UserPlus, User, Phone, Mail, MapPin, Calendar, Lock, ArrowLeft, Sparkle
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [storeId, setStoreId] = useState('');
@@ -449,5 +449,17 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f9fc] via-[#f0fdfe] to-[#d6f7fa]">
+        <div className="w-8 h-8 border-4 border-[#1ecbe1] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
