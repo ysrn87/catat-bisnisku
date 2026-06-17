@@ -200,11 +200,11 @@ export async function updateVariantAction(id: string, formData: FormData) {
     const variant = await db.productVariant.findFirst({ where: { id, storeId } });
     if (!variant) return { success: false, error: 'Varian tidak ditemukan' };
 
-    const existingSKU = await db.productVariant.findFirst({ where: { storeId_sku: { storeId, sku }, NOT: { id } } });
+    const existingSKU = await db.productVariant.findFirst({ where: { storeId, sku, NOT: { id } } });
     if (existingSKU) return { success: false, error: 'SKU varian sudah digunakan' };
 
     if (barcode) {
-      const existingBarcode = await db.productVariant.findFirst({ where: { storeId_barcode: { storeId, barcode }, NOT: { id } } });
+      const existingBarcode = await db.productVariant.findFirst({ where: { storeId, barcode, NOT: { id } } });
       if (existingBarcode) return { success: false, error: 'Barcode sudah digunakan oleh varian lain' };
     }
 
