@@ -195,7 +195,7 @@ export async function updateNonMemberCustomerAction(customerId: string, formData
     if (!customer) return { success: false, error: 'Customer tidak ditemukan' };
 
     const existing = await db.customer.findFirst({
-      where: { storeId_phone: { storeId, phone }, NOT: { id: customerId } },
+      where: { storeId, phone, NOT: { id: customerId } },
     });
     if (existing) return { success: false, error: 'Nomor telepon sudah digunakan customer lain' };
 
