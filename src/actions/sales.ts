@@ -12,7 +12,7 @@ import { sanitizeText } from '@/lib/sanitize';
 interface SaleItemInput {
   variantId: string;
   quantity: number;
-  price: number;
+  // price tidak diterima dari client — diambil dari DB untuk cegah manipulasi
 }
 
 interface CreateSaleInput {
@@ -57,6 +57,9 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     let pointsEarned = 0;
+    // Map harga dari DB — tidak percaya harga dari client
+    const variantPriceMap = new Map<string, number>();
+
     for (const item of items) {
       const variant = await db.productVariant.findFirst({
         where: { id: item.variantId, storeId },
@@ -68,12 +71,16 @@ export async function createSaleAction(input: CreateSaleInput) {
         return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
       }
 
+      // Simpan harga dari DB
+      variantPriceMap.set(item.variantId, Number(variant.price));
+
       if (customerId && pointsRedeemed === 0 && paymentStatus === 'PAID') {
         pointsEarned += variant.points * item.quantity;
       }
     }
 
-    const subtotal      = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    // Hitung subtotal dari harga DB — bukan dari input client
+    const subtotal      = items.reduce((sum, i) => sum + (variantPriceMap.get(i.variantId) ?? 0) * i.quantity, 0);
     const conversionRate = await getPointsConversionRate();
     const pointDiscount  = pointsRedeemed * conversionRate;
     const totalDiscount  = discount + pointDiscount;
@@ -103,8 +110,8 @@ export async function createSaleAction(input: CreateSaleInput) {
             create: items.map((i) => ({
               variantId: i.variantId,
               quantity:  i.quantity,
-              price:     i.price,
-              subtotal:  i.price * i.quantity,
+              price:     variantPriceMap.get(i.variantId) ?? 0,
+              subtotal:  (variantPriceMap.get(i.variantId) ?? 0) * i.quantity,
             })),
           },
         },
@@ -207,6 +214,8 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
 
     let pointsEarned = 0;
     const shouldEarnPoints = Number(originalSale.pointsRedeemed) === 0 && paymentStatus === 'PAID';
+    // Map harga dari DB — tidak percaya harga dari client
+    const variantPriceMap = new Map<string, number>();
 
     for (const item of items) {
       const variant = await db.productVariant.findFirst({
@@ -214,6 +223,9 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
         include: { product: { select: { type: true } } },
       });
       if (!variant) return { success: false, error: 'Varian produk tidak ditemukan' };
+
+      // Simpan harga dari DB
+      variantPriceMap.set(item.variantId, Number(variant.price));
 
       const originalQty = originalSale.items.find((i) => i.variantId === item.variantId)?.quantity ?? 0;
       const diff = item.quantity - originalQty;
@@ -225,7 +237,8 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
       if (shouldEarnPoints) pointsEarned += variant.points * item.quantity;
     }
 
-    const subtotal       = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    // Hitung subtotal dari harga DB — bukan dari input client
+    const subtotal       = items.reduce((sum, i) => sum + (variantPriceMap.get(i.variantId) ?? 0) * i.quantity, 0);
     const conversionRate = await getPointsConversionRate();
     const pointDiscount  = pointsRedeemed * conversionRate;
     const total          = subtotal - discount - pointDiscount + tax + ongkir;
@@ -248,7 +261,7 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
           paymentMethod, paymentStatus: paymentStatus as PaymentStatus, notes: notesSanitized,
           pointsEarned:  customerId && paymentStatus === 'PAID' ? pointsEarned : 0,
           pointsRedeemed,
-          items: { create: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.price, subtotal: i.price * i.quantity })) },
+          items: { create: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: variantPriceMap.get(i.variantId) ?? 0, subtotal: (variantPriceMap.get(i.variantId) ?? 0) * i.quantity })) },
         },
       });
 
