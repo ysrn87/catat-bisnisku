@@ -30,6 +30,7 @@ model Store {
   settings       Settings[]
   stockMovements StockMovement[]
   categories     Category[]
+  pointHistories PointHistory[]
 
   @@map("stores")
 }
@@ -248,6 +249,7 @@ model SaleItem {
 model PointHistory {
   id          String    @id @default(cuid())
   userId      String
+  storeId     String?
   points      Int
   type        String
   description String
@@ -255,7 +257,10 @@ model PointHistory {
   expiresAt   DateTime?
 
   user        User      @relation(fields: [userId], references: [id])
+  store       Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
 
+  @@index([storeId])
+  @@index([userId, storeId])
   @@map("point_history")
 }
 

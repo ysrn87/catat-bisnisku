@@ -127,10 +127,10 @@ export async function createSaleAction(input: CreateSaleInput) {
       if (customerId) {
         if (pointsRedeemed > 0) {
           await tx.user.update({ where: { id: customerId }, data: { points: { decrement: pointsRedeemed } } });
-          await tx.pointHistory.create({ data: { userId: customerId, points: -pointsRedeemed, type: 'REDEEMED', description: `Penukaran poin ${newSale.saleNumber}` } });
+          await tx.pointHistory.create({ data: { userId: customerId, storeId, points: -pointsRedeemed, type: 'REDEEMED', description: `Penukaran poin ${newSale.saleNumber}` } });
         } else if (pointsEarned > 0) {
           await tx.user.update({ where: { id: customerId }, data: { points: { increment: pointsEarned } } });
-          await tx.pointHistory.create({ data: { userId: customerId, points: pointsEarned, type: 'EARNED', description: `Poin pembelian ${newSale.saleNumber}`, expiresAt: getPointsExpiryDate() } });
+          await tx.pointHistory.create({ data: { userId: customerId, storeId, points: pointsEarned, type: 'EARNED', description: `Poin pembelian ${newSale.saleNumber}`, expiresAt: getPointsExpiryDate() } });
         }
       }
 
@@ -263,16 +263,16 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
         const diff = pointsEarned - Number(originalSale.pointsEarned);
         if (diff !== 0) {
           await tx.user.update({ where: { id: customerId! }, data: { points: { increment: diff } } });
-          await tx.pointHistory.create({ data: { userId: customerId!, points: diff, type: diff > 0 ? 'EARNED' : 'ADJUSTED', description: `Penyesuaian pembelian ${originalSale.saleNumber}` } });
+          await tx.pointHistory.create({ data: { userId: customerId!, storeId, points: diff, type: diff > 0 ? 'EARNED' : 'ADJUSTED', description: `Penyesuaian pembelian ${originalSale.saleNumber}` } });
         }
       } else {
         if (originalSale.customerId) {
           await tx.user.update({ where: { id: originalSale.customerId }, data: { points: { decrement: Number(originalSale.pointsEarned) } } });
-          await tx.pointHistory.create({ data: { userId: originalSale.customerId, points: -Number(originalSale.pointsEarned), type: 'ADJUSTED', description: `Removed from edited sale ${originalSale.saleNumber}` } });
+          await tx.pointHistory.create({ data: { userId: originalSale.customerId, storeId, points: -Number(originalSale.pointsEarned), type: 'ADJUSTED', description: `Removed from edited sale ${originalSale.saleNumber}` } });
         }
         if (customerId && pointsEarned > 0) {
           await tx.user.update({ where: { id: customerId }, data: { points: { increment: pointsEarned } } });
-          await tx.pointHistory.create({ data: { userId: customerId, points: pointsEarned, type: 'EARNED', description: `Didapat dari perubahan pembelian ${originalSale.saleNumber}` } });
+          await tx.pointHistory.create({ data: { userId: customerId, storeId, points: pointsEarned, type: 'EARNED', description: `Didapat dari perubahan pembelian ${originalSale.saleNumber}` } });
         }
       }
 
@@ -329,11 +329,11 @@ export async function deleteSaleAction(id: string) {
 
         if (earned > 0) {
           await tx.user.update({ where: { id: sale.customerId }, data: { points: { decrement: earned } } });
-          await tx.pointHistory.create({ data: { userId: sale.customerId, points: -earned, type: 'ADJUSTED', description: `Poin dikembalikan dari penghapusan ${sale.saleNumber}` } });
+          await tx.pointHistory.create({ data: { userId: sale.customerId, storeId, points: -earned, type: 'ADJUSTED', description: `Poin dikembalikan dari penghapusan ${sale.saleNumber}` } });
         }
         if (redeemed > 0) {
           await tx.user.update({ where: { id: sale.customerId }, data: { points: { increment: redeemed } } });
-          await tx.pointHistory.create({ data: { userId: sale.customerId, points: redeemed, type: 'ADJUSTED', description: `Poin dikembalikan dari penghapusan ${sale.saleNumber}` } });
+          await tx.pointHistory.create({ data: { userId: sale.customerId, storeId, points: redeemed, type: 'ADJUSTED', description: `Poin dikembalikan dari penghapusan ${sale.saleNumber}` } });
         }
       }
 

@@ -31,8 +31,9 @@ export async function getPointsHistory() {
   const session = await auth();
   if (!session) throw new Error('Unauthorized');
 
+  const { storeId } = await getStoreContext();
   return db.pointHistory.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, storeId },
     orderBy: { createdAt: 'desc' },
     take: 50,
   });
@@ -76,6 +77,8 @@ export async function redeemPoints(points: number, description: string) {
   const session = await auth();
   if (!session) throw new Error('Unauthorized');
 
+  const { storeId } = await getStoreContext();
+
   const user = await db.user.findUnique({ where: { id: session.user.id } });
   if (!user || user.points < points) throw new Error('Poin tidak mencukupi');
 
@@ -85,7 +88,7 @@ export async function redeemPoints(points: number, description: string) {
   });
 
   await db.pointHistory.create({
-    data: { userId: session.user.id, points: -points, type: 'REDEEMED', description },
+    data: { userId: session.user.id, storeId, points: -points, type: 'REDEEMED', description },
   });
 
   return true;
@@ -321,7 +324,7 @@ export async function updateCustomerAction(id: string, formData: FormData) {
       if (!pointsReason?.trim()) return { success: false, error: 'Alasan wajib diisi saat mengubah poin' };
       updateData.points = points;
       await db.pointHistory.create({
-        data: { userId: id, points: points - currentUser.points, type: 'ADJUSTED', description: pointsReason },
+        data: { userId: id, storeId, points: points - currentUser.points, type: 'ADJUSTED', description: pointsReason },
       });
     }
 
@@ -374,8 +377,8 @@ export async function getCustomerPointsHistory(customerId: string, page = 1, pag
 
   const skip = (page - 1) * pageSize;
   const [history, total] = await Promise.all([
-    db.pointHistory.findMany({ where: { userId: customerId }, orderBy: { createdAt: 'desc' }, skip, take: pageSize }),
-    db.pointHistory.count({ where: { userId: customerId } }),
+    db.pointHistory.findMany({ where: { userId: customerId, storeId }, orderBy: { createdAt: 'desc' }, skip, take: pageSize }),
+    db.pointHistory.count({ where: { userId: customerId, storeId } }),
   ]);
 
   return { history, total };
