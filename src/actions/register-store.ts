@@ -2,6 +2,8 @@
 
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { headers } from 'next/headers';
+import { checkRegisterStoreLimit, getIP } from '@/lib/ratelimit';
 
 
 function slugify(text: string): string {
@@ -19,6 +21,13 @@ export type RegisterStoreResult =
 
 export async function registerStoreAction(formData: FormData): Promise<RegisterStoreResult> {
   try {
+    // Rate limit: max 3 percobaan per jam per IP — termasuk jalur verifikasi password user existing
+    const ip          = getIP(await headers());
+    const rateLimited = await checkRegisterStoreLimit(ip);
+    if (!rateLimited.success) {
+      return { success: false, error: rateLimited.error };
+    }
+
     const storeName     = (formData.get('storeName')     as string)?.trim();
     const storeSlug     = (formData.get('storeSlug')     as string)?.trim().toLowerCase();
     const ownerName     = (formData.get('ownerName')     as string)?.trim();

@@ -31,6 +31,7 @@ model Store {
   stockMovements StockMovement[]
   categories     Category[]
   pointHistories PointHistory[]
+  payments       Payment[]
 
   @@map("stores")
 }
@@ -317,4 +318,18 @@ enum PaymentStatus {
   PAID
   PENDING
   UNPAID
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  storeId     String
+  status      String
+  grossAmount Decimal  @db.Decimal(10, 2)
+  processedAt DateTime @default(now())
+
+  store       Store    @relation(fields: [storeId], references: [id])
+
+  @@index([storeId])
+  @@map("payments")
 }

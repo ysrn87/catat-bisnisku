@@ -84,7 +84,14 @@ export async function POST(request: NextRequest) {
       transaction_status === 'cancel' ||
       transaction_status === 'expire';
 
-    // ── 4. Proses sesuai status ──────────────────────────────────────────────
+    // ── 4. Idempotency check — skip kalau order_id sudah pernah diproses ────
+    const existingPayment = await db.payment.findUnique({ where: { orderId: order_id } });
+    if (existingPayment) {
+      console.log(`[midtrans/webhook] Duplicate notification untuk order_id: ${order_id}, skip.`);
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
+
+    // ── 5. Proses sesuai status ──────────────────────────────────────────────
     if (isSuccess) {
       const store = await db.store.findUnique({
         where: { slug: storeSlug },
@@ -106,23 +113,42 @@ export async function POST(request: NextRequest) {
       const expiresAt = new Date(baseDate);
       expiresAt.setDate(expiresAt.getDate() + 30);
 
-      await db.store.update({
-        where: { slug: storeSlug },
-        data: {
-          plan: 'PRO',
-          subscriptionExpiresAt: expiresAt,
-          updatedAt: new Date(),
-        },
+      // Lakukan upgrade + catat payment dalam satu transaksi — atomik
+      await db.$transaction(async (tx) => {
+        await tx.store.update({
+          where: { slug: storeSlug },
+          data: { plan: 'PRO', subscriptionExpiresAt: expiresAt, updatedAt: new Date() },
+        });
+
+        await tx.payment.create({
+          data: {
+            orderId:     order_id,
+            storeId:     store.id,
+            status:      transaction_status,
+            grossAmount: parseFloat(gross_amount),
+          },
+        });
       });
 
       console.log(`[midtrans/webhook] ✓ Store "${storeSlug}" upgraded ke PRO sampai ${expiresAt.toISOString()}`);
 
     } else if (isFailed) {
-      // Transaksi gagal/dibatalkan — tidak perlu aksi, log saja
+      // Catat payment gagal untuk audit trail
+      const store = await db.store.findUnique({ where: { slug: storeSlug }, select: { id: true } });
+      if (store) {
+        await db.payment.create({
+          data: {
+            orderId:     order_id,
+            storeId:     store.id,
+            status:      transaction_status,
+            grossAmount: parseFloat(gross_amount),
+          },
+        }).catch(() => {}); // Jangan block response kalau gagal catat
+      }
       console.log(`[midtrans/webhook] Transaksi gagal untuk store "${storeSlug}":`, transaction_status);
 
     } else if (isPending) {
-      // Masih menunggu pembayaran (transfer bank, dll) — tidak aksi dulu
+      // Masih menunggu pembayaran — tidak aksi dulu
       console.log(`[midtrans/webhook] Transaksi pending untuk store "${storeSlug}"`);
     }
 

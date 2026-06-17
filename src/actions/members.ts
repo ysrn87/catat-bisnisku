@@ -77,6 +77,11 @@ export async function redeemPoints(points: number, description: string) {
   const session = await auth();
   if (!session) throw new Error('Unauthorized');
 
+  // Validasi: harus bilangan bulat positif
+  if (!Number.isInteger(points) || points <= 0) {
+    throw new Error('Jumlah poin tidak valid');
+  }
+
   const { storeId } = await getStoreContext();
 
   const user = await db.user.findUnique({ where: { id: session.user.id } });
