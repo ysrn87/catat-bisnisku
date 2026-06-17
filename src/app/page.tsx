@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -25,13 +24,13 @@ const plans = [
     period: 'selamanya',
     highlight: false,
     features: [
-      { label: 'Hingga 50 produk',       ok: true },
-      { label: 'Hingga 2 Manager',        ok: true },
+      { label: 'Hingga 15 produk (3 varian/produk)', ok: true },
+      { label: 'Hingga 1 Manager',        ok: true },
       { label: 'Kasir & Penjualan',       ok: true },
       { label: 'Sistem Poin Member',      ok: true },
       { label: 'Laporan & Rekap',         ok: true },
-      { label: 'Produk unlimited',        ok: false },
-      { label: 'Manager unlimited',       ok: false },
+      { label: 'Riwayat stok masuk-keluar', ok: false },
+      { label: 'Transaksi > 100/hari',   ok: false },
       { label: 'Export laporan (Excel)',  ok: false },
       { label: 'Custom branding',         ok: false },
     ],
@@ -44,11 +43,13 @@ const plans = [
     period: '/ bulan',
     highlight: true,
     features: [
-      { label: 'Produk unlimited',        ok: true },
-      { label: 'Manager unlimited',       ok: true },
+      { label: 'Hingga 1.000 produk (10 varian/produk)', ok: true },
+      { label: 'Hingga 5 Manager',        ok: true },
       { label: 'Kasir & Penjualan',       ok: true },
       { label: 'Sistem Poin Member',      ok: true },
       { label: 'Laporan & Rekap',         ok: true },
+      { label: 'Riwayat stok masuk-keluar', ok: true },
+      { label: 'Transaksi harian unlimited', ok: true },
       { label: 'Export laporan (Excel)',  ok: true },
       { label: 'Custom branding',         ok: true },
       { label: 'Prioritas support',       ok: true },
@@ -61,11 +62,6 @@ const plans = [
 export default async function LandingPage() {
   const session = await auth();
 
-  // User yang sudah login langsung diarahkan ke store-select
-  if (session) {
-    redirect('/store-select');
-  }
-
   return (
     <div className="min-h-screen bg-white">
 
@@ -77,16 +73,27 @@ export default async function LandingPage() {
             <span className="text-lg font-bold text-[#028697]">Catat Bisnisku</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login">
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-[#028697]">
-                Masuk
-              </Button>
-            </Link>
-            <Link href="/register-store">
-              <Button size="sm" className="bg-[#028697] hover:bg-[#017585] text-white">
-                Daftar Toko
-              </Button>
-            </Link>
+            {session ? (
+              <Link href="/store-select">
+                <Button size="sm" className="bg-[#028697] hover:bg-[#017585] text-white">
+                  Masuk ke Dasbor
+                  <ArrowRight className="ml-1.5 w-3.5 h-3.5" />
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-[#028697]">
+                    Masuk
+                  </Button>
+                </Link>
+                <Link href="/register-store">
+                  <Button size="sm" className="bg-[#028697] hover:bg-[#017585] text-white">
+                    Daftar Toko
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -110,17 +117,28 @@ export default async function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-            <Link href="/register-store">
-              <Button size="lg" className="bg-[#028697] hover:bg-[#017585] text-white px-8 h-12 text-base shadow-lg hover:shadow-xl transition-all">
-                Buat Toko Gratis
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button size="lg" variant="outline" className="border-[#028697] text-[#028697] hover:bg-[#e0f9fc] px-8 h-12 text-base">
-                Masuk ke Toko
-              </Button>
-            </Link>
+            {session ? (
+              <Link href="/store-select">
+                <Button size="lg" className="bg-[#028697] hover:bg-[#017585] text-white px-8 h-12 text-base shadow-lg hover:shadow-xl transition-all">
+                  Masuk ke Dasbor
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/register-store">
+                  <Button size="lg" className="bg-[#028697] hover:bg-[#017585] text-white px-8 h-12 text-base shadow-lg hover:shadow-xl transition-all">
+                    Buat Toko Gratis
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </Link>
+                <Link href="/login">
+                  <Button size="lg" variant="outline" className="border-[#028697] text-[#028697] hover:bg-[#e0f9fc] px-8 h-12 text-base">
+                    Masuk ke Toko
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           <p className="text-xs text-gray-400">
