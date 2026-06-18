@@ -4,9 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Home, Package, ShoppingCart, Settings, LogOut, Coins } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
 import { logoutAction } from '@/actions/auth';
 import { PlanBadge } from '@/components/plan/plan-badge';
+
+interface SubNavItem {
+  href: string;
+  label: string;
+}
 
 interface NavItem {
   href: string;
@@ -14,6 +18,7 @@ interface NavItem {
   mobileLabel: string;
   icon: React.ReactNode;
   matchPaths?: string[];
+  subItems?: SubNavItem[];
 }
 
 interface NavigationProps {
@@ -24,13 +29,8 @@ interface NavigationProps {
   storePlan?: 'FREE' | 'PRO';
 }
 
-type CompactLevel = 'full' | 'medium' | 'compact' | 'icons-only';
-
 export function Navigation({ role, userName, storeSlug, storeName, storePlan = 'FREE' }: NavigationProps) {
   const pathname = usePathname();
-  const [compactLevel, setCompactLevel] = useState<CompactLevel>('full');
-  const navContainerRef = useRef<HTMLDivElement>(null);
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const base = `/${storeSlug}`;
 
@@ -51,6 +51,11 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
         `${base}/admin/inventory/stock`,
         `${base}/admin/inventory/reports`,
       ],
+      subItems: [
+        { href: `${base}/admin/inventory/products`, label: 'Produk' },
+        { href: `${base}/admin/inventory/stock`,    label: 'Stok' },
+        { href: `${base}/admin/inventory/reports`,  label: 'Laporan' },
+      ],
     },
     {
       href: `${base}/admin/sales-customers/sales`,
@@ -62,6 +67,11 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
         `${base}/admin/sales-customers/customers`,
         `${base}/admin/sales-customers/recap`,
       ],
+      subItems: [
+        { href: `${base}/admin/sales-customers/sales`,     label: 'Penjualan' },
+        { href: `${base}/admin/sales-customers/customers`, label: 'Customer' },
+        { href: `${base}/admin/sales-customers/recap`,     label: 'Rekap' },
+      ],
     },
     {
       href: `${base}/admin/finance/cashflow`,
@@ -72,6 +82,10 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
         `${base}/admin/finance/cashflow`,
         `${base}/admin/finance/reports`,
       ],
+      subItems: [
+        { href: `${base}/admin/finance/cashflow`, label: 'Cashflow' },
+        { href: `${base}/admin/finance/reports`,  label: 'Laporan Keuangan' },
+      ],
     },
     {
       href: `${base}/admin/settings/points`,
@@ -80,7 +94,13 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       icon: <Settings className="w-4 h-4" />,
       matchPaths: [
         `${base}/admin/settings/points`,
+        `${base}/admin/settings/categories`,
         `${base}/admin/settings/profile`,
+      ],
+      subItems: [
+        { href: `${base}/admin/settings/points`,     label: 'Sistem Poin' },
+        { href: `${base}/admin/settings/categories`, label: 'Kategori' },
+        { href: `${base}/admin/settings/profile`,    label: 'Profil Admin' },
       ],
     },
   ];
@@ -102,6 +122,11 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
         `${base}/manager/sales-customers/customers`,
         `${base}/manager/sales-customers/recap`,
       ],
+      subItems: [
+        { href: `${base}/manager/sales-customers/sales`,     label: 'Penjualan' },
+        { href: `${base}/manager/sales-customers/customers`, label: 'Customer' },
+        { href: `${base}/manager/sales-customers/recap`,     label: 'Rekap' },
+      ],
     },
     {
       href: `${base}/manager/inventory/products`,
@@ -111,6 +136,10 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       matchPaths: [
         `${base}/manager/inventory/products`,
         `${base}/manager/inventory/stock`,
+      ],
+      subItems: [
+        { href: `${base}/manager/inventory/products`, label: 'Produk' },
+        { href: `${base}/manager/inventory/stock`,    label: 'Kelola Stok' },
       ],
     },
   ];
@@ -141,173 +170,112 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
     return false;
   };
 
-  useEffect(() => {
-    const checkNavSpace = () => {
-      if (!navContainerRef.current) return;
-      const container = navContainerRef.current;
-      const containerWidth = container.offsetWidth;
-      const screenWidth = window.innerWidth;
-      const userInfoWidth = screenWidth >= 1280 ? 280 : screenWidth >= 1024 ? 160 : 0;
-      const availableNavWidth = containerWidth - userInfoWidth;
-      const itemCount = navItems.length;
-
-      if (availableNavWidth >= itemCount * 140)      setCompactLevel('full');
-      else if (availableNavWidth >= itemCount * 100) setCompactLevel('medium');
-      else if (availableNavWidth >= itemCount * 75)  setCompactLevel('compact');
-      else                                           setCompactLevel('icons-only');
-    };
-
-    const handleResize = () => {
-      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
-      resizeTimeoutRef.current = setTimeout(checkNavSpace, 50);
-    };
-
-    const resizeObserver = new ResizeObserver(handleResize);
-    if (navContainerRef.current) resizeObserver.observe(navContainerRef.current);
-
-    checkNavSpace();
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', handleResize);
-      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
-    };
-  }, [navItems.length]);
-
-  const getNavItemStyles = () => {
-    switch (compactLevel) {
-      case 'full':       return { gap: 'gap-2',   padding: 'px-4 py-2', textWidth: 'w-auto', textOpacity: 'opacity-100' };
-      case 'medium':     return { gap: 'gap-2',   padding: 'px-3 py-2', textWidth: 'w-auto', textOpacity: 'opacity-100' };
-      case 'compact':    return { gap: 'gap-1.5', padding: 'px-2 py-2', textWidth: 'w-auto', textOpacity: 'opacity-100' };
-      case 'icons-only': return { gap: 'gap-1',   padding: 'p-2.5',     textWidth: 'w-0',    textOpacity: 'opacity-0'   };
-    }
-  };
-
-  const navStyles = getNavItemStyles();
-  const showTooltip = compactLevel === 'icons-only';
-
   return (
     <>
-      {/* ── TOP NAV ── */}
-      <nav className="bg-white/95 border-b border-[#a8f0f8] sticky top-0 z-40 shadow-md backdrop-blur-sm">
+      {/* ── DESKTOP SIDEBAR (lg dan ke atas) ── */}
+      <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64 bg-white/95 border-r border-[#a8f0f8] shadow-md backdrop-blur-sm">
+        {/* Logo */}
+        <div className="flex items-center h-16 px-6 border-b border-[#a8f0f8] flex-shrink-0">
+          <Link
+            href={`${base}/admin`}
+            className="text-lg font-bold text-[#028697] truncate hover:opacity-80 transition-opacity"
+          >
+            {storeName ?? 'Catat Bisnisku'}
+          </Link>
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = isNavItemActive(item);
+            return (
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`
+                    relative group flex items-center gap-3 px-3 py-2.5 rounded-lg
+                    font-medium text-sm transition-all duration-200
+                    ${isActive
+                      ? 'bg-[#028697] text-white shadow-md'
+                      : 'text-gray-600 hover:text-[#028697] hover:bg-[#e0f9fc]'
+                    }
+                  `}
+                >
+                  <span className="flex-shrink-0 transition-transform duration-200 group-hover:scale-110">
+                    {item.icon}
+                  </span>
+                  <span className="truncate">{item.label}</span>
+                </Link>
+
+                {item.subItems && isActive && (
+                  <div className="mt-1 mb-1 ml-[1.15rem] pl-4 border-l-2 border-[#a8f0f8] space-y-0.5">
+                    {item.subItems.map((sub) => {
+                      const subActive = pathname.startsWith(sub.href);
+                      return (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          className={`
+                            block px-3 py-1.5 rounded-md text-sm truncate transition-colors duration-150
+                            ${subActive
+                              ? 'bg-[#e0f9fc] text-[#028697] font-medium'
+                              : 'text-gray-500 hover:text-[#028697] hover:bg-[#e0f9fc]/60'
+                            }
+                          `}
+                        >
+                          {sub.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* User info + logout */}
+        <div className="flex-shrink-0 border-t border-[#a8f0f8] p-4 space-y-3">
+          <div className="text-sm">
+            <p className="font-medium text-gray-900 truncate">{userName ?? 'User'}</p>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#e0f9fc] text-[#0fa8be] whitespace-nowrap">
+                {role}
+              </span>
+              <PlanBadge plan={storePlan} storeSlug={storeSlug} compact />
+            </div>
+          </div>
+
+          <form action={logoutAction}>
+            <Button
+              variant="outline"
+              size="sm"
+              type="submit"
+              className="w-full group relative overflow-hidden border-[#a8f0f8] text-[#028697] hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-all duration-300 hover:shadow-md"
+            >
+              <LogOut className="w-4 h-4 mr-2 transition-transform duration-300 group-hover:rotate-12" />
+              Logout
+            </Button>
+          </form>
+        </div>
+      </aside>
+
+      {/* ── MOBILE TOP BAR (di bawah lg) ── */}
+      <nav className="lg:hidden bg-white/95 border-b border-[#a8f0f8] sticky top-0 z-40 shadow-md backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
 
-            {/* Left – Logo + Desktop Nav */}
-            <div className="flex items-center flex-1 min-w-0 gap-3 sm:gap-4 lg:gap-6">
+            {/* Logo */}
+            <div className="flex items-center flex-1 min-w-0 gap-3 sm:gap-4">
               <div className="flex-shrink-0">
                 <Link href={`${base}/admin`} className="text-lg font-bold text-[#028697] whitespace-nowrap hover:opacity-80 transition-opacity">
                   {storeName ?? 'Catat Bisnisku'}
                 </Link>
               </div>
-
-              {/* Desktop nav links */}
-              <div
-                ref={navContainerRef}
-                className="hidden lg:flex flex-1 items-center overflow-x-auto scrollbar-hide"
-              >
-                <div className={`flex items-center transition-all duration-500 ease-in-out ${navStyles.gap}`}>
-                  {navItems.map((item) => {
-                    const isActive = isNavItemActive(item);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        title={showTooltip ? item.label : undefined}
-                        className={`
-                          relative z-10 group inline-flex items-center justify-center
-                          font-medium rounded-lg transition-all duration-500 ease-in-out
-                          ${navStyles.gap} ${navStyles.padding}
-                          ${isActive
-                            ? 'bg-[#028697] text-white shadow-lg scale-105'
-                            : 'text-gray-600 hover:text-[#028697] hover:bg-[#e0f9fc] hover:scale-105'
-                          }
-                        `}
-                      >
-                        <span className="flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
-                          {item.icon}
-                        </span>
-                        <span className={`
-                          whitespace-nowrap font-medium overflow-hidden
-                          transition-all duration-500 ease-in-out
-                          ${navStyles.textWidth} ${navStyles.textOpacity}
-                          ${compactLevel === 'compact' ? 'text-xs' : 'text-sm'}
-                        `}>
-                          {item.label}
-                        </span>
-                        <span className={`
-                          absolute inset-0 -z-10 rounded-lg
-                          group-hover:opacity-100 transition-opacity duration-300
-                          ${isActive ? 'bg-white/10' : 'bg-[#028697]/5'}
-                        `} />
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Right – Desktop: user info + logout */}
-            <div className={`
-              hidden lg:flex items-center flex-shrink-0
-              transition-all duration-500 ease-in-out
-              ${compactLevel === 'icons-only' ? 'gap-1 ml-2' :
-                compactLevel === 'compact'    ? 'gap-2 ml-3' : 'gap-3 ml-6'}
-            `}>
-              <div className={`
-                text-sm text-right transition-all duration-500 ease-in-out overflow-hidden
-                ${compactLevel === 'icons-only' ? 'w-0 opacity-0' : 'opacity-100'}
-              `}>
-                <p className={`
-                  font-medium text-gray-900 whitespace-nowrap transition-all duration-300
-                  ${compactLevel === 'medium' ? 'text-xs' : 'text-sm'}
-                  hidden xl:block
-                `}>
-                  {userName ?? 'User'}
-                </p>
-                <span className={`
-                  inline-flex items-center px-2 py-0.5 rounded-full font-medium
-                  bg-[#e0f9fc] text-[#0fa8be] whitespace-nowrap
-                  transition-all duration-300
-                  ${compactLevel === 'medium' ? 'text-[10px]' : 'text-xs'}
-                `}>
-                  {role}
-                </span>
-                <PlanBadge plan={storePlan} storeSlug={storeSlug} compact />
-              </div>
-
-              <form action={logoutAction}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="submit"
-                  className={`
-                    group relative overflow-hidden whitespace-nowrap
-                    border-[#a8f0f8] text-[#028697]
-                    hover:bg-red-50 hover:border-red-300 hover:text-red-600
-                    transition-all duration-500 ease-in-out
-                    ${compactLevel === 'icons-only' ? 'px-2' : 'px-3'}
-                    hover:scale-105 hover:shadow-md
-                  `}
-                >
-                  <LogOut className={`
-                    w-4 h-4 transition-all duration-300
-                    ${compactLevel === 'icons-only' ? '' : 'xl:mr-2'}
-                    group-hover:rotate-12
-                  `} />
-                  <span className={`
-                    transition-all duration-500 ease-in-out overflow-hidden inline-block
-                    ${compactLevel === 'icons-only' ? 'w-0 opacity-0' : 'w-0 opacity-0 xl:w-auto xl:opacity-100'}
-                  `}>
-                    Logout
-                  </span>
-                </Button>
-              </form>
             </div>
 
             {/* Mobile – user info + logout */}
-            <div className="flex lg:hidden items-center gap-2">
+            <div className="flex items-center gap-2">
               <div className="flex flex-col items-end">
                 <span className="text-xs font-semibold text-gray-700 max-w-[90px] truncate leading-tight">
                   {userName ?? 'User'}

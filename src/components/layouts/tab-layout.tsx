@@ -38,7 +38,9 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
         value={currentTab}
         onValueChange={useRouterPush ? (v) => router.push(`${pathname.split('/').slice(0, -1).join('/')}/${v}`) : undefined}
       >
-        <div className="sticky top-16 z-30 bg-gray-50 -mx-4 px-4 md:-mx-6 md:px-6 py-3 border-b border-gray-200 shadow-sm">
+        {/* Tab navigasi sub-halaman — hanya untuk mobile/tablet.
+            Di desktop (lg+), navigasi yang sama sudah tersedia di sidebar. */}
+        <div className="lg:hidden sticky top-16 z-30 bg-gray-50 -mx-4 px-4 md:-mx-6 md:px-6 py-3 border-b border-gray-200 shadow-sm">
           <TabsList className={`grid w-full max-w-${tabs.length === 2 ? 'md' : 'lg'} grid-cols-${tabs.length}`}>
             {tabs.map((tab) =>
               tab.href ? (
@@ -54,7 +56,7 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
           </TabsList>
         </div>
 
-        <div className="pt-6">{children}</div>
+        <div className="pt-6 lg:pt-0">{children}</div>
       </Tabs>
     </div>
   );

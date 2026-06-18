@@ -42,7 +42,7 @@ export default async function ManagerLayout({
         storeName={storeUser.store.name}
         storePlan={storeUser.store.plan as 'FREE' | 'PRO'}
       />
-      <main className="container mx-auto px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8">
+      <main className="container mx-auto px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8 lg:ml-64">
         {children}
       </main>
     </div>

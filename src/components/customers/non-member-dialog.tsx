@@ -111,7 +111,9 @@ export function NonMemberDialog({ mode, customer, trigger, open: controlledOpen,
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
+      {trigger !== null && (
+        <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
+      )}
 
       <DialogContent
         aria-describedby={undefined}
