@@ -41,8 +41,8 @@ export function CustomerActions({ isAdmin }: CustomerActionsProps) {
     return (
       <>
         {/* Dialogs — satu instance masing-masing, dikontrol state */}
-        <NonMemberDialog mode="create" open={nonMemberOpen} onOpenChange={setNonMemberOpen} trigger={<></>} />
-        <CustomerDialog  mode="create" open={memberOpen}    onOpenChange={setMemberOpen}    trigger={<></>} />
+        <NonMemberDialog mode="create" open={nonMemberOpen} onOpenChange={setNonMemberOpen} trigger={null} />
+        <CustomerDialog  mode="create" open={memberOpen}    onOpenChange={setMemberOpen}    trigger={null} />
 
         {/* Desktop — pakai AddCustomerMenu yang sudah ada */}
         <div className="hidden sm:block">

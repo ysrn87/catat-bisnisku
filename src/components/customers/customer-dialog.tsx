@@ -197,21 +197,23 @@ export function CustomerDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button
-            variant={isCreate ? 'default' : 'ghost'}
-            size={isCreate ? 'default' : 'sm'}
-            className={isCreate ? 'bg-[#028697] hover:bg-[#027080] shadow-sm' : 'group'}
-          >
-            {isCreate ? (
-              <><Plus className="w-4 h-4 mr-2" />Tambah Member</>
-            ) : (
-              <Pencil className="w-4 h-4 text-white group-hover:text-slate-900 transition-colors" />
-            )}
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger !== null && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button
+              variant={isCreate ? 'default' : 'ghost'}
+              size={isCreate ? 'default' : 'sm'}
+              className={isCreate ? 'bg-[#028697] hover:bg-[#027080] shadow-sm' : 'group'}
+            >
+              {isCreate ? (
+                <><Plus className="w-4 h-4 mr-2" />Tambah Member</>
+              ) : (
+                <Pencil className="w-4 h-4 text-white group-hover:text-slate-900 transition-colors" />
+              )}
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent aria-describedby={undefined} className="sm:max-w-[500px] p-0 gap-0 overflow-hidden border-0 shadow-2xl">
         {/* Header */}
