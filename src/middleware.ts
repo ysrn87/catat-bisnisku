@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/offline',
   '/api/auth',
   '/api/store',   // internal API — skip auth di middleware
+  '/api/midtrans',  // webhook dari server Midtrans
 ];
 
 // ─── Route yang butuh session tapi tidak butuh store context ──────────────────
