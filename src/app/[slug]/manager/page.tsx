@@ -117,10 +117,10 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
       getPointsConversionRate(),
     ]);
 
-  const BerandaContent = (
+  const RingkasanContent = (
     <div className="space-y-6 md:space-y-8">
       <div className="hidden md:block">
-        <h1 className="text-2xl md:text-3xl font-bold">Beranda Manager</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Ringkasan Manager</h1>
         <p className="text-sm md:text-base text-gray-600 mt-1">
           Selamat datang! Berikut ringkasan toko kamu.
         </p>
@@ -240,7 +240,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
 
   return (
     <DashboardTabs
-      berandaContent={BerandaContent}
+      ringkasanContent={RingkasanContent}
       posContent={PosContent}
     />
   );

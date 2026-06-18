@@ -312,7 +312,7 @@ export default function RegisterStorePage() {
 
             <div className="text-center">
               <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1">
-                <ArrowLeft className="w-3 h-3" /> Kembali ke beranda
+                <ArrowLeft className="w-3 h-3" /> Kembali ke ringkasan
               </Link>
             </div>
 

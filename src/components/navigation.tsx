@@ -41,6 +41,11 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       label: 'Dashboard',
       mobileLabel: 'Dashboard',
       icon: <Home className="w-4 h-4" />,
+      matchPaths: [`${base}/admin/summary`],
+      subItems: [
+        { href: `${base}/admin`,     label: 'POS Kasir' },
+        { href: `${base}/admin/summary`, label: 'Ringkasan' },
+      ],
     },
     {
       href: `${base}/admin/inventory/products`,
@@ -215,28 +220,38 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                   <span className="truncate">{item.label}</span>
                 </Link>
 
-                {item.subItems && isActive && (
-                  <div className="mt-1 mb-1 ml-[1.15rem] pl-4 border-l-2 border-[#a8f0f8] space-y-0.5">
-                    {item.subItems.map((sub) => {
-                      const subActive = pathname.startsWith(sub.href);
-                      return (
-                        <Link
-                          key={sub.href}
-                          href={sub.href}
-                          className={`
-                            block px-3 py-1.5 rounded-md text-sm truncate transition-colors duration-150
-                            ${subActive
-                              ? 'bg-[#e0f9fc] text-[#028697] font-medium'
-                              : 'text-gray-500 hover:text-[#028697] hover:bg-[#e0f9fc]/60'
-                            }
-                          `}
-                        >
-                          {sub.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
+                {item.subItems && isActive && (() => {
+                  // Pilih sub-item paling spesifik yang cocok dengan path saat ini.
+                  // Perlu karena href Ringkasan ("/admin/summary") adalah prefix dari
+                  // href POS Kasir ("/admin") — tanpa ini keduanya akan
+                  // ke-highlight bersamaan saat berada di halaman POS Kasir.
+                  const matchedSub = [...item.subItems]
+                    .sort((a, b) => b.href.length - a.href.length)
+                    .find((sub) => pathname === sub.href || pathname.startsWith(sub.href));
+
+                  return (
+                    <div className="mt-1 mb-1 ml-[1.15rem] pl-4 border-l-2 border-[#a8f0f8] space-y-0.5">
+                      {item.subItems.map((sub) => {
+                        const subActive = matchedSub?.href === sub.href;
+                        return (
+                          <Link
+                            key={sub.href}
+                            href={sub.href}
+                            className={`
+                              block px-3 py-1.5 rounded-md text-sm truncate transition-colors duration-150
+                              ${subActive
+                                ? 'bg-[#e0f9fc] text-[#028697] font-medium'
+                                : 'text-gray-500 hover:text-[#028697] hover:bg-[#e0f9fc]/60'
+                              }
+                            `}
+                          >
+                            {sub.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}
