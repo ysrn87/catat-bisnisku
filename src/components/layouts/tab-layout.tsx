@@ -23,9 +23,11 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
   const pathname = usePathname();
   const router = useRouter();
 
-  const currentTab = tabs.find((t) =>
-    t.href ? pathname.includes(t.href) : pathname.endsWith(t.value)
-  )?.value ?? tabs[0].value;
+  const currentTab = [...tabs]
+    .sort((a, b) => (b.href?.length ?? 0) - (a.href?.length ?? 0))
+    .find((t) =>
+      t.href ? pathname === t.href || pathname.startsWith(t.href + '/') : pathname.endsWith(t.value)
+    )?.value ?? tabs[0].value;
 
   return (
     <div className="-mt-7 md:-mt-0">
