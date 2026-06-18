@@ -15,7 +15,7 @@ interface TabLayoutProps {
   description: string;
   tabs: TabItem[];
   children: React.ReactNode;
-  /** Gunakan router.push saat tab tidak pakai href (e.g. sales-customers) */
+  /** Gunakan router.push saat tab tidak pakai href (e.g. transactions) */
   useRouterPush?: boolean;
 }
 

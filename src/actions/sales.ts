@@ -156,8 +156,8 @@ export async function createSaleAction(input: CreateSaleInput) {
       return newSale;
     });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/sales`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/sales`);
+    revalidatePath(`/${storeSlug}/admin/transactions/sales`);
+    revalidatePath(`/${storeSlug}/manager/transactions/sales`);
     revalidatePath(`/${storeSlug}/admin/inventory/stock`);
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
     return { success: true, saleId: sale.id };
@@ -306,8 +306,8 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
       }
     });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/sales`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/sales`);
+    revalidatePath(`/${storeSlug}/admin/transactions/sales`);
+    revalidatePath(`/${storeSlug}/manager/transactions/sales`);
     revalidatePath(`/${storeSlug}/admin/inventory/stock`);
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
@@ -366,8 +366,8 @@ export async function deleteSaleAction(id: string) {
       await tx.sale.delete({ where: { id } });
     });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/sales`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/sales`);
+    revalidatePath(`/${storeSlug}/admin/transactions/sales`);
+    revalidatePath(`/${storeSlug}/manager/transactions/sales`);
     revalidatePath(`/${storeSlug}/admin/inventory/stock`);
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);

@@ -54,8 +54,8 @@ export async function updateSetting(key: string, value: string, description?: st
   });
 
   revalidatePath(`/${storeSlug}/admin/settings`);
-  revalidatePath(`/${storeSlug}/admin/sales-customers/sales`);
-  revalidatePath(`/${storeSlug}/manager/sales-customers/sales`);
+  revalidatePath(`/${storeSlug}/admin/transactions/sales`);
+  revalidatePath(`/${storeSlug}/manager/transactions/sales`);
 }
 
 export async function updatePointsConversionRate(rate: number) {

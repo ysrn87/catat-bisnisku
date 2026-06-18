@@ -234,8 +234,8 @@ export async function createCustomerAction(formData: FormData) {
         data: { storeId, userId: existingUser.id, role: 'MEMBER' },
       });
 
-      revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-      revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+      revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+      revalidatePath(`/${storeSlug}/manager/transactions/customers`);
       return { success: true, linked: true, name: existingUser.name };
     }
 
@@ -269,8 +269,8 @@ export async function createCustomerAction(formData: FormData) {
       await tx.storeUser.create({ data: { storeId, userId: newUser.id, role: 'MEMBER' } });
     });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     return { success: true, linked: false };
   } catch (error) {
     console.error('Create customer error:', error);
@@ -335,8 +335,8 @@ export async function updateCustomerAction(id: string, formData: FormData) {
 
     await db.user.update({ where: { id }, data: updateData });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     return { success: true };
   } catch (error) {
     console.error('Update customer error:', error);
@@ -361,8 +361,8 @@ export async function deleteCustomerAction(id: string) {
     // Hapus StoreUser saja, user-nya tetap ada
     await db.storeUser.delete({ where: { storeId_userId: { storeId, userId: id } } });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     return { success: true };
   } catch (error) {
     console.error('Delete customer error:', error);

@@ -11,12 +11,12 @@ export default async function SalesCustomersLayout({
 
   return (
     <TabLayout
-      title="Penjualan & Pelanggan"
+      title="Transaksi"
       description="Kelola transaksi penjualan dan data pelanggan"
       tabs={[
-        { value: 'sales',     label: 'Penjualan', href: `/${slug}/admin/sales-customers/sales` },
-        { value: 'customers', label: 'Customer',  href: `/${slug}/admin/sales-customers/customers` },
-        { value: 'recap',     label: 'Rekap',     href: `/${slug}/admin/sales-customers/recap` },
+        { value: 'sales',     label: 'Penjualan', href: `/${slug}/admin/transactions/sales` },
+        { value: 'customers', label: 'Customer',  href: `/${slug}/admin/transactions/customers` },
+        { value: 'recap',     label: 'Rekap',     href: `/${slug}/admin/transactions/recap` },
       ]}
     >
       {children}

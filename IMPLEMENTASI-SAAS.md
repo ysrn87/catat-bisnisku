@@ -30,17 +30,17 @@ mkdir "src\app\[slug]\admin\inventory\stock"
 mkdir "src\app\[slug]\admin\inventory\reports"
 mkdir "src\app\[slug]\admin\finance\cashflow"
 mkdir "src\app\[slug]\admin\finance\reports"
-mkdir "src\app\[slug]\admin\sales-customers\sales"
-mkdir "src\app\[slug]\admin\sales-customers\customers"
-mkdir "src\app\[slug]\admin\sales-customers\recap"
+mkdir "src\app\[slug]\admin\transactions\sales"
+mkdir "src\app\[slug]\admin\transactions\customers"
+mkdir "src\app\[slug]\admin\transactions\recap"
 mkdir "src\app\[slug]\admin\settings\points"
 mkdir "src\app\[slug]\admin\settings\profile"
 mkdir "src\app\[slug]\manager"
 mkdir "src\app\[slug]\manager\inventory\products"
 mkdir "src\app\[slug]\manager\inventory\stock"
-mkdir "src\app\[slug]\manager\sales-customers\sales"
-mkdir "src\app\[slug]\manager\sales-customers\customers"
-mkdir "src\app\[slug]\manager\sales-customers\recap"
+mkdir "src\app\[slug]\manager\transactions\sales"
+mkdir "src\app\[slug]\manager\transactions\customers"
+mkdir "src\app\[slug]\manager\transactions\recap"
 mkdir "src\app\[slug]\member\purchases"
 mkdir "src\app\[slug]\upgrade"
 mkdir "src\app\store-select"
@@ -80,18 +80,18 @@ src/app/page.tsx
 src/app/login/page.tsx
 src/app/admin/inventory/layout.tsx
 src/app/admin/finance/layout.tsx
-src/app/admin/sales-customers/layout.tsx
+src/app/admin/transactions/layout.tsx
 src/app/admin/settings/layout.tsx
 src/app/admin/inventory/products/page.tsx
-src/app/admin/sales-customers/sales/page.tsx
-src/app/admin/sales-customers/customers/page.tsx
-src/app/admin/sales-customers/recap/page.tsx
+src/app/admin/transactions/sales/page.tsx
+src/app/admin/transactions/customers/page.tsx
+src/app/admin/transactions/recap/page.tsx
 src/app/manager/inventory/layout.tsx
-src/app/manager/sales-customers/layout.tsx
+src/app/manager/transactions/layout.tsx
 src/app/manager/inventory/products/page.tsx
-src/app/manager/sales-customers/sales/page.tsx
-src/app/manager/sales-customers/customers/page.tsx
-src/app/manager/sales-customers/recap/page.tsx
+src/app/manager/transactions/sales/page.tsx
+src/app/manager/transactions/customers/page.tsx
+src/app/manager/transactions/recap/page.tsx
 src/components/customers/customers-table.tsx
 src/actions/settings.ts
 src/actions/products.ts
@@ -122,10 +122,10 @@ src/app/[slug]/admin/inventory/reports/page.tsx
 src/app/[slug]/admin/finance/layout.tsx
 src/app/[slug]/admin/finance/cashflow/page.tsx
 src/app/[slug]/admin/finance/reports/page.tsx
-src/app/[slug]/admin/sales-customers/layout.tsx
-src/app/[slug]/admin/sales-customers/sales/page.tsx
-src/app/[slug]/admin/sales-customers/customers/page.tsx
-src/app/[slug]/admin/sales-customers/recap/page.tsx
+src/app/[slug]/admin/transactions/layout.tsx
+src/app/[slug]/admin/transactions/sales/page.tsx
+src/app/[slug]/admin/transactions/customers/page.tsx
+src/app/[slug]/admin/transactions/recap/page.tsx
 src/app/[slug]/admin/settings/layout.tsx
 src/app/[slug]/admin/settings/points/page.tsx
 src/app/[slug]/admin/settings/profile/page.tsx
@@ -134,10 +134,10 @@ src/app/[slug]/manager/page.tsx
 src/app/[slug]/manager/inventory/layout.tsx
 src/app/[slug]/manager/inventory/products/page.tsx
 src/app/[slug]/manager/inventory/stock/page.tsx
-src/app/[slug]/manager/sales-customers/layout.tsx
-src/app/[slug]/manager/sales-customers/sales/page.tsx
-src/app/[slug]/manager/sales-customers/customers/page.tsx
-src/app/[slug]/manager/sales-customers/recap/page.tsx
+src/app/[slug]/manager/transactions/layout.tsx
+src/app/[slug]/manager/transactions/sales/page.tsx
+src/app/[slug]/manager/transactions/customers/page.tsx
+src/app/[slug]/manager/transactions/recap/page.tsx
 src/app/[slug]/member/layout.tsx
 src/app/[slug]/member/page.tsx
 src/app/[slug]/member/purchases/page.tsx
@@ -291,7 +291,7 @@ Setelah login → `/store-select` → pilih toko → `/toko-berkah/admin`
 http://localhost:3000/toko-berkah/admin
 http://localhost:3000/toko-berkah/admin/inventory/products
 http://localhost:3000/toko-berkah/admin/inventory/stock
-http://localhost:3000/toko-berkah/admin/sales-customers/sales
+http://localhost:3000/toko-berkah/admin/transactions/sales
 http://localhost:3000/toko-berkah/admin/finance/cashflow
 http://localhost:3000/toko-berkah/admin/settings/points
 http://localhost:3000/toko-berkah/upgrade

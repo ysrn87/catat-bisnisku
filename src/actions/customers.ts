@@ -29,8 +29,8 @@ export async function createNonMemberCustomerAction(formData: FormData) {
 
     const customer = await db.customer.create({ data: { storeId, name, phone, address } });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     return { success: true, data: customer };
   } catch (error) {
     console.error('Create non-member customer error:', error);
@@ -168,8 +168,8 @@ export async function upgradeToMemberAction(customerId: string, formData: FormDa
       await tx.customer.delete({ where: { id: customerId } });
     });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     return { success: true };
   } catch (error) {
     console.error('Upgrade to member error:', error);
@@ -202,8 +202,8 @@ export async function updateNonMemberCustomerAction(customerId: string, formData
 
     await db.customer.update({ where: { id: customerId }, data: { name, phone, address } });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     return { success: true };
   } catch (error) {
     console.error('Update non-member customer error:', error);
@@ -227,8 +227,8 @@ export async function deleteNonMemberCustomerAction(customerId: string) {
 
     await db.customer.delete({ where: { id: customerId } });
 
-    revalidatePath(`/${storeSlug}/admin/sales-customers/customers`);
-    revalidatePath(`/${storeSlug}/manager/sales-customers/customers`);
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     return { success: true };
   } catch (error) {
     console.error('Delete non-member customer error:', error);
