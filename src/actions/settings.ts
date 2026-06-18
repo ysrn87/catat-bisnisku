@@ -10,7 +10,8 @@ import { auth } from '@/auth';
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 export async function getSetting(key: string): Promise<string | null> {
-  const { storeId } = await getStoreContext();
+  // requireStoreAccess memastikan user terautentikasi dan punya akses ke store
+  const { storeId } = await requireStoreAccess();
   const setting = await db.settings.findUnique({
     where: { storeId_key: { storeId, key } },
   });
@@ -23,7 +24,7 @@ export async function getPointsConversionRate(): Promise<number> {
 }
 
 export async function getAllSettings() {
-  const { storeId } = await getStoreContext();
+  const { storeId } = await requireStoreAccess();
   const settings = await db.settings.findMany({
     where: { storeId },
     orderBy: { key: 'asc' },

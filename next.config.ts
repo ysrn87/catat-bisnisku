@@ -21,6 +21,7 @@ const securityHeaders = [
       "connect-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://api.sandbox.midtrans.com https://api.midtrans.com",
       "frame-src https://app.sandbox.midtrans.com https://app.midtrans.com",
       "frame-ancestors 'none'",
+      "worker-src 'self'",
     ].join('; '),
   },
 ];
@@ -69,6 +70,12 @@ export default withPWA({
     },
     {
       urlPattern: /\/api\/.*/i,
+      handler: 'NetworkOnly',
+    },
+    {
+      // Halaman sensitif — tidak boleh di-cache service worker
+      // Di perangkat shared, user lain bisa akses cached data keuangan
+      urlPattern: /\/(admin|manager|finance|reports|customers|members|upgrade|settings)/i,
       handler: 'NetworkOnly',
     },
     {

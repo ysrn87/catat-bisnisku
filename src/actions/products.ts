@@ -114,9 +114,9 @@ export async function createVariantAction(formData: FormData) {
     }
 
     const productId  = formData.get('productId')  as string;
-    const name       = formData.get('name')        as string;
-    const sku        = formData.get('sku')         as string;
-    const barcodeRaw = (formData.get('barcode') as string)?.trim() || '';
+    const name       = sanitizeName(formData.get('name') as string, 100);
+    const sku        = sanitizeSku(formData.get('sku')  as string);
+    const barcodeRaw = (formData.get('barcode') as string)?.trim().replace(/[^a-zA-Z0-9\-_.]/g, '') || '';
     const barcode    = barcodeRaw !== '' ? barcodeRaw : null;
     const price      = parseFloat(formData.get('price')    as string);
     const cost       = parseFloat(formData.get('cost')     as string);
@@ -127,6 +127,8 @@ export async function createVariantAction(formData: FormData) {
     if (!productId || !name || !sku || isNaN(price) || isNaN(cost) || isNaN(stock) || isNaN(lowStock)) {
       return { success: false, error: 'Semua field wajib diisi' };
     }
+    if (price < 0 || cost < 0) return { success: false, error: 'Harga tidak boleh negatif' };
+    if (stock < 0 || lowStock < 0) return { success: false, error: 'Stok tidak boleh negatif' };
 
     // Pastikan product milik store ini
     const product = await db.product.findFirst({ where: { id: productId, storeId } });
@@ -205,6 +207,8 @@ export async function updateVariantAction(id: string, formData: FormData) {
     if (!name || !sku || isNaN(price) || isNaN(cost) || isNaN(lowStock)) {
       return { success: false, error: 'Semua field wajib diisi' };
     }
+    if (price < 0 || cost < 0) return { success: false, error: 'Harga tidak boleh negatif' };
+    if (lowStock < 0) return { success: false, error: 'Stok minimum tidak boleh negatif' };
 
     const variant = await db.productVariant.findFirst({ where: { id, storeId } });
     if (!variant) return { success: false, error: 'Varian tidak ditemukan' };

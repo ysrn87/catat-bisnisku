@@ -15,7 +15,7 @@ export interface CategoryData {
 // ─── Read ──────────────────────────────────────────────────────────────────────
 
 export async function getCategories(): Promise<CategoryData[]> {
-  const { storeId } = await getStoreContext();
+  const { storeId } = await requireStoreAccess();
 
   return db.category.findMany({
     where: { storeId },
