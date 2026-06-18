@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/utils';
 import { Package } from 'lucide-react';
 import { InventoryReportTable } from '@/components/reports/inventory-report-table';
+import { PlanGate } from '@/components/plan/plan-gate';
+import { ExportButton } from '@/components/reports/export-button';
 
 async function getInventoryReport(storeId: string, page = 1, limit = 10) {
   const skip = (page - 1) * limit;
@@ -25,11 +27,12 @@ async function getInventoryReport(storeId: string, page = 1, limit = 10) {
   };
 }
 
-export default async function InventoryReportsPage({ searchParams }: {
+export default async function InventoryReportsPage({ params, searchParams }: {
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ page?: string; limit?: string }>;
 }) {
-  const p = await searchParams;
-  const { storeId } = await getStoreContext();
+  const [{ slug }, p] = await Promise.all([params, searchParams]);
+  const { storeId, storePlan } = await getStoreContext();
   const data = await getInventoryReport(storeId, Number(p.page) || 1, Number(p.limit) || 10);
 
   return (
@@ -73,7 +76,12 @@ export default async function InventoryReportsPage({ searchParams }: {
         </TabsList>
         <TabsContent value="inventory">
           <Card>
-            <CardHeader><CardTitle className="text-xs font-medium">Status Inventori</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-xs font-medium">Status Inventori</CardTitle>
+              <PlanGate plan={storePlan} storeSlug={slug} feature="Export Excel" description="Upgrade ke PRO untuk export laporan inventori">
+                <ExportButton type="inventory" />
+              </PlanGate>
+            </CardHeader>
             <CardContent>
               <InventoryReportTable inventory={data.inventory} currentPage={Number(p.page) || 1} pageSize={Number(p.limit) || 10} totalItems={data.totalProducts} />
             </CardContent>

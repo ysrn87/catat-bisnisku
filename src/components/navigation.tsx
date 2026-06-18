@@ -27,9 +27,10 @@ interface NavigationProps {
   storeSlug: string;
   storeName?: string;
   storePlan?: 'FREE' | 'PRO';
+  logoUrl?: string | null;
 }
 
-export function Navigation({ role, userName, storeSlug, storeName, storePlan = 'FREE' }: NavigationProps) {
+export function Navigation({ role, userName, storeSlug, storeName, storePlan = 'FREE', logoUrl }: NavigationProps) {
   const pathname = usePathname();
 
   const base = `/${storeSlug}`;
@@ -174,11 +175,18 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
     <>
       {/* ── DESKTOP SIDEBAR (lg dan ke atas) ── */}
       <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64 bg-white/95 border-r border-[#a8f0f8] shadow-md backdrop-blur-sm">
-        {/* Logo */}
-        <div className="flex items-center h-16 px-6 border-b border-[#a8f0f8] flex-shrink-0">
+        {/* Logo + Store name */}
+        <div className="flex items-center gap-3 h-16 px-4 border-b border-[#a8f0f8] flex-shrink-0">
+          {logoUrl ? (
+            <img src={logoUrl} alt={storeName ?? 'Logo'} className="w-8 h-8 rounded-lg object-contain flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-[#028697] flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-xs font-bold">{(storeName ?? 'C').charAt(0).toUpperCase()}</span>
+            </div>
+          )}
           <Link
             href={`${base}/admin`}
-            className="text-lg font-bold text-[#028697] truncate hover:opacity-80 transition-opacity"
+            className="text-sm font-bold text-[#028697] truncate hover:opacity-80 transition-opacity leading-tight"
           >
             {storeName ?? 'Catat Bisnisku'}
           </Link>
