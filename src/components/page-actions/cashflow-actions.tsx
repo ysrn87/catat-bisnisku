@@ -4,6 +4,10 @@ import { CashflowDialog } from '@/components/cashflow/cashflow-dialog';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
+interface CashflowActionsProps {
+  existingCategories?: string[];
+}
+
 const FAB_CLASS = [
   'sm:hidden fixed bottom-24 right-6 z-50',
   'w-12 h-12 rounded-full bg-[#00a090] text-white shadow-lg',
@@ -11,16 +15,16 @@ const FAB_CLASS = [
   'hover:bg-[#007868] active:scale-95 transition-all',
 ].join(' ');
 
-export function CashflowActions() {
+export function CashflowActions({ existingCategories = [] }: CashflowActionsProps) {
   return (
     <CashflowDialog
+      existingCategories={existingCategories}
       trigger={
         <div>
           <Button className="hidden sm:inline-flex bg-[#00a090] hover:bg-[#007868] text-white shadow-sm">
             <Plus className="w-4 h-4 mr-2" />
             Tambah Transaksi
           </Button>
-
           <button type="button" aria-label="Tambah Transaksi" className={FAB_CLASS}>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
               viewBox="0 0 24 24" fill="none" stroke="currentColor"

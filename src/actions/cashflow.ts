@@ -10,9 +10,9 @@ export async function createCashflowAction(formData: FormData) {
     const { storeId, storeSlug, userId } = await requireStoreAccess();
 
     const type        = formData.get('type')        as 'INCOME' | 'EXPENSE';
-    const amount      = parseFloat(formData.get('amount')   as string);
-    const category    = formData.get('category')    as string;
-    const description = (formData.get('description') as string) || '';
+    const amount      = parseFloat(formData.get('amount') as string);
+    const category    = sanitizeCategory(formData.get('category') as string);
+    const description = sanitizeText(formData.get('description') as string, 300);
     const date        = new Date(formData.get('date') as string);
 
     if (!type || !amount || !category || !date) return { success: false, error: 'Data tidak lengkap' };
@@ -23,6 +23,7 @@ export async function createCashflowAction(formData: FormData) {
     });
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
+    revalidatePath(`/${storeSlug}/admin/finance/reports`);
     return { success: true };
   } catch (error) {
     console.error('Cashflow creation error:', error);
@@ -35,21 +36,21 @@ export async function updateCashflowAction(id: string, formData: FormData) {
     const { storeId, storeSlug } = await requireStoreAccess();
 
     const type        = formData.get('type')        as 'INCOME' | 'EXPENSE';
-    const amount      = parseFloat(formData.get('amount')   as string);
-    const category    = formData.get('category')    as string;
-    const description = (formData.get('description') as string) || '';
+    const amount      = parseFloat(formData.get('amount') as string);
+    const category    = sanitizeCategory(formData.get('category') as string);
+    const description = sanitizeText(formData.get('description') as string, 300);
     const date        = new Date(formData.get('date') as string);
 
     if (!type || !amount || !category || !date) return { success: false, error: 'Data tidak lengkap' };
     if (amount <= 0) return { success: false, error: 'Jumlah harus lebih dari 0' };
 
-    // Pastikan cashflow milik store ini
     const cashflow = await db.cashflow.findFirst({ where: { id, storeId } });
     if (!cashflow) return { success: false, error: 'Transaksi tidak ditemukan' };
 
     await db.cashflow.update({ where: { id }, data: { type, amount, category, description, date } });
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
+    revalidatePath(`/${storeSlug}/admin/finance/reports`);
     return { success: true };
   } catch (error) {
     console.error('Cashflow update error:', error);
@@ -67,6 +68,7 @@ export async function deleteCashflowAction(id: string) {
     await db.cashflow.delete({ where: { id } });
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
+    revalidatePath(`/${storeSlug}/admin/finance/reports`);
     return { success: true };
   } catch (error) {
     console.error('Cashflow delete error:', error);
