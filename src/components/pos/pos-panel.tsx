@@ -365,6 +365,26 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     setCart((prev) => prev.filter((i) => i.variantId !== variantId));
   }, []);
 
+  const resetAll = useCallback(() => {
+    setCart([]);
+    setDiscount(0); setDiscountDisplay('');
+    setTax(0); setTaxDisplay('');
+    setOngkir(0); setOngkirDisplay('');
+    setPointsToRedeem(0); setPointsDisplay('');
+    setNotes('');
+    setCustomerType('walk-in');
+    setCustomerId('');
+    setNonMemberId('');
+    setCustomerSearch('');
+    setShowCustomerDropdown(false);
+    setPaymentMethod('CASH');
+    setPaymentStatus(PaymentStatus.PAID);
+    setShowAdvanced(false);
+    setShowCart(false);
+    setReceipt(null);
+  }, []);
+
+  // clearCart tetap ada untuk tombol "Kosongkan" di keranjang (tidak reset customer/payment)
   const clearCart = useCallback(() => {
     setCart([]);
     setDiscount(0); setDiscountDisplay('');
@@ -427,6 +447,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
       });
 
       if (result.success) {
+        setShowCart(false); // tutup bottom sheet mobile sebelum receipt muncul
         const payLabel = PAYMENT_METHODS.find((p) => p.value === paymentMethod)?.label ?? paymentMethod;
         setReceipt({
           saleId: (result as { success: true; saleId: string }).saleId,
@@ -452,24 +473,8 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     }
   };
 
-  const handleNewTransaction = () => {
-    setReceipt(null);
-    clearCart();
-    setCustomerType('walk-in');
-    setCustomerId('');
-    setNonMemberId('');
-    setCustomerSearch('');
-    setPaymentMethod('CASH');
-    setPaymentStatus(PaymentStatus.PAID);
-    setShowAdvanced(false);
-    setShowCart(false);
-  };
-
-  const handleCloseReceipt = () => {
-    setReceipt(null);
-    clearCart();
-    handleNewTransaction();
-  };
+  const handleNewTransaction = () => resetAll();
+  const handleCloseReceipt = () => resetAll();
 
   // ─── Cart panel (reused in desktop right column & mobile bottom sheet) ────
 
@@ -827,7 +832,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                 <p className="text-sm text-muted-foreground">Produk tidak ditemukan</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 pb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 pb-4">
                 {filteredVariants.map((variant) => {
                   const inCart = cart.find((i) => i.variantId === variant.id);
                   const isOutOfStock = variant.product.type !== 'PREORDER' && variant.stock <= 0;

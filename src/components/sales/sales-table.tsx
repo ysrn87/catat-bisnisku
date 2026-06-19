@@ -67,7 +67,7 @@ export function SalesTable({ sales, currentPage, pageSize, totalItems, conversio
   return (
     <>
       {/* Desktop Table View */}
-      <div className="hidden md:block">
+      <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

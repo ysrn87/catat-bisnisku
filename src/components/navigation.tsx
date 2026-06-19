@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useTransition, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, Package, ShoppingCart, Settings, LogOut, Coins } from 'lucide-react';
+import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2 } from 'lucide-react';
 import { logoutAction } from '@/actions/auth';
+import { triggerLoader } from '@/components/layouts/navigation-loader';
 import { PlanBadge } from '@/components/plan/plan-badge';
 
 interface SubNavItem {
@@ -32,6 +34,9 @@ interface NavigationProps {
 
 export function Navigation({ role, userName, storeSlug, storeName, storePlan = 'FREE', logoUrl }: NavigationProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const base = `/${storeSlug}`;
 
@@ -328,10 +333,18 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
           <div className="flex items-stretch justify-around px-1 py-1.5">
             {navItems.map((item) => {
               const isActive = isNavItemActive(item);
+              const isLoading = isPending && pendingHref === item.href;
               return (
-                <Link
+                <button
                   key={item.href}
-                  href={item.href}
+                  onClick={() => {
+                    if (pathname === item.href || isLoading) return;
+                    setPendingHref(item.href);
+                    triggerLoader();
+                    startTransition(() => {
+                      router.push(item.href);
+                    });
+                  }}
                   className="relative flex flex-col items-center justify-center gap-1 flex-1 py-2 px-1 rounded-xl transition-all duration-200 group"
                 >
                   {isActive && (
@@ -345,14 +358,18 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                       ? 'text-white scale-110'
                       : 'text-gray-400 group-hover:text-[#028697] group-active:scale-110'
                   }`}>
-                    <span className="[&>svg]:w-5 [&>svg]:h-5">{item.icon}</span>
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <span className="[&>svg]:w-5 [&>svg]:h-5">{item.icon}</span>
+                    )}
                   </span>
                   <span className={`relative z-10 text-[9px] font-semibold leading-none tracking-wide transition-colors duration-200 ${
                     isActive ? 'text-white' : 'text-gray-400 group-hover:text-[#028697]'
                   }`}>
                     {item.mobileLabel}
                   </span>
-                </Link>
+                </button>
               );
             })}
           </div>

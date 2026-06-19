@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { Navigation } from '@/components/navigation';
+import { NavigationLoader } from '@/components/layouts/navigation-loader';
 import { db } from '@/lib/db';
 
 export default async function ManagerLayout({
@@ -35,6 +36,7 @@ export default async function ManagerLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <NavigationLoader />
       <Navigation
         role="MANAGER"
         userName={session.user.name ?? undefined}
@@ -42,7 +44,7 @@ export default async function ManagerLayout({
         storeName={storeUser.store.name}
         storePlan={storeUser.store.plan as 'FREE' | 'PRO'}
       />
-      <main className="container mx-auto px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8 lg:ml-64">
+      <main className="px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8 lg:ml-64 lg:px-8">
         {children}
       </main>
     </div>

@@ -1,7 +1,10 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
+import { useTransition } from 'react';
 import Link from 'next/link';
+import { Loader2 } from 'lucide-react';
+import { triggerLoader } from '@/components/layouts/navigation-loader';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export interface TabItem {
@@ -22,12 +25,20 @@ interface TabLayoutProps {
 export function TabLayout({ title, description, tabs, children, useRouterPush = false }: TabLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const currentTab = [...tabs]
     .sort((a, b) => (b.href?.length ?? 0) - (a.href?.length ?? 0))
     .find((t) =>
       t.href ? pathname === t.href || pathname.startsWith(t.href + '/') : pathname.endsWith(t.value)
     )?.value ?? tabs[0].value;
+
+  const handleTabClick = (href: string) => {
+    triggerLoader();
+    startTransition(() => {
+      router.push(href);
+    });
+  };
 
   return (
     <div className="-mt-7 md:-mt-0">
@@ -38,7 +49,7 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
 
       <Tabs
         value={currentTab}
-        onValueChange={useRouterPush ? (v) => router.push(`${pathname.split('/').slice(0, -1).join('/')}/${v}`) : undefined}
+        onValueChange={useRouterPush ? (v) => startTransition(() => router.push(`${pathname.split('/').slice(0, -1).join('/')}/${v}`)) : undefined}
       >
         {/* Tab navigasi sub-halaman — hanya untuk mobile/tablet.
             Di desktop (lg+), navigasi yang sama sudah tersedia di sidebar. */}
@@ -46,11 +57,23 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
           <TabsList className={`grid w-full max-w-${tabs.length === 2 ? 'md' : 'lg'} grid-cols-${tabs.length}`}>
             {tabs.map((tab) =>
               tab.href ? (
-                <TabsTrigger key={tab.value} value={tab.value} asChild>
-                  <Link href={tab.href}>{tab.label}</Link>
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  onClick={() => handleTabClick(tab.href!)}
+                  className="flex items-center gap-1.5"
+                >
+                  {isPending && currentTab !== tab.value && (
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                  )}
+                  {tab.label}
                 </TabsTrigger>
               ) : (
-                <TabsTrigger key={tab.value} value={tab.value}>
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="flex items-center gap-1.5"
+                >
                   {tab.label}
                 </TabsTrigger>
               )
@@ -58,7 +81,9 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
           </TabsList>
         </div>
 
-        <div className="pt-6 lg:pt-0">{children}</div>
+        <div className={`pt-6 lg:pt-0 transition-opacity duration-200 ${isPending ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+          {children}
+        </div>
       </Tabs>
     </div>
   );
