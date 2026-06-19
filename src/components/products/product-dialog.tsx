@@ -170,9 +170,10 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
         <form action={handleSubmit}>
           <div className="px-6 pt-6 pb-2 space-y-5">
 
-            {/* Product type selector */}
+            {/* Product default type selector */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Tipe Produk</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Tipe Default Varian Baru</p>
+              <p className="text-[11px] text-gray-400 -mt-1">Varian baru akan otomatis menggunakan tipe ini. Bisa diubah per-varian.</p>
               <div className="grid grid-cols-2 gap-2.5">
                 {TYPE_OPTIONS.map(({ value, icon: Icon, label, sublabel, activeClass, dotClass }) => {
                   const isActive = productType === value;

@@ -6,14 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { createVariantAction, updateVariantAction } from '@/actions/products';
-import { Plus, Pencil, Loader2, Tag, Layers, DollarSign, BarChart2, Star, AlertTriangle, ScanLine, CameraOff, Barcode } from 'lucide-react';
+import { Plus, Pencil, Loader2, Tag, Layers, DollarSign, BarChart2, Star, AlertTriangle, ScanLine, CameraOff, Barcode, Package, Clock } from 'lucide-react';
 
 interface VariantDialogProps {
   mode: 'create' | 'edit';
   productId?: string;
   productSku?: string;
   variantCount?: number;
-  isPreorder?: boolean;
+  /** For create mode: pre-selects the type based on the product's default (from product.type) */
+  defaultType?: 'READY_STOCK' | 'PREORDER';
+  /** For edit mode: the current type of this specific variant */
+  variantType?: 'READY_STOCK' | 'PREORDER';
   variant?: {
     id: string;
     name: string;
@@ -233,12 +236,16 @@ function BarcodeScanner({
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-export function VariantDialog({ mode, productId, productSku, variantCount = 0, isPreorder = false, variant, trigger }: VariantDialogProps) {
+export function VariantDialog({ mode, productId, productSku, variantCount = 0, defaultType = 'READY_STOCK', variantType, variant, trigger }: VariantDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const isCreate = mode === 'create';
+  // Determine effective initial type: edit uses variantType, create uses defaultType
+  const initialType = isCreate ? defaultType : (variantType ?? 'READY_STOCK');
+  const [selectedType, setSelectedType] = useState<'READY_STOCK' | 'PREORDER'>(initialType);
+  const isPreorder = selectedType === 'PREORDER';
 
   const [variantName, setVariantName] = useState(variant?.name || '');
   const [skuOverride, setSkuOverride] = useState(false);
@@ -277,6 +284,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, i
   const handleSubmit = async (formData: FormData) => {
     setLoading(true);
     try {
+      formData.set('type', selectedType);
       formData.set('price', parseNumber(price));
       formData.set('cost', parseNumber(cost));
       formData.set('points', parseNumber(points));
@@ -323,6 +331,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, i
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen);
     if (isOpen) {
+      setSelectedType(isCreate ? defaultType : (variantType ?? 'READY_STOCK'));
       setVariantName(variant?.name || '');
       const newComputedSku = isCreate && productSku ? autoGenerateSku(productSku, variantCount) : (variant?.sku || '');
       setSku(newComputedSku);
@@ -374,26 +383,46 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, i
                 {isCreate ? `Varian Baru` : 'Edit Varian'}
               </DialogTitle>
               <p className="text-white/65 text-xs font-normal">
-                {isCreate
-                  ? isPreorder
-                    ? `Tentukan harga dan poin reward`
-                    : 'Tentukan harga, stok awal, dan poin'
-                  : `Mengedit: ${variant?.name}`}
+                {isCreate ? 'Pilih tipe, atur harga dan stok varian' : `Mengedit: ${variant?.name}`}
               </p>
             </DialogHeader>
           </div>
-
-          {isPreorder && (
-            <div className="relative mt-4 inline-flex items-center gap-1.5 bg-amber-400/20 border border-amber-300/30 rounded-full px-3 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-300 inline-block" />
-              <span className="text-amber-100 text-[11px] font-medium">Pre Order</span>
-            </div>
-          )}
         </div>
-
         {/* Form body — scrollable */}
         <form action={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="px-6 pt-5 pb-2 space-y-4 overflow-y-auto flex-1">
+
+            {/* Variant Type Selector */}
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Tipe Varian</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'READY_STOCK' as const, icon: Package, label: 'Ready Stock', sublabel: 'Stok dilacak', activeClass: 'border-[#00a090] bg-[#00a090]/8 text-[#00a090]' },
+                  { value: 'PREORDER' as const, icon: Clock, label: 'Pre-Order', sublabel: 'Tanpa batas stok', activeClass: 'border-amber-500 bg-amber-50 text-amber-700' },
+                ]).map(({ value, icon: Icon, label, sublabel, activeClass }) => {
+                  const active = selectedType === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setSelectedType(value)}
+                      disabled={loading}
+                      className={`flex items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 text-left transition-all disabled:opacity-50 ${
+                        active ? activeClass : 'border-gray-100 bg-gray-50/60 text-gray-500 hover:border-gray-200'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold leading-tight">{label}</p>
+                        <p className="text-[10px] opacity-60 leading-tight mt-0.5">{sublabel}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100" />
 
             {/* Name + SKU */}
             <div className="grid grid-cols-2 gap-4">

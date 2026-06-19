@@ -123,6 +123,7 @@ export async function createVariantAction(formData: FormData) {
     const stock      = parseInt(formData.get('stock')      as string);
     const lowStock   = parseInt(formData.get('lowStock')   as string);
     const points     = parseInt(formData.get('points')     as string) || 0;
+    const type       = (formData.get('type') as string) || 'READY_STOCK';
 
     if (!productId || !name || !sku || isNaN(price) || isNaN(cost) || isNaN(stock) || isNaN(lowStock)) {
       return { success: false, error: 'Semua field wajib diisi' };
@@ -152,10 +153,10 @@ export async function createVariantAction(formData: FormData) {
     }
 
     const variant = await db.productVariant.create({
-      data: { storeId, productId, name, sku, barcode, price, cost, stock, lowStock, points },
+      data: { storeId, productId, name, sku, barcode, price, cost, stock, lowStock, points, type: type as 'READY_STOCK' | 'PREORDER' },
     });
 
-    const isPreorder = product.type === 'PREORDER';
+    const isPreorder = type === 'PREORDER';
 
     if (!isPreorder && stock > 0) {
       await db.stockMovement.create({
@@ -203,6 +204,7 @@ export async function updateVariantAction(id: string, formData: FormData) {
     const cost       = parseFloat(formData.get('cost')     as string);
     const lowStock   = parseInt(formData.get('lowStock')   as string);
     const points     = parseInt(formData.get('points')     as string) || 0;
+    const type       = (formData.get('type') as string) || 'READY_STOCK';
 
     if (!name || !sku || isNaN(price) || isNaN(cost) || isNaN(lowStock)) {
       return { success: false, error: 'Semua field wajib diisi' };
@@ -221,7 +223,7 @@ export async function updateVariantAction(id: string, formData: FormData) {
       if (existingBarcode) return { success: false, error: 'Barcode sudah digunakan oleh varian lain' };
     }
 
-    await db.productVariant.update({ where: { id }, data: { name, sku, barcode, price, cost, lowStock, points } });
+    await db.productVariant.update({ where: { id }, data: { name, sku, barcode, price, cost, lowStock, points, type: type as 'READY_STOCK' | 'PREORDER' } });
 
     revalidatePath(`/${storeSlug}/admin/inventory/products`);
     revalidatePath(`/${storeSlug}/manager/inventory/products`);

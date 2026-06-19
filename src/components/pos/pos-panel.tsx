@@ -20,9 +20,9 @@ interface ProductVariant {
   stock: number;
   points: number;
   barcode: string | null;
+  type: string;
   product: {
     name: string;
-    type?: string;
   };
   category?: {
     name: string;
@@ -315,7 +315,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
 
   const addToCart = useCallback(
     (variant: ProductVariant) => {
-      const isPreorder = variant.product.type === 'PREORDER';
+      const isPreorder = variant.type === 'PREORDER';
       if (!isPreorder && variant.stock <= 0) {
         toast({ title: 'Stok Habis', description: `${variant.product.name} tidak tersedia.`, variant: 'destructive' });
         return;
@@ -835,7 +835,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 pb-4">
                 {filteredVariants.map((variant) => {
                   const inCart = cart.find((i) => i.variantId === variant.id);
-                  const isOutOfStock = variant.product.type !== 'PREORDER' && variant.stock <= 0;
+                  const isOutOfStock = variant.type !== 'PREORDER' && variant.stock <= 0;
                   const emoji = getVariantEmoji(variant);
 
                   return (
@@ -874,7 +874,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                       <p className="text-xs font-bold text-[#00a090]">{formatCurrency(variant.price)}</p>
 
                       {/* Stock */}
-                      {variant.product.type === 'PREORDER' ? (
+                      {variant.type === 'PREORDER' ? (
                         <span className="text-[10px] text-blue-600 bg-blue-50 dark:bg-blue-950/30 px-1.5 py-0.5 rounded-full">
                           Pre-order
                         </span>

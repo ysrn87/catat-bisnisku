@@ -277,18 +277,25 @@ export default async function LandingPage({
               <div className="space-y-10">
                 {products.map((product) => {
                   if (product.variants.length === 0) return null;
-                  const prices     = product.variants.map(v => v.price);
-                  const minP       = Math.min(...prices);
-                  const isPreorder = product.type === 'PREORDER';
+                  const prices      = product.variants.map(v => v.price);
+                  const minP        = Math.min(...prices);
+                  const allPreorder = product.variants.every(v => v.type === 'PREORDER');
+                  const hasMixed    = product.variants.some(v => v.type === 'PREORDER') && product.variants.some(v => v.type === 'READY_STOCK');
+
                   return (
                     <section key={product.id}>
                       <div className="flex items-start justify-between gap-4 mb-4 pb-3 border-b border-slate-100">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                             <h2 className="text-lg font-bold text-slate-900">{product.name}</h2>
-                            {isPreorder && (
+                            {allPreorder && (
                               <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
                                 <Clock className="w-2.5 h-2.5" />Pre Order
+                              </span>
+                            )}
+                            {hasMixed && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">
+                                Mixed
                               </span>
                             )}
                           </div>
@@ -302,7 +309,7 @@ export default async function LandingPage({
                           <p className="text-xs text-slate-400">{product.variants.length} varian</p>
                         </div>
                       </div>
-                      <VariantGrid variants={product.variants} product={product} isPreorder={isPreorder} waLink={waLink} />
+                      <VariantGrid variants={product.variants} product={product} waLink={waLink} />
                     </section>
                   );
                 })}
@@ -323,18 +330,25 @@ export default async function LandingPage({
             <div className="space-y-8 pt-4">
               {products.map((product) => {
                 if (product.variants.length === 0) return null;
-                const prices     = product.variants.map(v => v.price);
-                const minP       = Math.min(...prices);
-                const isPreorder = product.type === 'PREORDER';
+                const prices      = product.variants.map(v => v.price);
+                const minP        = Math.min(...prices);
+                const allPreorder = product.variants.every(v => v.type === 'PREORDER');
+                const hasMixed    = product.variants.some(v => v.type === 'PREORDER') && product.variants.some(v => v.type === 'READY_STOCK');
+
                 return (
                   <section key={product.id}>
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <h2 className="text-base font-bold text-slate-900">{product.name}</h2>
-                          {isPreorder && (
+                          {allPreorder && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
                               <Clock className="w-2.5 h-2.5" />Pre Order
+                            </span>
+                          )}
+                          {hasMixed && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full">
+                              Mixed
                             </span>
                           )}
                         </div>
@@ -347,7 +361,7 @@ export default async function LandingPage({
                         <p className="text-sm font-bold text-[#00a090]">{formatCurrency(minP)}</p>
                       </div>
                     </div>
-                    <VariantGrid variants={product.variants} product={product} isPreorder={isPreorder} waLink={waLink} />
+                    <VariantGrid variants={product.variants} product={product} waLink={waLink} />
                   </section>
                 );
               })}
@@ -395,6 +409,7 @@ type Variant = {
   stock: number;
   lowStock: number;
   points: number;
+  type: string;
 };
 
 type Product = {
@@ -405,17 +420,16 @@ type Product = {
 function VariantGrid({
   variants,
   product,
-  isPreorder,
   waLink,
 }: {
   variants: Variant[];
   product: Product;
-  isPreorder: boolean;
   waLink: (text: string) => string;
 }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       {variants.map((variant) => {
+        const isPreorder   = variant.type === 'PREORDER';
         const isOutOfStock = !isPreorder && variant.stock === 0;
         const isLowStock   = !isPreorder && variant.stock > 0 && variant.stock <= variant.lowStock;
 

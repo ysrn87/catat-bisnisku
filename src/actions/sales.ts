@@ -60,11 +60,11 @@ export async function createSaleAction(input: CreateSaleInput) {
     for (const item of items) {
       const variant = await db.productVariant.findFirst({
         where: { id: item.variantId, storeId },
-        include: { product: { select: { type: true } } },
+        select: { id: true, name: true, stock: true, points: true, type: true },
       });
 
       if (!variant) return { success: false, error: 'Varian produk tidak ditemukan' };
-      if (variant.product.type !== 'PREORDER' && variant.stock < item.quantity) {
+      if (variant.type !== 'PREORDER' && variant.stock < item.quantity) {
         return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
       }
 
@@ -114,9 +114,9 @@ export async function createSaleAction(input: CreateSaleInput) {
       for (const item of items) {
         const variant = await tx.productVariant.findUnique({
           where: { id: item.variantId },
-          include: { product: { select: { type: true } } },
+          select: { id: true, name: true, stock: true, points: true, type: true },
         });
-        if (variant?.product.type === 'PREORDER') continue;
+        if (variant?.type === 'PREORDER') continue;
 
         // Atomic check+decrement — cegah race condition (TOCTOU)
         const updated = await tx.productVariant.updateMany({
@@ -218,14 +218,14 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
     for (const item of items) {
       const variant = await db.productVariant.findFirst({
         where: { id: item.variantId, storeId },
-        include: { product: { select: { type: true } } },
+        select: { id: true, name: true, stock: true, points: true, type: true },
       });
       if (!variant) return { success: false, error: 'Varian produk tidak ditemukan' };
 
       const originalQty = originalSale.items.find((i) => i.variantId === item.variantId)?.quantity ?? 0;
       const diff = item.quantity - originalQty;
 
-      if (variant.product.type !== 'PREORDER' && diff > 0 && variant.stock < diff) {
+      if (variant.type !== 'PREORDER' && diff > 0 && variant.stock < diff) {
         return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
       }
 
@@ -240,8 +240,8 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
     await db.$transaction(async (tx) => {
       // Kembalikan stok dari penjualan asli
       for (const item of originalSale.items) {
-        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, include: { product: { select: { type: true } } } });
-        if (variant?.product.type === 'PREORDER') continue;
+        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { id: true, name: true, stock: true, points: true, type: true } });
+        if (variant?.type === 'PREORDER') continue;
         await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
         await tx.stockMovement.create({ data: { storeId, variantId: item.variantId, quantity: item.quantity, type: 'IN', notes: `Reversed from edited sale ${originalSale.saleNumber}` } });
       }
@@ -260,8 +260,8 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
       });
 
       for (const item of items) {
-        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, include: { product: { select: { type: true } } } });
-        if (variant?.product.type === 'PREORDER') continue;
+        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { id: true, name: true, stock: true, points: true, type: true } });
+        if (variant?.type === 'PREORDER') continue;
         // Atomic check+decrement — cegah race condition (TOCTOU)
         const updated = await tx.productVariant.updateMany({
           where: { id: item.variantId, stock: { gte: item.quantity } },
@@ -331,8 +331,8 @@ export async function deleteSaleAction(id: string) {
 
     await db.$transaction(async (tx) => {
       for (const item of sale.items) {
-        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, include: { product: { select: { type: true } } } });
-        if (variant?.product.type === 'PREORDER') continue;
+        const variant = await tx.productVariant.findUnique({ where: { id: item.variantId }, select: { id: true, name: true, stock: true, points: true, type: true } });
+        if (variant?.type === 'PREORDER') continue;
         await tx.productVariant.update({ where: { id: item.variantId }, data: { stock: { increment: item.quantity } } });
         await tx.stockMovement.create({ data: { storeId, variantId: item.variantId, quantity: item.quantity, type: 'IN', notes: `Stok dikembalikan dari penghapusan ${sale.saleNumber}` } });
       }

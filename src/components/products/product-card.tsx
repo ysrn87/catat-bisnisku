@@ -29,6 +29,7 @@ interface Variant {
   lowStock: number;
   isActive: boolean;
   points: number;
+  type: string;
 }
 
 interface ProductCardProps {
@@ -48,7 +49,9 @@ interface ProductCardProps {
 
 export function ProductCard({ product, filterStatus, categories = [] }: ProductCardProps) {
   const [variantsOpen, setVariantsOpen] = useState(true);
-  const isPreorder = product.type === 'PREORDER';
+  // A product shows the Pre-Order badge only if ALL its variants are PREORDER
+  const hasPreorder = product.variants.length > 0 && product.variants.every((v) => v.type === 'PREORDER');
+  const hasMixed = product.variants.some((v) => v.type === 'PREORDER') && product.variants.some((v) => v.type === 'READY_STOCK');
 
   const activeCount = product.variants.filter((v) => v.isActive).length;
   const totalCount = product.variants.length;
@@ -62,9 +65,14 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm sm:text-md font-bold leading-tight">{product.name}</span>
-                {isPreorder && (
+                {hasPreorder && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200">
                     Pre-Order
+                  </span>
+                )}
+                {hasMixed && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                    Mixed
                   </span>
                 )}
                 {!product.isActive && (
@@ -150,7 +158,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
               )}
               Varian
             </Button>
-            <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} isPreorder={isPreorder} />
+            <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
           </div>
         )}
 
@@ -187,7 +195,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                     ? 'Belum ada varian tersedia'
                     : `No ${filterStatus} variants found`}
                 </p>
-                <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} isPreorder={isPreorder} />
+                <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
               </div>
             ) : (
               <>
@@ -198,37 +206,43 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                       <TableRow className="bg-gray-50/80">
                         <TableHead>SKU</TableHead>
                         <TableHead>Nama</TableHead>
+                        <TableHead>Tipe</TableHead>
                         <TableHead>Harga</TableHead>
-                        {!isPreorder && <TableHead>Stok</TableHead>}
+                        <TableHead>Stok</TableHead>
                         <TableHead>Aktif</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody className="text-sm">
-                      {product.variants.map((variant) => (
+                      {product.variants.map((variant) => {
+                        const vIsPreorder = variant.type === 'PREORDER';
+                        return (
                         <TableRow
                           key={variant.id}
                           className={!variant.isActive ? 'opacity-50 bg-gray-50/50' : ''}
                         >
                           <TableCell className="text-gray-500">{variant.sku}</TableCell>
                           <TableCell className="font-medium">{variant.name}</TableCell>
+                          <TableCell>
+                            {vIsPreorder ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700 border border-amber-200">Pre-Order</span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-100 text-teal-700 border border-teal-200">Ready</span>
+                            )}
+                          </TableCell>
                           <TableCell>{formatCurrency(variant.price)}</TableCell>
-                          {!isPreorder && (
-                            <TableCell>
-                              <span
-                                className={
-                                  variant.stock <= variant.lowStock
-                                    ? 'text-red-600 font-semibold'
-                                    : ''
-                                }
-                              >
+                          <TableCell>
+                            {vIsPreorder ? (
+                              <span className="text-amber-500 font-medium">—</span>
+                            ) : (
+                              <span className={variant.stock <= variant.lowStock ? 'text-red-600 font-semibold' : ''}>
                                 {variant.stock}
                                 {variant.stock <= variant.lowStock && (
                                   <span className="ml-1 text-[10px] text-red-500">⚠</span>
                                 )}
                               </span>
-                            </TableCell>
-                          )}
+                            )}
+                          </TableCell>
                           <TableCell>
                             <ActiveToggle
                               id={variant.id}
@@ -240,7 +254,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                             <div className="flex gap-2 justify-end">
                               <VariantDialog
                                 mode="edit"
-                                isPreorder={isPreorder}
+                                variantType={variant.type as 'READY_STOCK' | 'PREORDER'}
                                 variant={{
                                   id: variant.id,
                                   name: variant.name,
@@ -257,7 +271,8 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -295,7 +310,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                             {formatCurrency(variant.price)}
                           </p>
                         </div>
-                        {!isPreorder && (
+                        {variant.type !== 'PREORDER' && (
                           <div>
                             <p className="text-[10px] text-gray-500">Stok</p>
                             <p
@@ -312,7 +327,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                             </p>
                           </div>
                         )}
-                        {isPreorder && (
+                        {variant.type === 'PREORDER' && (
                           <div>
                             <p className="text-[10px] text-gray-500">Tipe</p>
                             <p className="text-[12px] font-semibold text-amber-600">Pre Order</p>
@@ -324,7 +339,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                       <div className="flex gap-1 pt-1 border-t border-gray-200">
                         <VariantDialog
                           mode="edit"
-                          isPreorder={isPreorder}
+                          variantType={variant.type as 'READY_STOCK' | 'PREORDER'}
                           variant={{
                             id: variant.id,
                             name: variant.name,

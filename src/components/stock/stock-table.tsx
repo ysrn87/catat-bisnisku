@@ -12,9 +12,9 @@ interface StockItem {
   sku: string;
   stock: number;
   lowStock: number;
+  type: string;
   product: {
     name: string;
-    type: string;
   };
 }
 
@@ -74,7 +74,7 @@ export function StockTable({
               </TableRow>
             ) : (
               stockItems.map((item) => {
-                const isPreorder = item.product.type === 'PREORDER';
+                const isPreorder = item.type === 'PREORDER';
                 const isLowStock = !isPreorder && item.stock <= item.lowStock;
                 return (
                   <TableRow key={item.id} className={isPreorder ? 'bg-amber-50/40' : ''}>
@@ -144,7 +144,7 @@ export function StockTable({
           </div>
         ) : (
           stockItems.map((item) => {
-            const isPreorder = item.product.type === 'PREORDER';
+            const isPreorder = item.type === 'PREORDER';
             const isLowStock = !isPreorder && item.stock <= item.lowStock;
             return (
               <div

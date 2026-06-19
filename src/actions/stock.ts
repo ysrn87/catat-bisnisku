@@ -25,7 +25,7 @@ export async function adjustStockAction(formData: FormData) {
 
     if (!variant) return { success: false, error: 'Varian produk tidak ditemukan' };
 
-    const isPreorder = variant.product.type === 'PREORDER';
+    const isPreorder = variant.type === 'PREORDER';
 
     let newStock = variant.stock;
     if (!isPreorder) {

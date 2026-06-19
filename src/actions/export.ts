@@ -71,7 +71,7 @@ export async function getInventoryExportData() {
 
   const variants = await db.productVariant.findMany({
     where: { storeId },
-    include: { product: { select: { name: true, sku: true, type: true } } },
+    include: { product: { select: { name: true, sku: true } } },
     orderBy: { stock: 'asc' },
   });
 
@@ -80,12 +80,13 @@ export async function getInventoryExportData() {
     'Varian':         sanitizeCsvValue(v.name),
     'SKU':            sanitizeCsvValue(v.sku),
     'Barcode':        sanitizeCsvValue(v.barcode ?? ''),
+    'Tipe':           v.type === 'PREORDER' ? 'Pre-Order' : 'Ready Stock',
     'Harga Jual':     Number(v.price),
     'Harga Modal':    Number(v.cost),
-    'Stok':           v.stock,
-    'Stok Minimum':   v.lowStock,
+    'Stok':           v.type === 'PREORDER' ? '-' : v.stock,
+    'Stok Minimum':   v.type === 'PREORDER' ? '-' : v.lowStock,
     'Status':         v.isActive ? 'Aktif' : 'Nonaktif',
-    'Nilai Inventori': Number(v.cost) * v.stock,
+    'Nilai Inventori': v.type === 'PREORDER' ? 0 : Number(v.cost) * v.stock,
   }));
 
   return { success: true as const, data: rows, filename: `laporan-inventori-${Date.now()}` };

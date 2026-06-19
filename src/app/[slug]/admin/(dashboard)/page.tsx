@@ -11,9 +11,9 @@ async function getPosVariants(storeId: string) {
       storeId,
       isActive: true,
       product: { isActive: true },
-      OR: [{ stock: { gt: 0 } }, { product: { type: 'PREORDER' } }],
+      OR: [{ stock: { gt: 0 } }, { type: 'PREORDER' }],
     },
-    include: { product: { select: { name: true, type: true, categoryId: true } } },
+    include: { product: { select: { name: true, categoryId: true } } },
     orderBy: { product: { name: 'asc' } },
   });
 
@@ -37,7 +37,8 @@ async function getPosVariants(storeId: string) {
       stock: v.stock,
       points: v.points,
       barcode: v.barcode ?? null,
-      product: { name: v.product.name, type: v.product.type },
+      type: v.type,
+      product: { name: v.product.name },
       category: cat
         ? { name: cat.name, icon: cat.icon ?? null, color: cat.color ?? null }
         : null,
