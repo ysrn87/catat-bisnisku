@@ -31,7 +31,7 @@ export function CategoryManagerClient({ category }: CategoryManagerClientProps) 
   const { toast } = useToast();
   const router = useRouter();
 
-  const color = category.color ?? '#00a090';
+  const color = category.color ?? '#028697';
 
   async function handleDelete() {
     setDeleting(true);
@@ -129,7 +129,7 @@ export function CategoryManagerClient({ category }: CategoryManagerClientProps) 
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
               <button
                 onClick={() => setEditOpen(true)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#00a090] hover:bg-[#e0f5f2] transition-colors"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-[#028697] hover:bg-[#e0f9fc] transition-colors"
                 title="Edit"
               >
                 <Pencil className="w-3.5 h-3.5" />

@@ -21,7 +21,7 @@ export function DashboardTabs({ ringkasanContent, posContent }: DashboardTabsPro
           className={cn(
             'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
             activeTab === 'ringkasan'
-              ? 'border-[#00a090] text-[#00a090]'
+              ? 'border-[#028697] text-[#028697]'
               : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
           )}
         >
@@ -33,7 +33,7 @@ export function DashboardTabs({ ringkasanContent, posContent }: DashboardTabsPro
           className={cn(
             'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
             activeTab === 'pos'
-              ? 'border-[#00a090] text-[#00a090]'
+              ? 'border-[#028697] text-[#028697]'
               : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
           )}
         >

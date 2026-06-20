@@ -138,7 +138,7 @@ export default function PointsSettingsPage() {
                 placeholder="1000"
                 className="max-w-[140px]"
               />
-              <Button size="sm" onClick={handleSaveConversionRate} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
+              <Button size="sm" onClick={handleSaveConversionRate} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
                 <Save className="w-3.5 h-3.5 mr-1.5" />
                 Simpan
               </Button>
@@ -163,7 +163,7 @@ export default function PointsSettingsPage() {
                 className="max-w-[140px]"
               />
               <span className="text-sm text-gray-500">poin</span>
-              <Button size="sm" onClick={handleSaveMinPoints} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
+              <Button size="sm" onClick={handleSaveMinPoints} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
                 <Save className="w-3.5 h-3.5 mr-1.5" />
                 Simpan
               </Button>
@@ -187,7 +187,7 @@ export default function PointsSettingsPage() {
                 className="max-w-[140px]"
               />
               <span className="text-sm text-gray-500">poin</span>
-              <Button size="sm" onClick={handleSaveMaxPoints} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
+              <Button size="sm" onClick={handleSaveMaxPoints} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
                 <Save className="w-3.5 h-3.5 mr-1.5" />
                 Simpan
               </Button>
@@ -198,7 +198,7 @@ export default function PointsSettingsPage() {
       </Card>
 
       {/* Simulasi */}
-      <Card className="bg-gradient-to-br from-[#e0f9fc] to-[#f0fdfe] border-[#1ecbe1]/30">
+      <Card className="bg-gradient-to-br from-[#e0f9fc] to-[#f0fdfe] border-[#a8f0f8]/30">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <ArrowRightLeft className="w-5 h-5 text-[#028697]" />

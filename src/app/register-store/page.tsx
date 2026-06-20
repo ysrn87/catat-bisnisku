@@ -108,10 +108,10 @@ export default function RegisterStorePage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f5f2] via-[#f0faf8] to-[#d0f0eb] p-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f9fc] via-[#f0faf8] to-[#d0f0eb] p-4 py-12">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#2bbfb0] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#00a090] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#0fa8be] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#028697] rounded-full mix-blend-multiply filter blur-xl opacity-15" />
       </div>
 
       <Card className="w-full max-w-lg shadow-2xl border-0 relative z-10 bg-white/95 backdrop-blur-sm">
@@ -119,7 +119,7 @@ export default function RegisterStorePage() {
           <div className="mx-auto w-14 h-14 flex items-center justify-center">
             <Image src="/icon-512x512.png" alt="Catat Bisnisku" width={56} height={56} className="rounded-2xl shadow-lg" priority />
           </div>
-          <CardTitle className="text-2xl font-bold text-center text-[#00a090]">Buat Toko Baru</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center text-[#028697]">Buat Toko Baru</CardTitle>
           <CardDescription className="text-center text-sm">
             Isi detail toko dan akun pemilik untuk memulai
           </CardDescription>
@@ -130,7 +130,7 @@ export default function RegisterStorePage() {
 
             {/* ── Info Toko ── */}
             <div className="space-y-1 pb-1 border-b border-gray-100">
-              <p className="text-xs font-semibold text-[#00a090] uppercase tracking-wide flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-[#028697] uppercase tracking-wide flex items-center gap-1.5">
                 <Store className="w-3.5 h-3.5" /> Informasi Toko
               </p>
             </div>
@@ -142,7 +142,7 @@ export default function RegisterStorePage() {
                 placeholder="Contoh: Warung Bu Sari"
                 value={storeName} onChange={(e) => setStoreName(e.target.value)}
                 disabled={loading} maxLength={80}
-                className="h-10 text-sm focus-visible:ring-[#00a090]"
+                className="h-10 text-sm focus-visible:ring-[#028697]"
               />
             </div>
 
@@ -156,7 +156,7 @@ export default function RegisterStorePage() {
                     placeholder="nama-toko" value={storeSlug}
                     onChange={(e) => { setSlugManual(true); setStoreSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); }}
                     disabled={loading} minLength={3} maxLength={50}
-                    className="h-10 text-sm focus-visible:ring-[#00a090] pr-24"
+                    className="h-10 text-sm focus-visible:ring-[#028697] pr-24"
                   />
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">{slugStatus()}</div>
                 </div>
@@ -166,7 +166,7 @@ export default function RegisterStorePage() {
 
             {/* ── Akun Pemilik ── */}
             <div className="space-y-1 pb-1 pt-2 border-b border-gray-100">
-              <p className="text-xs font-semibold text-[#00a090] uppercase tracking-wide flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-[#028697] uppercase tracking-wide flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" /> Akun Pemilik
               </p>
             </div>
@@ -183,7 +183,7 @@ export default function RegisterStorePage() {
                   placeholder="08123456789" value={ownerPhone}
                   onChange={(e) => setOwnerPhone(e.target.value.replace(/[^0-9+\-\s()]/g, ''))}
                   disabled={loading} minLength={9} maxLength={20}
-                  className="h-10 text-sm focus-visible:ring-[#00a090] pr-8"
+                  className="h-10 text-sm focus-visible:ring-[#028697] pr-8"
                 />
                 {phoneChecking && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-gray-400" />}
               </div>
@@ -213,7 +213,7 @@ export default function RegisterStorePage() {
                   placeholder="Nama lengkap pemilik"
                   value={ownerName} onChange={(e) => setOwnerName(e.target.value)}
                   disabled={loading} maxLength={80}
-                  className="h-10 text-sm focus-visible:ring-[#00a090]"
+                  className="h-10 text-sm focus-visible:ring-[#028697]"
                 />
               </div>
             )}
@@ -230,7 +230,7 @@ export default function RegisterStorePage() {
                   placeholder="pemilik@email.com"
                   value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)}
                   disabled={loading}
-                  className="h-10 text-sm focus-visible:ring-[#00a090]"
+                  className="h-10 text-sm focus-visible:ring-[#028697]"
                 />
               </div>
             )}
@@ -249,7 +249,7 @@ export default function RegisterStorePage() {
                   placeholder={isExistingUser ? 'Masukkan password akun kamu' : 'Min. 6 karakter'}
                   value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)}
                   disabled={loading} minLength={isExistingUser ? 1 : 6}
-                  className="h-10 text-sm pr-10 focus-visible:ring-[#00a090]"
+                  className="h-10 text-sm pr-10 focus-visible:ring-[#028697]"
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -262,12 +262,12 @@ export default function RegisterStorePage() {
 
             {/* Plan info — hanya untuk user baru */}
             {!isExistingUser && (
-              <div className="p-3 bg-[#e0f5f2] rounded-lg border border-[#90e0d8] text-xs text-gray-600 space-y-1.5">
-                <p className="font-semibold text-[#00a090]">Plan FREE — Gratis selamanya</p>
+              <div className="p-3 bg-[#e0f9fc] rounded-lg border border-[#90e0d8] text-xs text-gray-600 space-y-1.5">
+                <p className="font-semibold text-[#028697]">Plan FREE — Gratis selamanya</p>
                 <div className="grid grid-cols-2 gap-1">
                   {['Hingga 50 produk', 'Hingga 2 Manager', 'Kasir & Penjualan', 'Sistem Poin Member'].map((f) => (
                     <span key={f} className="flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-[#00a090] flex-shrink-0" /> {f}
+                      <CheckCircle2 className="w-3 h-3 text-[#028697] flex-shrink-0" /> {f}
                     </span>
                   ))}
                 </div>
@@ -292,7 +292,7 @@ export default function RegisterStorePage() {
             <Button
               type="submit"
               disabled={loading || slugAvailable === false || slugChecking}
-              className="w-full h-11 text-sm font-semibold bg-[#00a090] hover:bg-[#007868] text-white shadow-lg"
+              className="w-full h-11 text-sm font-semibold bg-[#028697] hover:bg-[#017585] text-white shadow-lg"
             >
               {loading ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Membuat toko...</>
@@ -305,7 +305,7 @@ export default function RegisterStorePage() {
 
             <div className="text-center text-xs text-gray-500 pt-1">
               Sudah punya akun?{' '}
-              <Link href="/login" className="text-[#00a090] hover:underline font-medium">
+              <Link href="/login" className="text-[#028697] hover:underline font-medium">
                 Masuk di sini
               </Link>
             </div>

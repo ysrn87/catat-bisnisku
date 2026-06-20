@@ -109,7 +109,7 @@ export function SearchFilterBar({
             <SlidersHorizontal className="w-4 h-4 mr-2" />
             Filter
             {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#00a090] text-white text-xs rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#028697] text-white text-xs rounded-full flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -192,19 +192,19 @@ export function SearchFilterBar({
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {search && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00a090]/10 text-[#00a090] rounded-full text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#028697]/10 text-[#028697] rounded-full text-xs">
               Cari: "{search}"
               <button onClick={() => setSearch('')} className="hover:opacity-70 rounded-full"><X className="w-3 h-3" /></button>
             </span>
           )}
           {dateFrom && dateRangeKeys && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00a090]/10 text-[#00a090] rounded-full text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#028697]/10 text-[#028697] rounded-full text-xs">
               Dari: {dateFrom}
               <button onClick={() => handleDateChange(dateRangeKeys.from, '')} className="hover:opacity-70"><X className="w-3 h-3" /></button>
             </span>
           )}
           {dateTo && dateRangeKeys && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00a090]/10 text-[#00a090] rounded-full text-xs">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#028697]/10 text-[#028697] rounded-full text-xs">
               S/d: {dateTo}
               <button onClick={() => handleDateChange(dateRangeKeys.to, '')} className="hover:opacity-70"><X className="w-3 h-3" /></button>
             </span>
@@ -215,7 +215,7 @@ export function SearchFilterBar({
             const option = filter.options.find(o => o.value === value);
             if (!option) return null;
             return (
-              <span key={filter.key} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00a090]/10 text-[#00a090] rounded-full text-xs">
+              <span key={filter.key} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#028697]/10 text-[#028697] rounded-full text-xs">
                 {option.label}
                 <button onClick={() => handleFilterChange(filter.key, filter.defaultValue || 'all')} className="hover:opacity-70"><X className="w-3 h-3" /></button>
               </span>

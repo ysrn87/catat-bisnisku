@@ -91,7 +91,7 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Produk atau varian..."
-              className="w-full pl-8 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#00a090] focus:ring-2 focus:ring-[#00a090]/10 placeholder:text-slate-300 transition-all"
+              className="w-full pl-8 pr-8 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#028697] focus:ring-2 focus:ring-[#028697]/10 placeholder:text-slate-300 transition-all"
             />
             {search && (
               <button onClick={() => handleSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
@@ -108,7 +108,7 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
             <button
               onClick={() => handleProduct('')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                !productId ? 'bg-[#00a090] text-white' : 'text-slate-600 hover:bg-slate-100'
+                !productId ? 'bg-[#028697] text-white' : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               Semua Produk
@@ -119,7 +119,7 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
                 key={p.id}
                 onClick={() => handleProduct(p.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                  productId === p.id ? 'bg-[#00a090] text-white' : 'text-slate-600 hover:bg-slate-100'
+                  productId === p.id ? 'bg-[#028697] text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 <span className="truncate pr-2">{p.name}</span>
@@ -138,7 +138,7 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
                 key={opt.value}
                 onClick={() => handleSort(opt.value)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  sort === opt.value ? 'bg-[#00a090] text-white' : 'text-slate-600 hover:bg-slate-100'
+                  sort === opt.value ? 'bg-[#028697] text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
                 {opt.label}
@@ -173,7 +173,7 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Cari produk atau varian..."
-          className="w-full pl-9 pr-9 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#00a090] focus:ring-2 focus:ring-[#00a090]/10 placeholder:text-slate-300 transition-all"
+          className="w-full pl-9 pr-9 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#028697] focus:ring-2 focus:ring-[#028697]/10 placeholder:text-slate-300 transition-all"
         />
         {search && (
           <button onClick={() => handleSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
@@ -189,7 +189,7 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
           <button
             onClick={() => { setProductOpen(v => !v); setSortOpen(false); }}
             className={`w-full flex items-center justify-between gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-all ${
-              productId ? 'bg-[#00a090] text-white border-[#00a090]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#00a090]/40'
+              productId ? 'bg-[#028697] text-white border-[#028697]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#028697]/40'
             }`}
           >
             <span className="truncate">{selectedProduct ? selectedProduct.name : 'Semua Produk'}</span>
@@ -200,20 +200,20 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
               <div className="max-h-52 overflow-y-auto">
                 <button
                   onClick={() => handleProduct('')}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-left hover:bg-slate-50 transition-colors ${!productId ? 'text-[#00a090]' : 'text-slate-700'}`}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-left hover:bg-slate-50 transition-colors ${!productId ? 'text-[#028697]' : 'text-slate-700'}`}
                 >
                   Semua Produk
-                  {!productId && <Check className="w-3.5 h-3.5 text-[#00a090]" />}
+                  {!productId && <Check className="w-3.5 h-3.5 text-[#028697]" />}
                 </button>
                 <div className="border-t border-slate-100" />
                 {products.map(p => (
                   <button
                     key={p.id}
                     onClick={() => handleProduct(p.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-left hover:bg-slate-50 transition-colors ${productId === p.id ? 'text-[#00a090]' : 'text-slate-700'}`}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-left hover:bg-slate-50 transition-colors ${productId === p.id ? 'text-[#028697]' : 'text-slate-700'}`}
                   >
                     <span className="truncate pr-2">{p.name}</span>
-                    {productId === p.id && <Check className="w-3.5 h-3.5 text-[#00a090] flex-shrink-0" />}
+                    {productId === p.id && <Check className="w-3.5 h-3.5 text-[#028697] flex-shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -226,7 +226,7 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
           <button
             onClick={() => { setSortOpen(v => !v); setProductOpen(false); }}
             className={`w-full flex items-center justify-between gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-all ${
-              sort !== 'default' ? 'bg-[#00a090] text-white border-[#00a090]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#00a090]/40'
+              sort !== 'default' ? 'bg-[#028697] text-white border-[#028697]' : 'bg-white text-slate-600 border-slate-200 hover:border-[#028697]/40'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5 flex-shrink-0" />
@@ -239,10 +239,10 @@ export function LandingFilters({ products, layout = 'bar' }: LandingFiltersProps
                 <button
                   key={opt.value}
                   onClick={() => handleSort(opt.value)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-left hover:bg-slate-50 transition-colors ${sort === opt.value ? 'text-[#00a090]' : 'text-slate-700'}`}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-left hover:bg-slate-50 transition-colors ${sort === opt.value ? 'text-[#028697]' : 'text-slate-700'}`}
                 >
                   {opt.label}
-                  {sort === opt.value && <Check className="w-3.5 h-3.5 text-[#00a090]" />}
+                  {sort === opt.value && <Check className="w-3.5 h-3.5 text-[#028697]" />}
                 </button>
               ))}
             </div>

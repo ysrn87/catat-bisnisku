@@ -122,7 +122,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
           <Button
             variant={isCreate ? 'default' : 'ghost'}
             size={isCreate ? 'default' : 'sm'}
-            className={isCreate ? 'bg-[#00a090] hover:bg-[#007868] shadow-sm' : ''}
+            className={isCreate ? 'bg-[#028697] hover:bg-[#017585] shadow-sm' : ''}
           >
             {isCreate ? <><Plus className="w-4 h-4 mr-2" />Tambah Transaksi</> : <Pencil className="w-4 h-4" />}
           </Button>
@@ -134,7 +134,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
         className="sm:max-w-[480px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col"
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8 shrink-0">
+        <div className="relative bg-gradient-to-br from-[#028697] to-[#015561] px-6 pt-6 pb-8 shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
           <div className="relative flex items-center gap-3">
@@ -216,7 +216,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
                 onChange={(e) => setAmount(formatNumber(e.target.value))}
                 placeholder="0"
                 disabled={loading || isLocked}
-                className="h-9 text-sm font-mono tracking-wider border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal"
+                className="h-9 text-sm font-mono tracking-wider border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal"
               />
             </div>
 
@@ -235,7 +235,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
                     onClick={() => { setCategory(cat); if (cat !== 'Lainnya') setCustomCategory(''); }}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border disabled:opacity-50 ${
                       category === cat
-                        ? 'bg-[#00a090] border-[#00a090] text-white'
+                        ? 'bg-[#028697] border-[#028697] text-white'
                         : 'border-gray-200 text-gray-500 hover:border-gray-300 bg-gray-50'
                     }`}
                   >
@@ -251,7 +251,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
                   placeholder="Tulis kategori kustom..."
                   disabled={loading || isLocked}
                   maxLength={50}
-                  className="h-9 text-sm mt-2 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] placeholder:text-gray-300"
+                  className="h-9 text-sm mt-2 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] placeholder:text-gray-300"
                 />
               )}
               {/* Hidden input to submit effective category */}
@@ -270,7 +270,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
                 defaultValue={transaction?.description}
                 placeholder="Keterangan singkat transaksi..."
                 disabled={loading || isLocked}
-                className="h-9 text-sm border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] placeholder:text-gray-300"
+                className="h-9 text-sm border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] placeholder:text-gray-300"
               />
             </div>
 
@@ -289,7 +289,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
                       : new Date().toISOString().split('T')[0]
                   }
                   disabled={loading || isLocked}
-                  className="h-9 text-sm border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090]"
+                  className="h-9 text-sm border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697]"
                 />
               </div>
               <div className="space-y-1.5">
@@ -301,7 +301,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
                   id="time" name="time" type="time"
                   defaultValue={defaultTimeValue()}
                   disabled={loading || isLocked}
-                  className="h-9 text-sm border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090]"
+                  className="h-9 text-sm border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697]"
                 />
               </div>
             </div>
@@ -322,7 +322,7 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[130px] transition-all"
+                className="bg-[#028697] hover:bg-[#017585] text-white shadow-sm min-w-[130px] transition-all"
               >
                 {loading ? (
                   <span className="flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />Menyimpan...</span>

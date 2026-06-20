@@ -114,7 +114,7 @@ function ReceiptDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl dark:bg-gray-900 overflow-hidden">
         {/* Header */}
-        <div className="bg-[#00a090] px-5 py-4 text-white text-center">
+        <div className="bg-[#028697] px-5 py-4 text-white text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
             <CheckCircle className="w-6 h-6" />
             <span className="text-lg font-bold">Transaksi Berhasil!</span>
@@ -186,7 +186,7 @@ function ReceiptDialog({
             )}
             <div className="flex justify-between font-bold text-base pt-1 border-t border-border">
               <span>Total</span>
-              <span className="text-[#00a090]">{formatCurrency(data.total)}</span>
+              <span className="text-[#028697]">{formatCurrency(data.total)}</span>
             </div>
           </div>
 
@@ -205,7 +205,7 @@ function ReceiptDialog({
             Selesai
           </Button>
           <Button
-            className="flex-1 bg-[#00a090] hover:bg-[#007868] text-white"
+            className="flex-1 bg-[#028697] hover:bg-[#017585] text-white"
             onClick={onNewTransaction}
           >
             <Plus className="w-4 h-4 mr-1.5" />
@@ -548,8 +548,8 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                   className={cn(
                     'flex-1 text-[11px] py-1 px-1 rounded-md border transition-colors',
                     customerType === t
-                      ? 'bg-[#00a090] text-white border-[#00a090]'
-                      : 'bg-background border-border text-muted-foreground hover:border-[#00a090]/50'
+                      ? 'bg-[#028697] text-white border-[#028697]'
+                      : 'bg-background border-border text-muted-foreground hover:border-[#028697]/50'
                   )}
                 >
                   {t === 'walk-in' ? 'Umum' : t === 'member' ? 'Member' : 'Non-Member'}
@@ -573,7 +573,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
                     placeholder={customerType === 'member' ? 'Cari member...' : 'Cari non-member...'}
-                    className="w-full pl-7 pr-3 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-[#00a090]"
+                    className="w-full pl-7 pr-3 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-[#028697]"
                   />
                 </div>
                 {showCustomerDropdown && customerSearch && filteredCustomers.length > 0 && (
@@ -656,7 +656,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full mt-0.5 h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-[#00a090]"
+                    className="w-full mt-0.5 h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-[#028697]"
                   >
                     {PAYMENT_METHODS.map((p) => (
                       <option key={p.value} value={p.value}>{p.label}</option>
@@ -668,7 +668,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                   <select
                     value={paymentStatus}
                     onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
-                    className="w-full mt-0.5 h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-[#00a090]"
+                    className="w-full mt-0.5 h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-[#028697]"
                   >
                     <option value="PAID">Lunas</option>
                     <option value="PENDING">Pending</option>
@@ -682,7 +682,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Catatan tambahan..."
                     rows={2}
-                    className="w-full mt-0.5 text-xs border border-input rounded-md bg-background p-2 focus:outline-none focus:ring-1 focus:ring-[#00a090] resize-none"
+                    className="w-full mt-0.5 text-xs border border-input rounded-md bg-background p-2 focus:outline-none focus:ring-1 focus:ring-[#028697] resize-none"
                   />
                 </div>
               </div>
@@ -716,7 +716,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
             )}
             <div className="flex justify-between font-bold text-sm pt-1">
               <span>Total</span>
-              <span className="text-[#00a090]">{formatCurrency(total)}</span>
+              <span className="text-[#028697]">{formatCurrency(total)}</span>
             </div>
             {pointsEarned > 0 && (
               <p className="text-[11px] text-orange-500 text-right">+{pointsEarned} poin diperoleh</p>
@@ -735,7 +735,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
               <Trash2 className="w-4 h-4" />
             </Button>
             <Button
-              className="flex-1 h-9 bg-[#00a090] hover:bg-[#007868] text-white font-semibold disabled:opacity-50 transition-colors"
+              className="flex-1 h-9 bg-[#028697] hover:bg-[#017585] text-white font-semibold disabled:opacity-50 transition-colors"
               onClick={handleCheckout}
               disabled={!canCheckout}
             >
@@ -781,7 +781,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari produk..."
-              className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-[#00a090]/50"
+              className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-[#028697]/50"
             />
             {search && (
               <button
@@ -801,8 +801,8 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                 className={cn(
                   'shrink-0 px-3 py-1 text-xs rounded-full border transition-colors',
                   activeCategory === 'all'
-                    ? 'bg-[#00a090] text-white border-[#00a090]'
-                    : 'bg-background border-border text-muted-foreground hover:border-[#00a090]/60'
+                    ? 'bg-[#028697] text-white border-[#028697]'
+                    : 'bg-background border-border text-muted-foreground hover:border-[#028697]/60'
                 )}
               >
                 🛒 Semua
@@ -814,8 +814,8 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                   className={cn(
                     'shrink-0 px-3 py-1 text-xs rounded-full border transition-colors whitespace-nowrap',
                     activeCategory === cat.name
-                      ? 'bg-[#00a090] text-white border-[#00a090]'
-                      : 'bg-background border-border text-muted-foreground hover:border-[#00a090]/60'
+                      ? 'bg-[#028697] text-white border-[#028697]'
+                      : 'bg-background border-border text-muted-foreground hover:border-[#028697]/60'
                   )}
                 >
                   {cat.icon ? `${cat.icon} ` : ''}{cat.name}
@@ -848,13 +848,13 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                         isOutOfStock
                           ? 'opacity-50 cursor-not-allowed bg-muted border-border'
                           : inCart
-                          ? 'bg-[#00a090]/5 border-[#00a090] shadow-sm hover:shadow-md cursor-pointer'
-                          : 'bg-card border-border hover:border-[#00a090]/60 hover:shadow-sm cursor-pointer'
+                          ? 'bg-[#028697]/5 border-[#028697] shadow-sm hover:shadow-md cursor-pointer'
+                          : 'bg-card border-border hover:border-[#028697]/60 hover:shadow-sm cursor-pointer'
                       )}
                     >
                       {/* Cart qty badge */}
                       {inCart && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 rounded-full bg-[#00a090] text-white text-[10px] font-bold flex items-center justify-center px-1 z-10">
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 rounded-full bg-[#028697] text-white text-[10px] font-bold flex items-center justify-center px-1 z-10">
                           {inCart.quantity}
                         </span>
                       )}
@@ -871,7 +871,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                       </div>
 
                       {/* Price */}
-                      <p className="text-xs font-bold text-[#00a090]">{formatCurrency(variant.price)}</p>
+                      <p className="text-xs font-bold text-[#028697]">{formatCurrency(variant.price)}</p>
 
                       {/* Stock */}
                       {variant.type === 'PREORDER' ? (
@@ -899,11 +899,11 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
         <div className="hidden lg:flex lg:flex-col w-72 xl:w-80 shrink-0 border border-border rounded-2xl bg-card overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
             <div className="flex items-center gap-2 font-semibold text-sm">
-              <ShoppingCart className="w-4 h-4 text-[#00a090]" />
+              <ShoppingCart className="w-4 h-4 text-[#028697]" />
               Keranjang
             </div>
             {cartCount > 0 && (
-              <span className="text-xs bg-[#00a090] text-white rounded-full px-2 py-0.5 font-medium">
+              <span className="text-xs bg-[#028697] text-white rounded-full px-2 py-0.5 font-medium">
                 {cartCount} item
               </span>
             )}
@@ -917,7 +917,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
             <div className="fixed bottom-20 right-4 z-40">
               <button
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-2 bg-[#00a090] text-white px-4 py-3 rounded-2xl shadow-lg font-semibold text-sm active:scale-95 transition-transform"
+                className="relative flex items-center gap-2 bg-[#028697] text-white px-4 py-3 rounded-2xl shadow-lg font-semibold text-sm active:scale-95 transition-transform"
               >
                 <ShoppingCart className="w-5 h-5" />
                 <span>{cartCount} item · {formatCurrency(total)}</span>
@@ -933,10 +933,10 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
               <div className="bg-card rounded-t-2xl shadow-2xl flex flex-col max-h-[85vh]">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
                   <div className="flex items-center gap-2 font-semibold">
-                    <ShoppingCart className="w-4 h-4 text-[#00a090]" />
+                    <ShoppingCart className="w-4 h-4 text-[#028697]" />
                     Keranjang
                     {cartCount > 0 && (
-                      <span className="text-xs bg-[#00a090] text-white rounded-full px-2 py-0.5 font-medium">
+                      <span className="text-xs bg-[#028697] text-white rounded-full px-2 py-0.5 font-medium">
                         {cartCount} item
                       </span>
                     )}

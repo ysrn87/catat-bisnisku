@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { createProductAction, updateProductAction } from '@/actions/products';
-import { Plus, Pencil, Package, Clock, Loader2, Box, Tag, AlignLeft } from 'lucide-react';
+import { createCategoryAction } from '@/actions/categories';
+import { Plus, Pencil, Package, Clock, Loader2, Box, Tag, AlignLeft, ChevronDown, Check, Sparkles } from 'lucide-react';
 
 interface CategoryOption {
   id: string;
@@ -29,11 +30,13 @@ interface ProductDialogProps {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Hanya OWNER/ADMINISTRATOR yang boleh membuat kategori baru lewat dialog ini */
+  isAdmin?: boolean;
 }
 
 const toTitleCase = (val: string) => val.replace(/\b\w/g, (c) => c.toUpperCase());
 
-export function ProductDialog({ mode, product, categories = [], trigger, open: controlledOpen, onOpenChange }: ProductDialogProps) {
+export function ProductDialog({ mode, product, categories = [], trigger, open: controlledOpen, onOpenChange, isAdmin = false }: ProductDialogProps) {
   const isControlled = controlledOpen !== undefined;
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isControlled ? controlledOpen! : internalOpen;
@@ -48,17 +51,67 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
     (product?.type as 'READY_STOCK' | 'PREORDER') || 'READY_STOCK'
   );
   const [selectedCategory, setSelectedCategory] = useState<string>(product?.categoryId ?? '');
+  const [isNewCategory, setIsNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
   const [productSku, setProductSku] = useState(product?.sku || '');
   const [productDesc, setProductDesc] = useState(product?.description || '');
   const { toast } = useToast();
 
   const isCreate = mode === 'create';
+  const useCategoryDropdown = categories.length > 3;
+
+  // Tutup dropdown kategori saat klik di luar
+  useEffect(() => {
+    if (!categoryMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) {
+        setCategoryMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [categoryMenuOpen]);
 
   const handleSubmit = async (formData: FormData) => {
     setLoading(true);
     formData.set('type', productType);
-    if (selectedCategory) formData.set('categoryId', selectedCategory);
+
     try {
+      let categoryId = selectedCategory;
+
+      // Jika user pilih "Kategori Lainnya", buat kategori baru dulu
+      if (isNewCategory && isAdmin) {
+        const trimmedName = newCategoryName.trim();
+        if (!trimmedName) {
+          toast({
+            title: 'Terjadi kesalahan',
+            description: 'Nama kategori baru wajib diisi.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+
+        const catFormData = new FormData();
+        catFormData.set('name', trimmedName);
+
+        const catResult = await createCategoryAction(catFormData);
+        if (!catResult.success || !catResult.category) {
+          toast({
+            title: 'Gagal membuat kategori',
+            description: catResult.error || 'Tidak dapat membuat kategori baru.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+        categoryId = catResult.category.id;
+      }
+
+      if (categoryId) formData.set('categoryId', categoryId);
+
       const result = isCreate
         ? await createProductAction(formData)
         : await updateProductAction(product!.id, formData);
@@ -97,6 +150,9 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
       setProductSku(product?.sku || '');
       setProductDesc(product?.description || '');
       setSelectedCategory(product?.categoryId ?? '');
+      setIsNewCategory(false);
+      setNewCategoryName('');
+      setCategoryMenuOpen(false);
     }
   };
 
@@ -108,7 +164,7 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
           <Button
             variant={isCreate ? 'default' : 'ghost'}
             size={isCreate ? 'default' : 'sm'}
-            className={isCreate ? 'bg-[#00a090] hover:bg-[#007868] shadow-sm' : ''}
+            className={isCreate ? 'bg-[#028697] hover:bg-[#017585] shadow-sm' : ''}
           >
             {isCreate ? (
               <>
@@ -127,7 +183,7 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
         className="sm:max-w-[480px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col"
       >
         {/* Header band */}
-        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8 shrink-0">
+        <div className="relative bg-gradient-to-br from-[#028697] to-[#015561] px-6 pt-6 pb-8 shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
 
@@ -156,7 +212,7 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
               <p className="text-[11px] text-gray-400 -mt-1">Varian baru akan otomatis menggunakan tipe ini. Bisa diubah per-varian.</p>
               <div className="grid grid-cols-2 gap-2">
                 {([
-                  { value: 'READY_STOCK' as const, icon: Package, label: 'Ready Stock', sublabel: 'Stok dilacak', activeClass: 'border-[#00a090] bg-[#00a090]/8 text-[#00a090]' },
+                  { value: 'READY_STOCK' as const, icon: Package, label: 'Ready Stock', sublabel: 'Stok dilacak', activeClass: 'border-[#028697] bg-[#028697]/8 text-[#028697]' },
                   { value: 'PREORDER' as const, icon: Clock, label: 'Pre-Order', sublabel: 'Tanpa batas stok', activeClass: 'border-amber-500 bg-amber-50 text-amber-700' },
                 ]).map(({ value, icon: Icon, label, sublabel, activeClass }) => {
                   const active = productType === value;
@@ -198,7 +254,7 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
                 placeholder="Contoh: Kue Lapis, Tart Coklat"
                 disabled={loading}
                 maxLength={30}
-                className="h-9 text-sm border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                className="h-9 text-sm border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
               />
             </div>
 
@@ -217,24 +273,114 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
                 placeholder="Contoh: KL-001"
                 disabled={loading}
                 maxLength={15}
-                className="h-9 text-sm font-mono tracking-wider border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal uppercase"
+                className="h-9 text-sm font-mono tracking-wider border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal uppercase"
               />
             </div>
 
             {/* Kategori */}
-            {categories.length > 0 && (
-              <div className="space-y-1.5">
-                <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                  <Tag className="w-3 h-3" />
-                  Kategori
-                  <span className="ml-auto font-normal normal-case tracking-normal text-gray-300 text-[11px]">Opsional</span>
-                </label>
+            <div className="space-y-1.5">
+              <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+                <Tag className="w-3 h-3" />
+                Kategori
+                <span className="ml-auto font-normal normal-case tracking-normal text-gray-300 text-[11px]">Opsional</span>
+              </label>
+
+              {useCategoryDropdown ? (
+                /* ── Dropdown (lebih dari 3 kategori) ── */
+                <div className="relative" ref={categoryMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryMenuOpen((v) => !v)}
+                    disabled={loading}
+                    className="w-full h-9 px-3 rounded-lg border border-gray-200 bg-white text-left text-sm flex items-center gap-2 hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors disabled:opacity-50"
+                  >
+                    {isNewCategory ? (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-[#028697] shrink-0" />
+                        <span className="text-gray-700 truncate">Kategori Lainnya</span>
+                      </>
+                    ) : selectedCategory ? (
+                      (() => {
+                        const cat = categories.find((c) => c.id === selectedCategory);
+                        return (
+                          <>
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: cat?.color ?? '#028697' }}
+                            />
+                            <span className="text-gray-700 truncate">
+                              {cat?.icon ? `${cat.icon} ` : ''}{cat?.name ?? 'Kategori'}
+                            </span>
+                          </>
+                        );
+                      })()
+                    ) : (
+                      <span className="text-gray-400">Tanpa Kategori</span>
+                    )}
+                    <ChevronDown className={`w-3.5 h-3.5 text-gray-400 ml-auto shrink-0 transition-transform ${categoryMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {categoryMenuOpen && (
+                    <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-y-auto py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategory('');
+                          setIsNewCategory(false);
+                          setCategoryMenuOpen(false);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 flex items-center justify-between"
+                      >
+                        Tanpa Kategori
+                        {!selectedCategory && !isNewCategory && <Check className="w-3.5 h-3.5 text-[#028697]" />}
+                      </button>
+                      {categories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategory(cat.id);
+                            setIsNewCategory(false);
+                            setCategoryMenuOpen(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: cat.color ?? '#028697' }}
+                          />
+                          <span className="truncate">{cat.icon ? `${cat.icon} ` : ''}{cat.name}</span>
+                          {selectedCategory === cat.id && !isNewCategory && <Check className="w-3.5 h-3.5 text-[#028697] ml-auto shrink-0" />}
+                        </button>
+                      ))}
+                      {isAdmin && (
+                        <>
+                          <div className="border-t border-gray-100 my-1" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsNewCategory(true);
+                              setSelectedCategory('');
+                              setCategoryMenuOpen(false);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm text-[#028697] hover:bg-[#e0f9fc] flex items-center gap-2 font-medium"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Kategori Lainnya
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ── Pill buttons (3 kategori atau kurang) ── */
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setSelectedCategory('')}
+                    onClick={() => { setSelectedCategory(''); setIsNewCategory(false); }}
                     className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${
-                      !selectedCategory
+                      !selectedCategory && !isNewCategory
                         ? 'bg-gray-100 border-gray-400 text-gray-700'
                         : 'border-gray-200 text-gray-400 hover:border-gray-300'
                     }`}
@@ -245,23 +391,53 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => setSelectedCategory(selectedCategory === cat.id ? '' : cat.id)}
+                      onClick={() => {
+                        setIsNewCategory(false);
+                        setSelectedCategory(selectedCategory === cat.id ? '' : cat.id);
+                      }}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border flex items-center gap-1 ${
-                        selectedCategory === cat.id ? 'border-2' : 'border hover:opacity-80'
+                        selectedCategory === cat.id && !isNewCategory ? 'border-2' : 'border hover:opacity-80'
                       }`}
                       style={
-                        selectedCategory === cat.id
-                          ? { backgroundColor: (cat.color ?? '#00a090') + '20', borderColor: cat.color ?? '#00a090', color: cat.color ?? '#00a090' }
-                          : { backgroundColor: (cat.color ?? '#00a090') + '10', borderColor: (cat.color ?? '#00a090') + '40', color: cat.color ?? '#00a090' }
+                        selectedCategory === cat.id && !isNewCategory
+                          ? { backgroundColor: (cat.color ?? '#028697') + '20', borderColor: cat.color ?? '#028697', color: cat.color ?? '#028697' }
+                          : { backgroundColor: (cat.color ?? '#028697') + '10', borderColor: (cat.color ?? '#028697') + '40', color: cat.color ?? '#028697' }
                       }
                     >
                       {cat.icon && <span>{cat.icon}</span>}
                       {cat.name}
                     </button>
                   ))}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => { setIsNewCategory((v) => !v); setSelectedCategory(''); }}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border flex items-center gap-1 ${
+                        isNewCategory
+                          ? 'bg-[#028697]/10 border-[#028697] text-[#028697] border-2'
+                          : 'border-dashed border-gray-300 text-gray-500 hover:border-[#028697] hover:text-[#028697]'
+                      }`}
+                    >
+                      <Plus className="w-3 h-3" />
+                      Kategori Lainnya
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* Input nama kategori baru */}
+              {isNewCategory && (
+                <Input
+                  autoFocus
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Nama kategori baru, contoh: Minuman"
+                  disabled={loading}
+                  maxLength={50}
+                  className="h-9 text-sm border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 mt-1.5"
+                />
+              )}
+            </div>
 
             {/* Description */}
             <div className="space-y-1.5">
@@ -278,7 +454,7 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
                 placeholder="Deskripsi singkat produk..."
                 disabled={loading}
                 maxLength={150}
-                className="h-9 text-sm border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                className="h-9 text-sm border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
               />
             </div>
           </div>
@@ -296,7 +472,7 @@ export function ProductDialog({ mode, product, categories = [], trigger, open: c
             <Button
               type="submit"
               disabled={loading}
-              className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[110px] transition-all"
+              className="bg-[#028697] hover:bg-[#017585] text-white shadow-sm min-w-[110px] transition-all"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

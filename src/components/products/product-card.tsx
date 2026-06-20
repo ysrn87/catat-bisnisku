@@ -45,9 +45,10 @@ interface ProductCardProps {
   };
   filterStatus: string;
   categories?: { id: string; name: string; color: string | null; icon: string | null }[];
+  isAdmin?: boolean;
 }
 
-export function ProductCard({ product, filterStatus, categories = [] }: ProductCardProps) {
+export function ProductCard({ product, filterStatus, categories = [], isAdmin = false }: ProductCardProps) {
   const [variantsOpen, setVariantsOpen] = useState(true);
   // A product shows the Pre-Order badge only if ALL its variants are PREORDER
   const hasPreorder = product.variants.length > 0 && product.variants.every((v) => v.type === 'PREORDER');
@@ -84,9 +85,9 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
                     style={{
-                      backgroundColor: (product.category.color ?? '#00a090') + '18',
-                      color: product.category.color ?? '#00a090',
-                      border: `1px solid ${(product.category.color ?? '#00a090')}40`,
+                      backgroundColor: (product.category.color ?? '#028697') + '18',
+                      color: product.category.color ?? '#028697',
+                      border: `1px solid ${(product.category.color ?? '#028697')}40`,
                     }}
                   >
                     {product.category.icon && <span className="text-[10px]">{product.category.icon}</span>}
@@ -98,7 +99,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                 SKU: {product.sku} •{' '}
                 <button
                   onClick={() => setVariantsOpen((v) => !v)}
-                  className="hover:text-[#00a090] transition-colors"
+                  className="hover:text-[#028697] transition-colors"
                 >
                   {totalCount} varian
                   {totalCount > 0 && (
@@ -127,6 +128,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
             <ProductDialog
               mode="edit"
               categories={categories}
+              isAdmin={isAdmin}
               product={{
                 id: product.id,
                 name: product.name,
@@ -149,7 +151,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
               variant="ghost"
               size="sm"
               onClick={() => setVariantsOpen((v) => !v)}
-              className="text-[12px] sm:text-xs font-medium text-gray-700 hover:text-[#00a090] hover:bg-transparent px-0 gap-1.5"
+              className="text-[12px] sm:text-xs font-medium text-gray-700 hover:text-[#028697] hover:bg-transparent px-0 gap-1.5"
             >
               {variantsOpen ? (
                 <ChevronUp className="h-4 w-4" />
@@ -306,7 +308,7 @@ export function ProductCard({ product, filterStatus, categories = [] }: ProductC
                       <div className="grid grid-cols-2 gap-2 mb-1">
                         <div>
                           <p className="text-[10px] text-gray-500">Harga</p>
-                          <p className="text-[12px] font-semibold text-[#00a090]">
+                          <p className="text-[12px] font-semibold text-[#028697]">
                             {formatCurrency(variant.price)}
                           </p>
                         </div>

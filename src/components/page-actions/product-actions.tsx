@@ -18,9 +18,9 @@ interface ProductActionsProps {
 
 const FAB_CLASS = [
   'sm:hidden fixed bottom-24 right-6 z-50',
-  'w-12 h-12 rounded-full bg-[#00a090] text-white shadow-lg',
+  'w-12 h-12 rounded-full bg-[#028697] text-white shadow-lg',
   'flex items-center justify-center',
-  'hover:bg-[#007868] active:scale-95 transition-all',
+  'hover:bg-[#017585] active:scale-95 transition-all',
 ].join(' ');
 
 export function ProductActions({ isAdmin, categories = [] }: ProductActionsProps) {
@@ -30,9 +30,10 @@ export function ProductActions({ isAdmin, categories = [] }: ProductActionsProps
     <ProductDialog
       mode="create"
       categories={categories}
+      isAdmin={isAdmin}
       trigger={
         <div>
-          <Button className="hidden sm:inline-flex bg-[#00a090] hover:bg-[#007868] text-white shadow-sm">
+          <Button className="hidden sm:inline-flex bg-[#028697] hover:bg-[#017585] text-white shadow-sm">
             <Plus className="w-4 h-4 mr-2" />
             Tambah Produk
           </Button>

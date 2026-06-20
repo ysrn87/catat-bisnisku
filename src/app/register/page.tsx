@@ -130,19 +130,19 @@ function RegisterForm() {
   const selectClass = (unlocked: boolean, filled: boolean) =>
     [
       'w-full h-11 text-sm rounded-md border px-3 pr-8 appearance-none',
-      'focus:outline-none focus:ring-2 focus:ring-[#1ecbe1] transition-all duration-200',
+      'focus:outline-none focus:ring-2 focus:ring-[#a8f0f8] transition-all duration-200',
       !unlocked
         ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
         : !filled
-          ? 'border-[#1ecbe1] bg-[#e0f9fc] text-[#0fa8be] cursor-pointer'
+          ? 'border-[#a8f0f8] bg-[#e0f9fc] text-[#0fa8be] cursor-pointer'
           : 'border-input bg-background text-gray-700 cursor-pointer',
     ].join(' ');
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f9fc] via-[#f0fdfe] to-[#d6f7fa] p-4 py-12">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#1ecbe1] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#17a8bb] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob animation-delay-2000" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-[#a8f0f8] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-[#0fa8be] rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-blob animation-delay-2000" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-[#0fa8be] rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-4000" />
       </div>
 
@@ -169,7 +169,7 @@ function RegisterForm() {
           {/* Benefits Banner */}
           <div className="p-4 bg-[#e0f9fc] rounded-lg border border-[#a8f0f8]">
             <p className="font-semibold mb-2 text-xs text-gray-700 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#1ecbe1]" />
+              <Sparkles className="w-4 h-4 text-[#a8f0f8]" />
               Keuntungan Member:
             </p>
             <ul className="space-y-1 text-xs text-gray-600">
@@ -191,7 +191,7 @@ function RegisterForm() {
                 placeholder="Nama Lengkap"
                 value={name} onChange={handleNameChange}
                 disabled={loading} maxLength={80}
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#a8f0f8]"
               />
             </div>
 
@@ -213,7 +213,7 @@ function RegisterForm() {
                 minLength={9} maxLength={19} inputMode="tel" required
                 placeholder="0812 3456 7890"
                 disabled={loading}
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#a8f0f8]"
               />
               <p className="text-xs text-muted-foreground">Diperlukan untuk login dan klaim poin</p>
             </div>
@@ -231,7 +231,7 @@ function RegisterForm() {
                 {[!!birthYear, !!birthMonth, !!birthDay].map((done, i) => (
                   <div
                     key={i}
-                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${done ? 'bg-[#1ecbe1]' : 'bg-gray-200'
+                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${done ? 'bg-[#a8f0f8]' : 'bg-gray-200'
                       }`}
                   />
                 ))}
@@ -255,7 +255,7 @@ function RegisterForm() {
                 </div>
 
                 <div className="space-y-1">
-                  <p className={`text-xs font-medium transition-colors duration-200 ${monthUnlocked ? 'text-[#1ecbe1]' : 'text-gray-300'}`}>
+                  <p className={`text-xs font-medium transition-colors duration-200 ${monthUnlocked ? 'text-[#a8f0f8]' : 'text-gray-300'}`}>
                     ② Bulan {monthUnlocked && !birthMonth && '👈'}
                   </p>
                   <div className="relative">
@@ -281,7 +281,7 @@ function RegisterForm() {
                 </div>
 
                 <div className="space-y-1">
-                  <p className={`text-xs font-medium transition-colors duration-200 ${dayUnlocked ? 'text-[#1ecbe1]' : 'text-gray-300'}`}>
+                  <p className={`text-xs font-medium transition-colors duration-200 ${dayUnlocked ? 'text-[#a8f0f8]' : 'text-gray-300'}`}>
                     ③ Tanggal {dayUnlocked && !birthDay && '👈'}
                   </p>
                   <div className="relative">
@@ -305,9 +305,9 @@ function RegisterForm() {
                     ✓ {birthDay} {months[Number(birthMonth) - 1]} {birthYear}
                   </p>
                 ) : dayUnlocked && !birthDay ? (
-                  <p className="text-xs text-[#1ecbe1]">Satu langkah lagi — pilih tanggal lahir</p>
+                  <p className="text-xs text-[#a8f0f8]">Satu langkah lagi — pilih tanggal lahir</p>
                 ) : monthUnlocked && !birthMonth ? (
-                  <p className="text-xs text-[#1ecbe1]">Sekarang pilih bulan lahir</p>
+                  <p className="text-xs text-[#a8f0f8]">Sekarang pilih bulan lahir</p>
                 ) : !birthYear ? (
                   <p className="text-xs text-gray-400">Mulai dengan memilih tahun lahir</p>
                 ) : null}
@@ -326,7 +326,7 @@ function RegisterForm() {
                 value={address} required
                 onChange={(e) => setAddress(e.target.value)}
                 disabled={loading} maxLength={250}
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#a8f0f8]"
               />
               <p className="text-xs text-gray-500 text-right">{address.length}/250 karakter</p>
             </div>
@@ -343,7 +343,7 @@ function RegisterForm() {
                 placeholder="you@example.com"
                 disabled={loading} onChange={handleEmailChange}
                 pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                className="h-11 text-sm focus-visible:ring-[#1ecbe1]"
+                className="h-11 text-sm focus-visible:ring-[#a8f0f8]"
               />
               {emailError && <p className="text-xs text-red-500">{emailError}</p>}
             </div>
@@ -361,7 +361,7 @@ function RegisterForm() {
                     type={showPassword ? 'text' : 'password'}
                     required placeholder="Min. 6 characters"
                     minLength={6} disabled={loading}
-                    className="h-11 text-sm pr-10 focus-visible:ring-[#1ecbe1]"
+                    className="h-11 text-sm pr-10 focus-visible:ring-[#a8f0f8]"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
@@ -381,7 +381,7 @@ function RegisterForm() {
                     type={showConfirmPassword ? 'text' : 'password'}
                     required placeholder="Re-enter password"
                     minLength={6} disabled={loading}
-                    className="h-11 text-sm pr-10 focus-visible:ring-[#1ecbe1]"
+                    className="h-11 text-sm pr-10 focus-visible:ring-[#a8f0f8]"
                   />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
@@ -400,7 +400,7 @@ function RegisterForm() {
 
             <Button
               type="submit"
-              className="w-full h-11 text-sm font-semibold bg-[#028697] hover:bg-[#17a8bb] text-white transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="w-full h-11 text-sm font-semibold bg-[#028697] hover:bg-[#0fa8be] text-white transition-all duration-200 shadow-lg hover:shadow-xl"
               disabled={loading}
             >
               {loading ? (
@@ -456,7 +456,7 @@ export default function RegisterPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e0f9fc] via-[#f0fdfe] to-[#d6f7fa]">
-        <div className="w-8 h-8 border-4 border-[#1ecbe1] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-[#a8f0f8] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <RegisterForm />

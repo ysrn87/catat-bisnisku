@@ -30,16 +30,16 @@ export default async function CategoriesPage() {
           mode="create"
           trigger={
             <div>
-              <button className="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-[#00a090] text-white hover:bg-[#007868] shadow-sm transition-colors">
+              <button className="hidden sm:inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-[#028697] text-white hover:bg-[#017585] shadow-sm transition-colors">
                 <Tag className="w-4 h-4" />
                 Tambah Kategori
               </button>
               <button
                 type="button"
                 className="sm:hidden fixed bottom-24 right-6 z-50
-                           w-12 h-12 rounded-full bg-[#00a090] text-white shadow-lg
+                           w-12 h-12 rounded-full bg-[#028697] text-white shadow-lg
                            flex items-center justify-center
-                           hover:bg-[#007868] active:scale-95 transition-all"
+                           hover:bg-[#017585] active:scale-95 transition-all"
                 aria-label="Tambah Kategori"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"

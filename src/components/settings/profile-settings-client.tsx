@@ -180,7 +180,7 @@ function ManagerModal({
         </div>
         <div className="flex justify-end gap-2 p-5 border-t">
           <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
-          <Button onClick={handleSubmit} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
+          <Button onClick={handleSubmit} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
             <Save className="w-4 h-4 mr-2" />{loading ? 'Menyimpan...' : 'Simpan'}
           </Button>
         </div>
@@ -338,7 +338,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
                 </div>
               </div>
               <div className="flex justify-end pt-1">
-                <Button onClick={handleSaveProfile} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
+                <Button onClick={handleSaveProfile} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
                   <Save className="w-4 h-4 mr-2" />Simpan Profil
                 </Button>
               </div>
@@ -370,7 +370,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
                 </div>
               </div>
               <div className="flex justify-end pt-1">
-                <Button onClick={handleChangePassword} disabled={loading} className="bg-[#028697] hover:bg-[#17a8bb]">
+                <Button onClick={handleChangePassword} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
                   <Lock className="w-4 h-4 mr-2" />Ubah Password
                 </Button>
               </div>
@@ -387,7 +387,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
               <p className="text-sm font-medium">Daftar Manager</p>
               <p className="text-xs text-gray-500">{managers.length} akun manager terdaftar</p>
             </div>
-            <Button onClick={() => setModalManager(null)} className="bg-[#028697] hover:bg-[#17a8bb] h-9 text-sm">
+            <Button onClick={() => setModalManager(null)} className="bg-[#028697] hover:bg-[#0fa8be] h-9 text-sm">
               <Plus className="w-4 h-4 mr-1.5" />Tambah Manager
             </Button>
           </div>

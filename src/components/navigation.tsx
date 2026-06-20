@@ -225,14 +225,17 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                   <span className="truncate">{item.label}</span>
                 </Link>
 
-                {item.subItems && isActive && (() => {
+                {item.subItems && (() => {
+                  // Sub-items selalu ditampilkan (expanded) di desktop sidebar.
                   // Pilih sub-item paling spesifik yang cocok dengan path saat ini.
                   // Perlu karena href Ringkasan ("/admin/summary") adalah prefix dari
                   // href POS Kasir ("/admin") — tanpa ini keduanya akan
                   // ke-highlight bersamaan saat berada di halaman POS Kasir.
-                  const matchedSub = [...item.subItems]
-                    .sort((a, b) => b.href.length - a.href.length)
-                    .find((sub) => pathname === sub.href || pathname.startsWith(sub.href));
+                  const matchedSub = isActive
+                    ? [...item.subItems]
+                        .sort((a, b) => b.href.length - a.href.length)
+                        .find((sub) => pathname === sub.href || pathname.startsWith(sub.href))
+                    : undefined;
 
                   return (
                     <div className="mt-1 mb-1 ml-[1.15rem] pl-4 border-l-2 border-[#a8f0f8] space-y-0.5">

@@ -81,10 +81,10 @@ const MOVEMENT_TYPES = [
     label: 'Refresh Stok',
     sublabel: 'Sesuaikan stok ',
     icon: RefreshCw,
-    activeClass: 'border-[#00a090] bg-[#00a090]/8 text-[#00a090]',
-    dotClass: 'bg-[#00a090]',
-    iconClass: 'text-[#00a090]',
-    iconBg: 'bg-[#00a090]/10',
+    activeClass: 'border-[#028697] bg-[#028697]/8 text-[#028697]',
+    dotClass: 'bg-[#028697]',
+    iconClass: 'text-[#028697]',
+    iconBg: 'bg-[#028697]/10',
   },
 ];
 
@@ -148,7 +148,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className=" h-7 w-24 text-xs border-gray-200 hover:border-[#00a090] hover:text-[#00a090] transition-colors">
+        <Button variant="outline" size="sm" className=" h-7 w-24 text-xs border-gray-200 hover:border-[#028697] hover:text-[#028697] transition-colors">
           <SlidersHorizontal className="w-1 h-1" />
           Atur Stok
         </Button>
@@ -159,7 +159,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
         className="sm:max-w-[460px] p-0 gap-0 overflow-hidden border-0 shadow-2xl"
       >
         {/* Header band */}
-        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8">
+        <div className="relative bg-gradient-to-br from-[#028697] to-[#015561] px-6 pt-6 pb-8">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
 
@@ -240,7 +240,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
                 onChange={(e) => handleNumberChange(e.target.value)}
                 placeholder="0"
                 disabled={loading}
-                className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 tabular-nums"
+                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 tabular-nums"
               />
 
               {/* Stock preview */}
@@ -252,7 +252,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                     : selectedType?.value === 'OUT'
                     ? 'bg-orange-50 border-orange-200 text-orange-700'
-                    : 'bg-[#00a090]/5 border-[#00a090]/20 text-[#00a090]'
+                    : 'bg-[#028697]/5 border-[#028697]/20 text-[#028697]'
                 }`}>
                   <span>Stok setelah perubahan</span>
                   <span className="font-bold text-sm">
@@ -271,7 +271,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
                 placeholder="Contoh: Restock, Barang rusak, Opname..."
                 disabled={loading}
                 maxLength={100}
-                className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
               />
             </div>
           </div>
@@ -289,7 +289,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
             <Button
               type="submit"
               disabled={loading || !movementType || !quantity}
-              className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[130px] transition-all"
+              className="bg-[#028697] hover:bg-[#017585] text-white shadow-sm min-w-[130px] transition-all"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

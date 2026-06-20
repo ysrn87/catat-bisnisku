@@ -184,7 +184,7 @@ export function StockTable({
                     {isPreorder ? (
                       <p className="text-xs font-bold text-amber-500">—</p>
                     ) : (
-                      <p className={`text-xs font-bold ${isLowStock ? 'text-red-600' : 'text-[#00a090]'}`}>
+                      <p className={`text-xs font-bold ${isLowStock ? 'text-red-600' : 'text-[#028697]'}`}>
                         {item.stock}
                       </p>
                     )}

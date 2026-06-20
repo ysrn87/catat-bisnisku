@@ -245,7 +245,7 @@ export function CustomersTable({
                 <div className="grid grid-cols-2 gap-3 mb-2">
                   <div>
                     <p className="text-[10px] text-gray-500">Total Belanja</p>
-                    <p className="text-xs font-bold text-[#00a090]">{formatCurrency(totalSpent)}</p>
+                    <p className="text-xs font-bold text-[#028697]">{formatCurrency(totalSpent)}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-500 text-right pr-3">Transaksi</p>

@@ -99,7 +99,7 @@ export function NonMemberDialog({ mode, customer, trigger, open: controlledOpen,
   };
 
   const defaultTrigger = isCreate ? (
-    <Button className="bg-[#00a090] hover:bg-[#007868] shadow-sm">
+    <Button className="bg-[#028697] hover:bg-[#017585] shadow-sm">
       <UserPlus className="w-4 h-4 mr-2" />
       Tambah Pelanggan
     </Button>
@@ -120,7 +120,7 @@ export function NonMemberDialog({ mode, customer, trigger, open: controlledOpen,
         className="sm:max-w-[440px] p-0 gap-0 overflow-hidden border-0 shadow-2xl"
       >
         {/* Header band */}
-        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8">
+        <div className="relative bg-gradient-to-br from-[#028697] to-[#015561] px-6 pt-6 pb-8">
           {/* Decorative circles */}
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
@@ -164,7 +164,7 @@ export function NonMemberDialog({ mode, customer, trigger, open: controlledOpen,
                 disabled={loading}
                 maxLength={80}
                 placeholder="Nama Lengkap"
-                className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
               />
             </div>
 
@@ -195,7 +195,7 @@ export function NonMemberDialog({ mode, customer, trigger, open: controlledOpen,
                 minLength={9}
                 maxLength={19}
                 placeholder="0812 3456 7890"
-                className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
               />
             </div>
 
@@ -217,7 +217,7 @@ export function NonMemberDialog({ mode, customer, trigger, open: controlledOpen,
                 disabled={loading}
                 maxLength={250}
                 placeholder="Nama Jalan, Kota, Kode Pos"
-                className="resize-none border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                className="resize-none border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                 rows={3}
               />
               <p className="text-[11px] text-gray-300 text-right">{address.length}/250</p>
@@ -237,7 +237,7 @@ export function NonMemberDialog({ mode, customer, trigger, open: controlledOpen,
             <Button
               type="submit"
               disabled={loading}
-              className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[130px] transition-all"
+              className="bg-[#028697] hover:bg-[#017585] text-white shadow-sm min-w-[130px] transition-all"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

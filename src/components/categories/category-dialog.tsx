@@ -13,7 +13,7 @@ import { Tag, Loader2, Plus, Pencil } from 'lucide-react';
 
 const PRESET_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#84cc16',
-  '#10b981', '#00a090', '#06b6d4', '#3b82f6',
+  '#10b981', '#028697', '#06b6d4', '#3b82f6',
   '#8b5cf6', '#ec4899', '#6b7280', '#292524',
 ];
 
@@ -50,7 +50,7 @@ export function CategoryDialog({
   };
 
   const [name, setName]   = useState('');
-  const [color, setColor] = useState('#00a090');
+  const [color, setColor] = useState('#028697');
   const [icon, setIcon]   = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -59,7 +59,7 @@ export function CategoryDialog({
   useEffect(() => {
     if (open) {
       setName(category?.name ?? '');
-      setColor(category?.color ?? '#00a090');
+      setColor(category?.color ?? '#028697');
       setIcon(category?.icon ?? '');
     }
   }, [open, category]);
@@ -100,7 +100,7 @@ export function CategoryDialog({
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-[#00a090]" />
+              <Tag className="w-4 h-4 text-[#028697]" />
               {isCreate ? 'Tambah Kategori' : 'Edit Kategori'}
             </DialogTitle>
           </DialogHeader>
@@ -207,7 +207,7 @@ export function CategoryDialog({
               </Button>
               <Button
                 type="submit" disabled={loading}
-                className="flex-1 bg-[#00a090] hover:bg-[#007868] text-white"
+                className="flex-1 bg-[#028697] hover:bg-[#017585] text-white"
               >
                 {loading
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />Menyimpan...</>

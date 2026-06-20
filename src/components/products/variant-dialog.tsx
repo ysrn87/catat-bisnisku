@@ -85,7 +85,7 @@ function CurrencyInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
-        className="pl-9 h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 tabular-nums"
+        className="pl-9 h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 tabular-nums"
       />
     </div>
   );
@@ -181,7 +181,7 @@ function BarcodeScanner({
   }, [onDetected, stop]);
 
   return (
-    <div className="rounded-xl overflow-hidden border border-[#00a090]/20 bg-black">
+    <div className="rounded-xl overflow-hidden border border-[#028697]/20 bg-black">
       <div className="relative w-full aspect-[4/3]">
         <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
 
@@ -193,7 +193,7 @@ function BarcodeScanner({
               <span className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white rounded-tr" />
               <span className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white rounded-bl" />
               <span className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white rounded-br" />
-              <div className="absolute inset-x-1 top-0 h-0.5 bg-[#00a090] animate-scan-line" />
+              <div className="absolute inset-x-1 top-0 h-0.5 bg-[#028697] animate-scan-line" />
             </div>
           </div>
         )}
@@ -370,7 +370,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
         className="sm:max-w-[520px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col"
       >
         {/* Header band */}
-        <div className="relative bg-gradient-to-br from-[#00a090] to-[#006558] px-6 pt-6 pb-8 shrink-0">
+        <div className="relative bg-gradient-to-br from-[#028697] to-[#015561] px-6 pt-6 pb-8 shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
 
@@ -397,7 +397,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Tipe Varian</p>
               <div className="grid grid-cols-2 gap-2">
                 {([
-                  { value: 'READY_STOCK' as const, icon: Package, label: 'Ready Stock', sublabel: 'Stok dilacak', activeClass: 'border-[#00a090] bg-[#00a090]/8 text-[#00a090]' },
+                  { value: 'READY_STOCK' as const, icon: Package, label: 'Ready Stock', sublabel: 'Stok dilacak', activeClass: 'border-[#028697] bg-[#028697]/8 text-[#028697]' },
                   { value: 'PREORDER' as const, icon: Clock, label: 'Pre-Order', sublabel: 'Tanpa batas stok', activeClass: 'border-amber-500 bg-amber-50 text-amber-700' },
                 ]).map(({ value, icon: Icon, label, sublabel, activeClass }) => {
                   const active = selectedType === value;
@@ -437,7 +437,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                   placeholder="Contoh: 500gr, Coklat"
                   disabled={loading}
                   maxLength={30}
-                  className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300"
+                  className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
                 />
               </div>
               <div>
@@ -447,7 +447,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                     <button
                       type="button"
                       onClick={() => setSkuOverride((v) => !v)}
-                      className="text-[10px] text-[#00a090] hover:underline shrink-0 -mt-1.5"
+                      className="text-[10px] text-[#028697] hover:underline shrink-0 -mt-1.5"
                     >
                       {skuOverride ? 'Auto' : 'Custom'}
                     </button>
@@ -469,7 +469,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                     placeholder="KL-001-0A"
                     disabled={loading}
                     maxLength={20}
-                    className={`pl-12 h-10 font-mono tracking-wider border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal uppercase ${isCreate && productSku && !skuOverride ? 'bg-gray-50 text-gray-400 cursor-default' : ''}`}
+                    className={`pl-12 h-10 font-mono tracking-wider border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 placeholder:font-sans placeholder:tracking-normal uppercase ${isCreate && productSku && !skuOverride ? 'bg-gray-50 text-gray-400 cursor-default' : ''}`}
                   />
                 </div>
                 {isCreate && productSku && !skuOverride && (
@@ -491,7 +491,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                     placeholder="Scan atau ketik barcode..."
                     disabled={loading}
                     maxLength={50}
-                    className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 font-mono tracking-wide"
+                    className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 font-mono tracking-wide"
                   />
                   {barcode && (
                     <button
@@ -511,8 +511,8 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                   title={showBarcodeScanner ? 'Tutup scanner' : 'Scan barcode kemasan'}
                   className={`h-10 w-10 shrink-0 flex items-center justify-center rounded-lg border transition-all disabled:opacity-40 ${
                     showBarcodeScanner
-                      ? 'bg-[#00a090] border-[#00a090] text-white'
-                      : 'bg-white border-gray-200 text-gray-500 hover:border-[#00a090] hover:text-[#00a090]'
+                      ? 'bg-[#028697] border-[#028697] text-white'
+                      : 'bg-white border-gray-200 text-gray-500 hover:border-[#028697] hover:text-[#028697]'
                   }`}
                 >
                   {showBarcodeScanner ? (
@@ -612,7 +612,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                         onChange={(e) => handleNumberChange(e.target.value, setStock)}
                         placeholder="0"
                         disabled={loading}
-                        className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 tabular-nums"
+                        className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 tabular-nums"
                       />
                     </div>
                   )}
@@ -627,7 +627,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                       onChange={(e) => handleNumberChange(e.target.value, setLowStock)}
                       placeholder="10"
                       disabled={loading}
-                      className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 tabular-nums"
+                      className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 tabular-nums"
                     />
                   </div>
                   <div>
@@ -640,7 +640,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                       onChange={(e) => handleNumberChange(e.target.value, setPoints)}
                       placeholder="0"
                       disabled={loading}
-                      className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 tabular-nums"
+                      className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 tabular-nums"
                     />
                   </div>
                 </div>
@@ -656,7 +656,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
                       onChange={(e) => handleNumberChange(e.target.value, setPoints)}
                       placeholder="0"
                       disabled={loading}
-                      className="h-10 border-gray-200 focus-visible:ring-[#00a090]/30 focus-visible:border-[#00a090] transition-colors placeholder:text-gray-300 tabular-nums"
+                      className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300 tabular-nums"
                     />
                   </div>
                   <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
@@ -691,7 +691,7 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
             <Button
               type="submit"
               disabled={loading}
-              className="bg-[#00a090] hover:bg-[#007868] text-white shadow-sm min-w-[120px] transition-all"
+              className="bg-[#028697] hover:bg-[#017585] text-white shadow-sm min-w-[120px] transition-all"
             >
               {loading ? (
                 <span className="flex items-center gap-2">

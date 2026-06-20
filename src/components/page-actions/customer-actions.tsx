@@ -19,9 +19,9 @@ interface CustomerActionsProps {
 
 const FAB_BTN_CLASS = `
   sm:hidden fixed bottom-24 right-6 z-50
-  w-12 h-12 rounded-full bg-[#00a090] text-white shadow-lg
+  w-12 h-12 rounded-full bg-[#028697] text-white shadow-lg
   flex items-center justify-center
-  hover:bg-[#007868] active:scale-95 transition-all
+  hover:bg-[#017585] active:scale-95 transition-all
 `.trim();
 
 const PlusIcon = () => (
@@ -58,7 +58,7 @@ export function CustomerActions({ isAdmin }: CustomerActionsProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-48 mb-2">
             <DropdownMenuItem onClick={() => setMemberOpen(true)} className="gap-2 cursor-pointer">
-              <UserPlus className="w-4 h-4 text-[#00a090]" />
+              <UserPlus className="w-4 h-4 text-[#028697]" />
               Tambah Member
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setNonMemberOpen(true)} className="gap-2 cursor-pointer">
@@ -77,7 +77,7 @@ export function CustomerActions({ isAdmin }: CustomerActionsProps) {
       mode="create"
       trigger={
         <>
-          <Button className="hidden sm:inline-flex bg-[#00a090] hover:bg-[#007868] text-white shadow-sm">
+          <Button className="hidden sm:inline-flex bg-[#028697] hover:bg-[#017585] text-white shadow-sm">
             <Plus className="w-4 h-4 mr-2" />
             Tambah Non-Member
           </Button>

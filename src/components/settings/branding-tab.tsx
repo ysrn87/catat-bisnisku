@@ -190,7 +190,7 @@ export function BrandingTab({ storeSlug, storePlan }: BrandingTabProps) {
           <Button
             onClick={handleSave}
             disabled={loading || !isDirty}
-            className="bg-[#028697] hover:bg-[#17a8bb]"
+            className="bg-[#028697] hover:bg-[#0fa8be]"
           >
             {loading
               ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Menyimpan...</>

@@ -775,7 +775,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   </div>
                 )}
               </div>
-              <div className="flex justify-between px-3 sm:px-4 py-3 bg-[#00a090] text-white font-bold text-base sm:text-lg">
+              <div className="flex justify-between px-3 sm:px-4 py-3 bg-[#028697] text-white font-bold text-base sm:text-lg">
                 <span>Total</span>
                 <span>{formatCurrency(sale.total)}</span>
               </div>

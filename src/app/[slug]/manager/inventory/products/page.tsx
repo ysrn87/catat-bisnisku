@@ -134,7 +134,7 @@ export default async function ProductsPage({
           </Card>
         ) : (
           products.map((product: typeof products[number]) => (
-            <ProductCard key={product.id} product={product} filterStatus={status} categories={categories} />
+            <ProductCard key={product.id} product={product} filterStatus={status} categories={categories} isAdmin={isAdmin} />
           ))
         )}
       </div>

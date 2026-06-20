@@ -12,9 +12,9 @@ export function MobileFab({ onPress, label = 'Tambah' }: MobileFabProps) {
         type="button"
         onClick={onPress}
         aria-label={label}
-        className="w-12 h-12 rounded-full bg-[#00a090] text-white shadow-lg
+        className="w-12 h-12 rounded-full bg-[#028697] text-white shadow-lg
                    flex items-center justify-center
-                   hover:bg-[#007868] active:scale-95 transition-all"
+                   hover:bg-[#017585] active:scale-95 transition-all"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
           viewBox="0 0 24 24" fill="none" stroke="currentColor"
