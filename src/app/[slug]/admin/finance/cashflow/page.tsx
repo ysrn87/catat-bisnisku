@@ -2,7 +2,6 @@ import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { CashflowDialog } from '@/components/cashflow/cashflow-dialog';
 import { CashflowTable } from '@/components/cashflow/cashflow-table';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { SearchFilterBar } from '@/components/filters/search-filter-bar';
@@ -63,10 +62,10 @@ async function getCashflowStats(storeId: string, dateFrom?: string, dateTo?: str
   return { income, expense, balance: income - expense };
 }
 
-// Get distinct categories for the combobox
+// Get distinct categories for the combobox (manual entries only, excludes sale-generated categories)
 async function getCashflowCategories(storeId: string): Promise<string[]> {
   const rows = await db.cashflow.findMany({
-    where: { storeId },
+    where: { storeId, saleId: null },
     select: { category: true },
     distinct: ['category'],
     orderBy: { category: 'asc' },

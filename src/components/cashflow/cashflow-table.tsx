@@ -2,8 +2,8 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatCurrency, formatDateTime } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { TrendingUp, TrendingDown, Trash2, Lock } from 'lucide-react';
 import { Pagination } from '@/components/ui/pagination';
 import { CashflowDialog } from '@/components/cashflow/cashflow-dialog';
 import { deleteCashflowAction } from '@/actions/cashflow';
@@ -17,6 +17,8 @@ interface Transaction {
   category: string;
   description: string | null;
   date: Date;
+  time: string | null;
+  saleId: string | null;
   createdBy: { name: string };
 }
 
@@ -62,6 +64,12 @@ function DeleteButton({ id }: { id: string }) {
   );
 }
 
+function formatTimeLabel(t: Transaction): string {
+  if (t.time) return t.time;
+  const d = new Date(t.date);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 export function CashflowTable({ transactions, currentPage, pageSize, totalItems }: CashflowTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,6 +96,7 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
           <TableHeader>
             <TableRow>
               <TableHead>Tanggal</TableHead>
+              <TableHead>Jam</TableHead>
               <TableHead>Jenis</TableHead>
               <TableHead>Kategori</TableHead>
               <TableHead>Deskripsi</TableHead>
@@ -99,14 +108,17 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
           <TableBody className="text-xs">
             {transactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                   Belum ada transaksi
                 </TableCell>
               </TableRow>
             ) : (
-              transactions.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="whitespace-nowrap">{formatDateTime(t.date)}</TableCell>
+              transactions.map((t) => {
+                const isLocked = !!t.saleId;
+                return (
+                <TableRow key={t.id} className={isLocked ? 'bg-gray-50/50' : ''}>
+                  <TableCell className="whitespace-nowrap">{formatDate(t.date)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{formatTimeLabel(t)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       {t.type === 'INCOME' ? (
@@ -116,7 +128,12 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{t.category}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      {t.category}
+                      {isLocked && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-muted-foreground max-w-[200px] truncate">{t.description || '—'}</TableCell>
                   <TableCell className="text-right">
                     <span className={`font-semibold ${t.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
@@ -128,13 +145,14 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                     <div className="flex items-center gap-1">
                       <CashflowDialog
                         mode="edit"
-                        transaction={{ ...t, type: t.type as 'INCOME' | 'EXPENSE', description: t.description ?? '', date: new Date(t.date) }}
+                        transaction={{ ...t, type: t.type as 'INCOME' | 'EXPENSE', description: t.description ?? '', date: new Date(t.date), time: t.time, saleId: t.saleId }}
                       />
-                      <DeleteButton id={t.id} />
+                      {!isLocked && <DeleteButton id={t.id} />}
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -149,8 +167,9 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
         ) : (
           transactions.map((t) => {
             const isIncome = t.type === 'INCOME';
+            const isLocked = !!t.saleId;
             return (
-              <div key={t.id} className="bg-white border border-gray-200 rounded-xl p-4">
+              <div key={t.id} className={`bg-white border border-gray-200 rounded-xl p-4 ${isLocked ? 'bg-gray-50/50' : ''}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     {isIncome
@@ -160,7 +179,7 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                       <p className={`text-sm font-bold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
                         {isIncome ? 'Pemasukan' : 'Pengeluaran'}
                       </p>
-                      <p className="text-xs text-gray-500">{formatDateTime(t.date)}</p>
+                      <p className="text-xs text-gray-500">{formatDate(t.date)} · {formatTimeLabel(t)}</p>
                     </div>
                   </div>
                   <div className={`text-base font-bold shrink-0 ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
@@ -170,7 +189,10 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">Kategori</span>
-                    <span className="font-medium text-gray-900">{t.category}</span>
+                    <span className="font-medium text-gray-900 flex items-center gap-1">
+                      {t.category}
+                      {isLocked && <Lock className="h-3 w-3 text-amber-500" />}
+                    </span>
                   </div>
                   {t.description && (
                     <div className="pt-2 border-t border-gray-100">
@@ -182,9 +204,9 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                     <div className="flex gap-1">
                       <CashflowDialog
                         mode="edit"
-                        transaction={{ ...t, type: t.type as 'INCOME' | 'EXPENSE', description: t.description ?? '', date: new Date(t.date) }}
+                        transaction={{ ...t, type: t.type as 'INCOME' | 'EXPENSE', description: t.description ?? '', date: new Date(t.date), time: t.time, saleId: t.saleId }}
                       />
-                      <DeleteButton id={t.id} />
+                      {!isLocked && <DeleteButton id={t.id} />}
                     </div>
                   </div>
                 </div>

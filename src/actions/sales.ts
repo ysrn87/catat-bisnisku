@@ -149,6 +149,7 @@ export async function createSaleAction(input: CreateSaleInput) {
           amount: total,
           description: `Sale ${newSale.saleNumber}`,
           date: new Date(),
+          saleId: newSale.id,
           createdById: userId,
         },
       });
@@ -300,6 +301,7 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
             amount: Math.abs(cashflowDiff),
             description: `Transaksi ${originalSale.saleNumber}`,
             date: new Date(),
+            saleId: id,
             createdById: userId,
           },
         });
@@ -359,6 +361,7 @@ export async function deleteSaleAction(id: string) {
           amount: Number(sale.total),
           description: `Penghapusan ${sale.saleNumber}`,
           date: new Date(),
+          saleId: id,
           createdById: userId,
         },
       });

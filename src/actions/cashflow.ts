@@ -13,13 +13,15 @@ export async function createCashflowAction(formData: FormData) {
     const amount      = parseFloat(formData.get('amount') as string);
     const category    = sanitizeCategory(formData.get('category') as string);
     const description = sanitizeText(formData.get('description') as string, 300);
-    const date        = new Date(formData.get('date') as string);
+    const dateStr     = formData.get('date') as string;
+    const time        = (formData.get('time') as string)?.trim() || null;
+    const date        = new Date(dateStr);
 
-    if (!type || !amount || !category || !date) return { success: false, error: 'Data tidak lengkap' };
+    if (!type || !amount || !category || !dateStr) return { success: false, error: 'Data tidak lengkap' };
     if (amount <= 0) return { success: false, error: 'Jumlah harus lebih dari 0' };
 
     await db.cashflow.create({
-      data: { storeId, type, amount, category, description, date, createdById: userId },
+      data: { storeId, type, amount, category, description, date, time, createdById: userId },
     });
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
@@ -35,19 +37,23 @@ export async function updateCashflowAction(id: string, formData: FormData) {
   try {
     const { storeId, storeSlug } = await requireStoreAccess();
 
+    // Block editing sale-generated entries
+    const cashflow = await db.cashflow.findFirst({ where: { id, storeId } });
+    if (!cashflow) return { success: false, error: 'Transaksi tidak ditemukan' };
+    if (cashflow.saleId) return { success: false, error: 'Transaksi dari penjualan tidak dapat diedit. Edit melalui menu Transaksi Penjualan.' };
+
     const type        = formData.get('type')        as 'INCOME' | 'EXPENSE';
     const amount      = parseFloat(formData.get('amount') as string);
     const category    = sanitizeCategory(formData.get('category') as string);
     const description = sanitizeText(formData.get('description') as string, 300);
-    const date        = new Date(formData.get('date') as string);
+    const dateStr     = formData.get('date') as string;
+    const time        = (formData.get('time') as string)?.trim() || null;
+    const date        = new Date(dateStr);
 
-    if (!type || !amount || !category || !date) return { success: false, error: 'Data tidak lengkap' };
+    if (!type || !amount || !category || !dateStr) return { success: false, error: 'Data tidak lengkap' };
     if (amount <= 0) return { success: false, error: 'Jumlah harus lebih dari 0' };
 
-    const cashflow = await db.cashflow.findFirst({ where: { id, storeId } });
-    if (!cashflow) return { success: false, error: 'Transaksi tidak ditemukan' };
-
-    await db.cashflow.update({ where: { id }, data: { type, amount, category, description, date } });
+    await db.cashflow.update({ where: { id }, data: { type, amount, category, description, date, time } });
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
     revalidatePath(`/${storeSlug}/admin/finance/reports`);
@@ -64,6 +70,7 @@ export async function deleteCashflowAction(id: string) {
 
     const cashflow = await db.cashflow.findFirst({ where: { id, storeId } });
     if (!cashflow) return { success: false, error: 'Transaksi tidak ditemukan' };
+    if (cashflow.saleId) return { success: false, error: 'Transaksi dari penjualan tidak dapat dihapus. Hapus melalui menu Transaksi Penjualan.' };
 
     await db.cashflow.delete({ where: { id } });
 

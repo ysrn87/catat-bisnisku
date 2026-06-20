@@ -276,6 +276,8 @@ model Cashflow {
   amount      Decimal         @db.Decimal(10, 2)
   description String
   date        DateTime        @default(now())
+  saleId      String?         // set when auto-created from a sale transaction
+  time        String?         // HH:MM, stored separately from date for user input
   createdById String
   createdAt   DateTime        @default(now())
 
