@@ -20,15 +20,22 @@ import {
   type ManagerData,
 } from '@/actions/manager-actions';
 import {
+  getCashiers,
+  createCashier,
+  updateCashier,
+  deleteCashier,
+  type CashierData,
+} from '@/actions/cashier-actions';
+import {
   User, Lock, Mail, Phone, MapPin, Save,
   Eye, EyeOff, Users, Plus, Pencil, Trash2,
-  X, ShieldCheck, Palette,
+  X, ShieldCheck, Palette, Wallet,
 } from 'lucide-react';
 import { BrandingTab } from '@/components/settings/branding-tab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'profile' | 'managers' | 'branding';
+type Tab = 'profile' | 'managers' | 'cashiers' | 'branding';
 
 interface ManagerForm {
   name: string;
@@ -42,6 +49,9 @@ interface ManagerForm {
 const emptyManagerForm: ManagerForm = {
   name: '', phone: '', email: '', address: '', password: '', confirmPassword: '',
 };
+
+type CashierForm = ManagerForm;
+const emptyCashierForm: CashierForm = emptyManagerForm;
 
 // ─── Password Input ───────────────────────────────────────────────────────────
 
@@ -189,6 +199,125 @@ function ManagerModal({
   );
 }
 
+// ─── Cashier Modal ────────────────────────────────────────────────────────────
+
+function CashierModal({
+  cashier, onClose, onSaved,
+}: {
+  cashier: CashierData | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = !!cashier;
+  const [form, setForm] = useState<CashierForm>(
+    cashier
+      ? { name: cashier.name, phone: cashier.phone, email: cashier.email ?? '', address: cashier.address ?? '', password: '', confirmPassword: '' }
+      : emptyCashierForm
+  );
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  function set(field: keyof CashierForm, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleSubmit() {
+    if (!form.name.trim() || !form.phone.trim()) {
+      toast({ title: 'Nama dan nomor telepon wajib diisi', variant: 'destructive' });
+      return;
+    }
+    if (!isEdit && form.password.length < 6) {
+      toast({ title: 'Password minimal 6 karakter', variant: 'destructive' });
+      return;
+    }
+    if (form.password && form.password !== form.confirmPassword) {
+      toast({ title: 'Konfirmasi password tidak cocok', variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    try {
+      if (isEdit) {
+        await updateCashier(cashier!.id, {
+          name: form.name, phone: form.phone,
+          email: form.email || undefined, address: form.address || undefined,
+          newPassword: form.password || undefined,
+        });
+        toast({ title: 'Kasir berhasil diperbarui' });
+      } else {
+        await createCashier({
+          name: form.name, phone: form.phone, password: form.password,
+          email: form.email || undefined, address: form.address || undefined,
+        });
+        toast({ title: 'Kasir berhasil ditambahkan' });
+      }
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      toast({ title: 'Gagal', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-semibold text-base">{isEdit ? 'Edit Kasir' : 'Tambah Kasir'}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="c-name" className="text-xs font-medium flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-gray-400" />Nama <span className="text-red-400">*</span>
+            </Label>
+            <Input id="c-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nama kasir" className="h-10 text-sm" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="c-phone" className="text-xs font-medium flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-gray-400" />No. Telepon <span className="text-red-400">*</span>
+            </Label>
+            <Input id="c-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="08123456789" className="h-10 text-sm" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="c-email" className="text-xs font-medium flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-gray-400" />Email
+            </Label>
+            <Input id="c-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="kasir@example.com" className="h-10 text-sm" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="c-address" className="text-xs font-medium flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat
+            </Label>
+            <Input id="c-address" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
+          </div>
+          <hr className="border-t border-gray-100" />
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-medium">
+              {isEdit ? 'Password Baru (kosongkan jika tidak diubah)' : <span>Password <span className="text-red-400">*</span></span>}
+            </Label>
+            <PasswordInput id="c-password" value={form.password} onChange={(v) => set('password', v)} placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Min. 6 karakter'} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-medium">
+              Konfirmasi Password {!isEdit && <span className="text-red-400">*</span>}
+            </Label>
+            <PasswordInput id="c-confirm" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Ulangi password" />
+            {form.confirmPassword && form.password !== form.confirmPassword && <p className="text-xs text-red-500">Password tidak cocok</p>}
+            {form.confirmPassword && form.password === form.confirmPassword && form.password.length >= 6 && <p className="text-xs text-emerald-600">Password cocok ✓</p>}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 p-5 border-t">
+          <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
+          <Button onClick={handleSubmit} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
+            <Save className="w-4 h-4 mr-2" />{loading ? 'Menyimpan...' : 'Simpan'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 interface ProfileSettingsPageProps {
@@ -212,10 +341,15 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
   const [modalManager, setModalManager] = useState<ManagerData | null | undefined>(undefined);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const [cashiers, setCashiers] = useState<CashierData[]>([]);
+  const [modalCashier, setModalCashier] = useState<CashierData | null | undefined>(undefined);
+  const [deletingCashierId, setDeletingCashierId] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => { loadAdminProfile(); }, []);
   useEffect(() => { if (activeTab === 'managers') loadManagers(); }, [activeTab]);
+  useEffect(() => { if (activeTab === 'cashiers') loadCashiers(); }, [activeTab]);
 
   async function loadAdminProfile() {
     try {
@@ -229,6 +363,11 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
 
   async function loadManagers() {
     try { setManagers(await getManagers()); }
+    catch (error) { console.error(error); }
+  }
+
+  async function loadCashiers() {
+    try { setCashiers(await getCashiers()); }
     catch (error) { console.error(error); }
   }
 
@@ -269,6 +408,17 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
     } finally { setDeletingId(null); }
   }
 
+  async function handleDeleteCashier(id: string) {
+    setDeletingCashierId(id);
+    try {
+      await deleteCashier(id);
+      toast({ title: 'Kasir berhasil dihapus' });
+      loadCashiers();
+    } catch (err: any) {
+      toast({ title: 'Gagal menghapus', description: err.message, variant: 'destructive' });
+    } finally { setDeletingCashierId(null); }
+  }
+
   const initials = adminName
     ? adminName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
     : '?';
@@ -281,6 +431,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
         {([
           { key: 'profile',   label: 'Profil Admin',    icon: User    },
           { key: 'managers',  label: 'Kelola Manager',   icon: Users   },
+          { key: 'cashiers',  label: 'Kelola Kasir',     icon: Wallet  },
           { key: 'branding',  label: 'Custom Branding',  icon: Palette },
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
@@ -445,6 +596,72 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
         </div>
       )}
 
+      {/* ── Cashier Tab ── */}
+      {activeTab === 'cashiers' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Daftar Kasir</p>
+              <p className="text-xs text-gray-500">{cashiers.length} akun kasir terdaftar</p>
+            </div>
+            <Button onClick={() => setModalCashier(null)} className="bg-[#028697] hover:bg-[#0fa8be] h-9 text-sm">
+              <Plus className="w-4 h-4 mr-1.5" />Tambah Kasir
+            </Button>
+          </div>
+
+          {cashiers.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
+                <Wallet className="w-10 h-10" />
+                <p className="text-sm">Belum ada akun kasir</p>
+                <Button variant="outline" size="sm" onClick={() => setModalCashier(null)}>
+                  <Plus className="w-4 h-4 mr-1.5" />Tambah Kasir
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {cashiers.map((c) => {
+                const cInitials = c.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+                return (
+                  <Card key={c.id}>
+                    <CardContent className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#028697]/10 flex items-center justify-center shrink-0">
+                          <span className="text-[#028697] text-sm font-bold">{cInitials}</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-sm truncate">{c.name}</p>
+                            <Badge variant="outline" className="text-[10px] text-[#028697] border-[#028697]/30 shrink-0">Kasir</Badge>
+                          </div>
+                          <p className="text-xs text-gray-500 truncate">
+                            {c.phone}{c.email ? ` · ${c.email}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setModalCashier(c)}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="outline" size="icon"
+                            className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50"
+                            disabled={deletingCashierId === c.id}
+                            onClick={() => handleDeleteCashier(c.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Branding Tab ── */}
       {activeTab === 'branding' && (
         <BrandingTab storeSlug={storeSlug} storePlan={storePlan} />
@@ -456,6 +673,13 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
           manager={modalManager}
           onClose={() => setModalManager(undefined)}
           onSaved={loadManagers}
+        />
+      )}
+      {modalCashier !== undefined && (
+        <CashierModal
+          cashier={modalCashier}
+          onClose={() => setModalCashier(undefined)}
+          onSaved={loadCashiers}
         />
       )}
     </div>

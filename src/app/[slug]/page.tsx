@@ -32,6 +32,8 @@ export default async function StoreRootPage({
       redirect(`/${slug}/admin`);
     case 'MANAGER':
       redirect(`/${slug}/manager`);
+    case 'CASHIER':
+      redirect(`/${slug}/cashier`);
     case 'MEMBER':
       redirect(`/${slug}/member`);
     default:

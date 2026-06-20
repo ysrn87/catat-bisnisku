@@ -7,7 +7,11 @@ import { requireStoreAccess } from '@/lib/store-context';
 
 export async function createCashflowAction(formData: FormData) {
   try {
-    const { storeId, storeSlug, userId } = await requireStoreAccess();
+    const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Unauthorized' };
+    }
 
     const type        = formData.get('type')        as 'INCOME' | 'EXPENSE';
     const amount      = parseFloat(formData.get('amount') as string);
@@ -35,7 +39,11 @@ export async function createCashflowAction(formData: FormData) {
 
 export async function updateCashflowAction(id: string, formData: FormData) {
   try {
-    const { storeId, storeSlug } = await requireStoreAccess();
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Unauthorized' };
+    }
 
     // Block editing sale-generated entries
     const cashflow = await db.cashflow.findFirst({ where: { id, storeId } });
@@ -66,7 +74,11 @@ export async function updateCashflowAction(id: string, formData: FormData) {
 
 export async function deleteCashflowAction(id: string) {
   try {
-    const { storeId, storeSlug } = await requireStoreAccess();
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Unauthorized' };
+    }
 
     const cashflow = await db.cashflow.findFirst({ where: { id, storeId } });
     if (!cashflow) return { success: false, error: 'Transaksi tidak ditemukan' };

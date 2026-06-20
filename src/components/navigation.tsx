@@ -24,7 +24,7 @@ interface NavItem {
 }
 
 interface NavigationProps {
-  role: 'ADMINISTRATOR' | 'MANAGER' | 'MEMBER';
+  role: 'ADMINISTRATOR' | 'MANAGER' | 'CASHIER' | 'MEMBER';
   userName?: string;
   storeSlug: string;
   storeName?: string;
@@ -39,6 +39,11 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const base = `/${storeSlug}`;
+  const homeHref =
+    role === 'ADMINISTRATOR' ? `${base}/admin` :
+    role === 'MANAGER'       ? `${base}/manager` :
+    role === 'CASHIER'       ? `${base}/cashier` :
+    `${base}/member`;
 
   const adminNavItems: NavItem[] = [
     {
@@ -155,6 +160,15 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
     },
   ];
 
+  const cashierNavItems: NavItem[] = [
+    {
+      href: `${base}/cashier`,
+      label: 'POS Kasir',
+      mobileLabel: 'POS',
+      icon: <ShoppingCart className="w-4 h-4" />,
+    },
+  ];
+
   const memberNavItems: NavItem[] = [
     {
       href: `${base}/member`,
@@ -173,6 +187,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
   const navItems =
     role === 'ADMINISTRATOR' ? adminNavItems :
     role === 'MANAGER'       ? managerNavItems :
+    role === 'CASHIER'       ? cashierNavItems :
     memberNavItems;
 
   const isNavItemActive = (item: NavItem) => {
@@ -195,7 +210,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
             </div>
           )}
           <Link
-            href={`${base}/admin`}
+            href={homeHref}
             className="text-sm font-bold text-[#028697] truncate hover:opacity-80 transition-opacity leading-tight"
           >
             {storeName ?? 'Catat Bisnisku'}
@@ -299,7 +314,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
             {/* Logo */}
             <div className="flex items-center flex-1 min-w-0 gap-3 sm:gap-4">
               <div className="flex-shrink-0">
-                <Link href={`${base}/admin`} className="text-lg font-bold text-[#028697] whitespace-nowrap hover:opacity-80 transition-opacity">
+                <Link href={homeHref} className="text-lg font-bold text-[#028697] whitespace-nowrap hover:opacity-80 transition-opacity">
                   {storeName ?? 'Catat Bisnisku'}
                 </Link>
               </div>

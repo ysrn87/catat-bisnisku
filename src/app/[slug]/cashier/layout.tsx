@@ -1,0 +1,52 @@
+import { auth } from '@/auth';
+import { redirect } from 'next/navigation';
+import { Navigation } from '@/components/navigation';
+import { NavigationLoader } from '@/components/layouts/navigation-loader';
+import { db } from '@/lib/db';
+
+export default async function CashierLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const session = await auth();
+
+  if (!session) {
+    redirect(`/login?callbackUrl=/${slug}/cashier`);
+  }
+
+  // OWNER, ADMINISTRATOR, dan MANAGER juga boleh akses halaman cashier (POS)
+  const storeUser = await db.storeUser.findFirst({
+    where: {
+      userId: session.user.id,
+      store: { slug },
+      role: { in: ['OWNER', 'ADMINISTRATOR', 'MANAGER', 'CASHIER'] },
+    },
+    include: {
+      store: { select: { name: true, slug: true, plan: true } },
+    },
+  });
+
+  if (!storeUser) {
+    redirect('/unauthorized');
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <NavigationLoader />
+      <Navigation
+        role="CASHIER"
+        userName={session.user.name ?? undefined}
+        storeSlug={slug}
+        storeName={storeUser.store.name}
+        storePlan={storeUser.store.plan as 'FREE' | 'PRO'}
+      />
+      <main className="px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8 lg:ml-64 lg:px-8">
+        {children}
+      </main>
+    </div>
+  );
+}

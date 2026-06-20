@@ -54,8 +54,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // ─── Extract slug dari path ───────────────────────────────────────────────
-  // Pattern: /[slug]/admin/..., /[slug]/manager/..., /[slug]/member/..., /[slug]/upgrade
-  const slugMatch = pathname.match(/^\/([^/]+)\/(admin|manager|member|upgrade)(\/|$)/);
+  // Pattern: /[slug]/admin/..., /[slug]/manager/..., /[slug]/cashier/..., /[slug]/member/..., /[slug]/upgrade
+  const slugMatch = pathname.match(/^\/([^/]+)\/(admin|manager|cashier|member|upgrade)(\/|$)/);
 
   if (!slugMatch) {
     return NextResponse.next();

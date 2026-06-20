@@ -125,7 +125,7 @@ export async function requireStoreAccess(): Promise<{
  * Gunakan sebelum create resource baru.
  */
 export async function checkPlanLimit(
-  resource: 'products' | 'variantsPerProduct' | 'managers' | 'dailyTransactions',
+  resource: 'products' | 'variantsPerProduct' | 'managers' | 'cashiers' | 'dailyTransactions',
   extra?: string
 ): Promise<{ allowed: boolean; current: number; limit: number }> {
   const { storeId, storePlan } = await getStoreContext();
@@ -153,6 +153,11 @@ export async function checkPlanLimit(
       current = await db.storeUser.count({ where: { storeId, role: 'MANAGER' } });
       break;
 
+    case 'cashiers':
+      limit   = limits.cashiers;
+      current = await db.storeUser.count({ where: { storeId, role: 'CASHIER' } });
+      break;
+
     case 'dailyTransactions': {
       limit = limits.dailyTransactions;
       if (limit === Infinity) return { allowed: true, current: 0, limit: Infinity };
@@ -174,6 +179,7 @@ export const PLAN_LIMITS = {
     products:          15,
     variantsPerProduct: 3,
     managers:           1,
+    cashiers:           1,
     dailyTransactions: 100,
     stockHistory:      false,
     exportReports:     false,
@@ -183,6 +189,7 @@ export const PLAN_LIMITS = {
     products:           1000,
     variantsPerProduct: 10,
     managers:           5,
+    cashiers:           5,
     dailyTransactions:  Infinity,
     stockHistory:       true,
     exportReports:      true,

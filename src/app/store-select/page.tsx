@@ -3,12 +3,13 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Link from 'next/link';
-import { Store, ArrowRight, Crown, ShieldCheck, Users } from 'lucide-react';
+import { Store, ArrowRight, Crown, ShieldCheck, Users, Wallet } from 'lucide-react';
 
 const roleIcon: Record<string, React.ReactNode> = {
   OWNER:         <Crown      className="w-4 h-4 text-amber-500" />,
   ADMINISTRATOR: <ShieldCheck className="w-4 h-4 text-blue-500" />,
   MANAGER:       <Users      className="w-4 h-4 text-green-500" />,
+  CASHIER:       <Wallet     className="w-4 h-4 text-[#028697]" />,
   MEMBER:        <Users      className="w-4 h-4 text-gray-400" />,
 };
 
@@ -16,6 +17,7 @@ const roleLabel: Record<string, string> = {
   OWNER:         'Pemilik',
   ADMINISTRATOR: 'Administrator',
   MANAGER:       'Manager',
+  CASHIER:       'Kasir',
   MEMBER:        'Member',
 };
 

@@ -298,6 +298,7 @@ enum StoreRole {
   OWNER
   ADMINISTRATOR
   MANAGER
+  CASHIER
   MEMBER
 }
 
@@ -309,6 +310,7 @@ enum ProductType {
 enum Role {
   ADMINISTRATOR
   MANAGER
+  CASHIER
   MEMBER
 }
 

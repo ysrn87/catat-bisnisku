@@ -32,7 +32,7 @@ export async function createSaleAction(input: CreateSaleInput) {
   try {
     const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER' && storeRole !== 'CASHIER') {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -161,6 +161,7 @@ export async function createSaleAction(input: CreateSaleInput) {
     revalidatePath(`/${storeSlug}/manager/transactions/sales`);
     revalidatePath(`/${storeSlug}/admin/inventory/stock`);
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
+    revalidatePath(`/${storeSlug}/cashier`);
     return { success: true, saleId: sale.id };
   } catch (error) {
     console.error('Create sale error:', error);
