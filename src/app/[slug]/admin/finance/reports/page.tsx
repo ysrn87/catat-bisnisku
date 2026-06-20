@@ -1,7 +1,8 @@
 import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsContent } from '@/components/ui/tabs';
+import { ReportTabs } from '@/components/reports/report-tabs';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, Package, DollarSign, AlertTriangle } from 'lucide-react';
 import { SalesReportTable } from '@/components/reports/sales-report-table';
@@ -50,7 +51,6 @@ async function getSalesReport(storeId: string, page = 1, limit = 10) {
 async function getInventoryReport(storeId: string, page = 1, limit = 10) {
   const skip = (page - 1) * limit;
 
-  // Fetch current page + total count
   const [inventory, totalProducts] = await Promise.all([
     db.productVariant.findMany({
       where: { storeId }, skip, take: limit,
@@ -62,10 +62,10 @@ async function getInventoryReport(storeId: string, page = 1, limit = 10) {
 
   const serialized = inventory.map((i) => ({ ...i, price: Number(i.price), cost: Number(i.cost) }));
 
-  // Fix #9: field-to-field comparison must be done in JS, not Prisma where clause
+  // lowStock comparison done in JS — Prisma cannot compare two fields of the
+  // same row directly in a `where` clause without a raw query.
   const lowStockCount = serialized.filter((i) => i.stock <= i.lowStock).length;
 
-  // Inventory value only from READY_STOCK variants (PREORDER has no meaningful stock value)
   const inventoryValue = serialized.reduce((sum, i) => sum + (i.type !== 'PREORDER' ? i.cost * i.stock : 0), 0);
 
   return { inventory: serialized, totalProducts, lowStockCount, inventoryValue };
@@ -151,20 +151,8 @@ export default async function FinanceReportsPage({ params, searchParams }: {
         </Card>
       </div>
 
-      {/* Tabs — persist via URL ?tab= */}
-      <Tabs defaultValue={activeTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-sm grid-cols-3">
-          <TabsTrigger value="financial" onClick={() => {}} asChild>
-            <a href={`?${new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(p as any)), tab: 'financial' })}`}>Keuangan</a>
-          </TabsTrigger>
-          <TabsTrigger value="sales" asChild>
-            <a href={`?${new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(p as any)), tab: 'sales' })}`}>Penjualan</a>
-          </TabsTrigger>
-          <TabsTrigger value="inventory" asChild>
-            <a href={`?${new URLSearchParams({ ...Object.fromEntries(new URLSearchParams(p as any)), tab: 'inventory' })}`}>Inventori</a>
-          </TabsTrigger>
-        </TabsList>
-
+      {/* Tabs — persisted via ?tab= URL param, driven by a small client wrapper */}
+      <ReportTabs activeTab={activeTab}>
         <TabsContent value="financial">
           <div className="flex justify-end mb-3">
             <PlanGate plan={storePlan} storeSlug={slug} feature="Export Excel" description="Upgrade ke PRO untuk export laporan">
@@ -211,7 +199,7 @@ export default async function FinanceReportsPage({ params, searchParams }: {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+      </ReportTabs>
     </div>
   );
 }

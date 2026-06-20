@@ -6,6 +6,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { createCashflowAction, updateCashflowAction } from '@/actions/cashflow';
 import {
@@ -220,29 +223,68 @@ export function CashflowDialog({ mode = 'create', transaction, existingCategorie
               />
             </div>
 
-            {/* Kategori — chip selector */}
+            {/* Kategori — dropdown if >3 options, chip selector otherwise */}
             <div className="space-y-1.5">
               <label className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 <Tag className="w-3 h-3" />
                 Kategori <span className="text-red-400">*</span>
               </label>
-              <div className="flex flex-wrap gap-1.5">
-                {allCats.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    disabled={loading || isLocked}
-                    onClick={() => { setCategory(cat); if (cat !== 'Lainnya') setCustomCategory(''); }}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border disabled:opacity-50 ${
-                      category === cat
-                        ? 'bg-[#028697] border-[#028697] text-white'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300 bg-gray-50'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
+              {allCats.length > 3 ? (
+                <Select
+                  value={category || undefined}
+                  onValueChange={(value) => { setCategory(value); if (value !== 'Lainnya') setCustomCategory(''); }}
+                  disabled={loading || isLocked}
+                >
+                  <SelectTrigger className="h-9 text-sm border-gray-200 focus:ring-[#028697]/30 focus:border-[#028697] data-[placeholder]:text-gray-300">
+                    <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allCats.filter((c) => c !== 'Lainnya').map((cat) => (
+                      <SelectItem key={cat} value={cat} className="text-sm">
+                        {cat}
+                      </SelectItem>
+                    ))}
+                    {allCats.includes('Lainnya') && (
+                      <>
+                        <SelectSeparator />
+                        <SelectItem value="Lainnya" className="text-sm text-[#028697] font-medium focus:text-[#028697]">
+                          <span className="flex items-center gap-1.5">
+                            <Plus className="w-3 h-3" />
+                            Kategori Lainnya
+                          </span>
+                        </SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {allCats.map((cat) => {
+                    const isLainnya = cat === 'Lainnya';
+                    const active = category === cat;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        disabled={loading || isLocked}
+                        onClick={() => { setCategory(cat); if (cat !== 'Lainnya') setCustomCategory(''); }}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border disabled:opacity-50 flex items-center gap-1 ${
+                          active
+                            ? isLainnya
+                              ? 'bg-[#028697]/10 border-[#028697] text-[#028697] border-2'
+                              : 'bg-[#028697] border-[#028697] text-white'
+                            : isLainnya
+                              ? 'border-dashed border-gray-300 text-gray-500 hover:border-[#028697] hover:text-[#028697]'
+                              : 'border-gray-200 text-gray-500 hover:border-gray-300 bg-gray-50'
+                        }`}
+                      >
+                        {isLainnya && <Plus className="w-3 h-3" />}
+                        {isLainnya ? 'Kategori Lainnya' : cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {/* Custom input when "Lainnya" is selected */}
               {(category === 'Lainnya' || (category && !allCats.includes(category))) && (
                 <Input
