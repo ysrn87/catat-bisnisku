@@ -35,7 +35,7 @@ import { BrandingTab } from '@/components/settings/branding-tab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'profile' | 'managers' | 'cashiers' | 'branding';
+type Tab = 'profile' | 'team' | 'branding';
 
 interface ManagerForm {
   name: string;
@@ -348,8 +348,9 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
   const { toast } = useToast();
 
   useEffect(() => { loadAdminProfile(); }, []);
-  useEffect(() => { if (activeTab === 'managers') loadManagers(); }, [activeTab]);
-  useEffect(() => { if (activeTab === 'cashiers') loadCashiers(); }, [activeTab]);
+  useEffect(() => {
+    if (activeTab === 'team') { loadManagers(); loadCashiers(); }
+  }, [activeTab]);
 
   async function loadAdminProfile() {
     try {
@@ -430,8 +431,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
       <div className="flex border-b border-gray-200">
         {([
           { key: 'profile',   label: 'Profil Admin',    icon: User    },
-          { key: 'managers',  label: 'Kelola Manager',   icon: Users   },
-          { key: 'cashiers',  label: 'Kelola Kasir',     icon: Wallet  },
+          { key: 'team',      label: 'Kelola Tim',       icon: Users   },
           { key: 'branding',  label: 'Custom Branding',  icon: Palette },
         ] as const).map(({ key, label, icon: Icon }) => (
           <button
@@ -530,135 +530,139 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
         </div>
       )}
 
-      {/* ── Manager Tab ── */}
-      {activeTab === 'managers' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Daftar Manager</p>
-              <p className="text-xs text-gray-500">{managers.length} akun manager terdaftar</p>
-            </div>
-            <Button onClick={() => setModalManager(null)} className="bg-[#028697] hover:bg-[#0fa8be] h-9 text-sm">
-              <Plus className="w-4 h-4 mr-1.5" />Tambah Manager
-            </Button>
+      {/* ── Kelola Tim Tab ── */}
+      {activeTab === 'team' && (
+        <div className="space-y-6">
+          <div>
+            <p className="text-sm font-medium">Anggota Tim</p>
+            <p className="text-xs text-gray-500">
+              {managers.length} manager · {cashiers.length} kasir
+            </p>
           </div>
 
-          {managers.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
-                <ShieldCheck className="w-10 h-10" />
-                <p className="text-sm">Belum ada akun manager</p>
-                <Button variant="outline" size="sm" onClick={() => setModalManager(null)}>
-                  <Plus className="w-4 h-4 mr-1.5" />Tambah Manager
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {managers.map((m) => {
-                const mInitials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-                return (
-                  <Card key={m.id}>
-                    <CardContent className="py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#028697]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#028697] text-sm font-bold">{mInitials}</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-sm truncate">{m.name}</p>
-                            <Badge variant="outline" className="text-[10px] text-[#028697] border-[#028697]/30 shrink-0">Manager</Badge>
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">
-                            {m.phone}{m.email ? ` · ${m.email}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex gap-1.5 shrink-0">
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setModalManager(m)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="outline" size="icon"
-                            className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50"
-                            disabled={deletingId === m.id}
-                            onClick={() => handleDeleteManager(m.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+          {/* ─ Manager Section ─ */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-[#028697]" />
+                <p className="text-sm font-semibold">Manager</p>
+              </div>
+              <Button onClick={() => setModalManager(null)} variant="outline" className="h-8 text-xs">
+                <Plus className="w-3.5 h-3.5 mr-1.5" />Tambah Manager
+              </Button>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* ── Cashier Tab ── */}
-      {activeTab === 'cashiers' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Daftar Kasir</p>
-              <p className="text-xs text-gray-500">{cashiers.length} akun kasir terdaftar</p>
-            </div>
-            <Button onClick={() => setModalCashier(null)} className="bg-[#028697] hover:bg-[#0fa8be] h-9 text-sm">
-              <Plus className="w-4 h-4 mr-1.5" />Tambah Kasir
-            </Button>
+            {managers.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
+                  <ShieldCheck className="w-8 h-8" />
+                  <p className="text-xs">Belum ada akun manager</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2.5">
+                {managers.map((m) => {
+                  const mInitials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+                  return (
+                    <Card key={m.id}>
+                      <CardContent className="py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[#028697]/10 flex items-center justify-center shrink-0">
+                            <span className="text-[#028697] text-sm font-bold">{mInitials}</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-sm truncate">{m.name}</p>
+                              <Badge variant="outline" className="text-[10px] text-[#028697] border-[#028697]/30 shrink-0">Manager</Badge>
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">
+                              {m.phone}{m.email ? ` · ${m.email}` : ''}
+                            </p>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setModalManager(m)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="outline" size="icon"
+                              className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50"
+                              disabled={deletingId === m.id}
+                              onClick={() => handleDeleteManager(m.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {cashiers.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
-                <Wallet className="w-10 h-10" />
-                <p className="text-sm">Belum ada akun kasir</p>
-                <Button variant="outline" size="sm" onClick={() => setModalCashier(null)}>
-                  <Plus className="w-4 h-4 mr-1.5" />Tambah Kasir
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {cashiers.map((c) => {
-                const cInitials = c.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-                return (
-                  <Card key={c.id}>
-                    <CardContent className="py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#028697]/10 flex items-center justify-center shrink-0">
-                          <span className="text-[#028697] text-sm font-bold">{cInitials}</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-sm truncate">{c.name}</p>
-                            <Badge variant="outline" className="text-[10px] text-[#028697] border-[#028697]/30 shrink-0">Kasir</Badge>
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">
-                            {c.phone}{c.email ? ` · ${c.email}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex gap-1.5 shrink-0">
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setModalCashier(c)}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="outline" size="icon"
-                            className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50"
-                            disabled={deletingCashierId === c.id}
-                            onClick={() => handleDeleteCashier(c.id)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+          <hr className="border-t border-gray-100" />
+
+          {/* ─ Kasir Section ─ */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Wallet className="w-4 h-4 text-[#028697]" />
+                <p className="text-sm font-semibold">Kasir</p>
+              </div>
+              <Button onClick={() => setModalCashier(null)} variant="outline" className="h-8 text-xs">
+                <Plus className="w-3.5 h-3.5 mr-1.5" />Tambah Kasir
+              </Button>
             </div>
-          )}
+
+            {cashiers.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
+                  <Wallet className="w-8 h-8" />
+                  <p className="text-xs">Belum ada akun kasir</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2.5">
+                {cashiers.map((c) => {
+                  const cInitials = c.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+                  return (
+                    <Card key={c.id}>
+                      <CardContent className="py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[#028697]/10 flex items-center justify-center shrink-0">
+                            <span className="text-[#028697] text-sm font-bold">{cInitials}</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-sm truncate">{c.name}</p>
+                              <Badge variant="outline" className="text-[10px] text-[#028697] border-[#028697]/30 shrink-0">Kasir</Badge>
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">
+                              {c.phone}{c.email ? ` · ${c.email}` : ''}
+                            </p>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setModalCashier(c)}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="outline" size="icon"
+                              className="h-8 w-8 border-red-200 text-red-500 hover:bg-red-50"
+                              disabled={deletingCashierId === c.id}
+                              onClick={() => handleDeleteCashier(c.id)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

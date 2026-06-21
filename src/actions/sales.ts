@@ -57,6 +57,7 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     let pointsEarned = 0;
+    const variantTypeById = new Map<string, string>();
     for (const item of items) {
       const variant = await db.productVariant.findFirst({
         where: { id: item.variantId, storeId },
@@ -67,6 +68,8 @@ export async function createSaleAction(input: CreateSaleInput) {
       if (variant.type !== 'PREORDER' && variant.stock < item.quantity) {
         return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
       }
+
+      variantTypeById.set(variant.id, variant.type);
 
       if (customerId && pointsRedeemed === 0 && paymentStatus === 'PAID') {
         pointsEarned += variant.points * item.quantity;
@@ -111,12 +114,11 @@ export async function createSaleAction(input: CreateSaleInput) {
         include: { items: true },
       });
 
+      const stockMovements: { storeId: string; variantId: string; quantity: number; type: string; notes: string }[] = [];
+
       for (const item of items) {
-        const variant = await tx.productVariant.findUnique({
-          where: { id: item.variantId },
-          select: { id: true, name: true, stock: true, points: true, type: true },
-        });
-        if (variant?.type === 'PREORDER') continue;
+        const type = variantTypeById.get(item.variantId);
+        if (type === 'PREORDER') continue;
 
         // Atomic check+decrement — cegah race condition (TOCTOU)
         const updated = await tx.productVariant.updateMany({
@@ -126,9 +128,14 @@ export async function createSaleAction(input: CreateSaleInput) {
         if (updated.count === 0) {
           throw new Error(`Stok tidak mencukupi untuk varian ${item.variantId}`);
         }
-        await tx.stockMovement.create({
-          data: { storeId, variantId: item.variantId, quantity: -item.quantity, type: 'OUT', notes: `PENJUALAN ${newSale.saleNumber}` },
+        stockMovements.push({
+          storeId, variantId: item.variantId, quantity: -item.quantity, type: 'OUT',
+          notes: `PENJUALAN ${newSale.saleNumber}`,
         });
+      }
+
+      if (stockMovements.length > 0) {
+        await tx.stockMovement.createMany({ data: stockMovements });
       }
 
       if (customerId) {
@@ -155,6 +162,9 @@ export async function createSaleAction(input: CreateSaleInput) {
       });
 
       return newSale;
+    }, {
+      maxWait: 10000, // waktu tunggu maksimal untuk dapat koneksi dari pool
+      timeout:  20000, // waktu maksimal transaksi berjalan — beri ruang untuk DB remote/lambat
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/sales`);
@@ -162,7 +172,7 @@ export async function createSaleAction(input: CreateSaleInput) {
     revalidatePath(`/${storeSlug}/admin/inventory/stock`);
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
     revalidatePath(`/${storeSlug}/cashier`);
-    return { success: true, saleId: sale.id };
+    return { success: true, saleId: sale.id, saleNumber: sale.saleNumber, createdAt: sale.createdAt };
   } catch (error) {
     console.error('Create sale error:', error);
     return { success: false, error: 'Gagal membuat penjualan' };
@@ -277,7 +287,7 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
         if (updated.count === 0) {
           throw new Error(`Stok tidak mencukupi untuk varian ${item.variantId}`);
         }
-        await tx.stockMovement.create({ data: { storeId, variantId: item.variantId, quantity: -item.quantity, type: 'OUT', notes: `PERBARUI PENJUALAN ${originalSale.saleNumber}` } });
+        await tx.stockMovement.create({ data: { storeId, variantId: item.variantId, quantity: -item.quantity, type: 'OUT', notes: `Updated sale ${originalSale.saleNumber}` } });
       }
 
       if (originalSale.customerId && originalSale.customerId === customerId) {

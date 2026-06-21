@@ -1,3 +1,4 @@
+import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
 import { PosPanel } from '@/components/pos/pos-panel';
@@ -69,11 +70,13 @@ export default async function PosKasirPage({ params }: { params: Promise<{ slug:
   const { slug } = await params;
   const { storeId } = await getStoreContext();
 
-  const [posVariants, members, nonMembers, conversionRate] = await Promise.all([
+  const [posVariants, members, nonMembers, conversionRate, store, session] = await Promise.all([
     getPosVariants(storeId),
     getMembers(storeId),
     getNonMembers(storeId),
     getPointsConversionRate(),
+    db.store.findUnique({ where: { id: storeId }, select: { name: true } }),
+    auth(),
   ]);
 
   return (
@@ -83,6 +86,8 @@ export default async function PosKasirPage({ params }: { params: Promise<{ slug:
       nonMembers={nonMembers}
       conversionRate={conversionRate}
       storeSlug={slug}
+      storeName={store?.name ?? 'Toko'}
+      cashierName={session?.user?.name ?? undefined}
     />
   );
 }

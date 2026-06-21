@@ -1,3 +1,4 @@
+import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,7 +109,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
   const { slug } = await params;
   const { storeId } = await getStoreContext();
 
-  const [stats, { recentSales, lowStockProducts }, posVariants, members, nonMembers, conversionRate] =
+  const [stats, { recentSales, lowStockProducts }, posVariants, members, nonMembers, conversionRate, store, session] =
     await Promise.all([
       getManagerStats(storeId),
       getRecentActivity(storeId),
@@ -116,6 +117,8 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
       getMembers(storeId),
       getNonMembers(storeId),
       getPointsConversionRate(),
+      db.store.findUnique({ where: { id: storeId }, select: { name: true } }),
+      auth(),
     ]);
 
   const RingkasanContent = (
@@ -236,6 +239,8 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
       nonMembers={nonMembers}
       conversionRate={conversionRate}
       storeSlug={slug}
+      storeName={store?.name ?? 'Toko'}
+      cashierName={session?.user?.name ?? undefined}
     />
   );
 

@@ -2,13 +2,13 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { PaymentStatus } from '@prisma/client';
-import { ShoppingCart, Search, User, ChevronDown, X, Plus, Minus, Trash2, CheckCircle, UserPlus, Receipt } from 'lucide-react';
+import { ShoppingCart, Search, User, ChevronDown, X, Plus, Minus, Trash2, CheckCircle, UserPlus, Receipt, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { createSaleAction } from '@/actions/sales';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,7 +57,8 @@ interface CartItem {
 
 interface ReceiptData {
   saleId: string;
-  saleNumber?: string;
+  saleNumber: string;
+  createdAt: Date;
   items: CartItem[];
   customerName: string;
   paymentMethod: string;
@@ -77,6 +78,8 @@ interface PosPanelProps {
   nonMembers: NonMember[];
   conversionRate: number;
   storeSlug: string;
+  storeName: string;
+  cashierName?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -103,12 +106,16 @@ function parseNumber(val: string): number {
 
 function ReceiptDialog({
   data,
+  storeName,
+  cashierName,
   onClose,
-  onNewTransaction,
+  onPrint,
 }: {
   data: ReceiptData;
+  storeName: string;
+  cashierName?: string;
   onClose: () => void;
-  onNewTransaction: () => void;
+  onPrint: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -124,8 +131,19 @@ function ReceiptDialog({
 
         {/* Receipt body */}
         <div className="px-5 py-4 space-y-4">
+          {/* Sale info */}
+          <div className="text-center">
+            <p className="text-sm font-semibold">{storeName}</p>
+            <p className="text-xs text-muted-foreground">
+              {data.saleNumber} · {formatDateTime(data.createdAt)}
+            </p>
+            {cashierName && (
+              <p className="text-xs text-muted-foreground">Kasir: {cashierName}</p>
+            )}
+          </div>
+
           {/* Customer & payment */}
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-sm border-t border-dashed border-border pt-3">
             <span className="text-muted-foreground">Pelanggan</span>
             <span className="font-medium">{data.customerName}</span>
           </div>
@@ -206,10 +224,10 @@ function ReceiptDialog({
           </Button>
           <Button
             className="flex-1 bg-[#028697] hover:bg-[#017585] text-white"
-            onClick={onNewTransaction}
+            onClick={onPrint}
           >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Transaksi Baru
+            <Printer className="w-4 h-4 mr-1.5" />
+            Cetak Struk
           </Button>
         </div>
       </div>
@@ -219,7 +237,7 @@ function ReceiptDialog({
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-export function PosPanel({ variants, members, nonMembers, conversionRate, storeSlug }: PosPanelProps) {
+export function PosPanel({ variants, members, nonMembers, conversionRate, storeSlug, storeName, cashierName }: PosPanelProps) {
   const { toast } = useToast();
 
   // Cart state
@@ -450,7 +468,9 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
         setShowCart(false); // tutup bottom sheet mobile sebelum receipt muncul
         const payLabel = PAYMENT_METHODS.find((p) => p.value === paymentMethod)?.label ?? paymentMethod;
         setReceipt({
-          saleId: (result as { success: true; saleId: string }).saleId,
+          saleId: (result as { success: true; saleId: string; saleNumber: string; createdAt: Date }).saleId,
+          saleNumber: (result as { success: true; saleId: string; saleNumber: string; createdAt: Date }).saleNumber,
+          createdAt: (result as { success: true; saleId: string; saleNumber: string; createdAt: Date }).createdAt,
           items: [...cart],
           customerName,
           paymentMethod: payLabel,
@@ -473,8 +493,110 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     }
   };
 
-  const handleNewTransaction = () => resetAll();
   const handleCloseReceipt = () => resetAll();
+
+  const handlePrintReceipt = () => {
+    if (!receipt) return;
+    const printWindow = window.open('', '_blank', 'width=420,height=600');
+    if (!printWindow) return;
+
+    const itemsHTML = receipt.items.map((item) => `
+      <div class="item">
+        <div class="item-name">${item.productName}${item.variantName !== item.productName ? ` – ${item.variantName}` : ''}</div>
+        <div class="item-line">
+          <span>${item.quantity} x ${formatCurrency(item.price)}</span>
+          <span>${formatCurrency(item.price * item.quantity)}</span>
+        </div>
+      </div>
+    `).join('');
+
+    const summaryRows = [
+      ['Subtotal', formatCurrency(receipt.subtotal), false],
+      ...(receipt.discount > 0    ? [['Diskon',     `- ${formatCurrency(receipt.discount)}`,     false]] : []),
+      ...(receipt.pointDiscount > 0 ? [['Tukar Poin', `- ${formatCurrency(receipt.pointDiscount)}`, false]] : []),
+      ...(receipt.tax > 0         ? [['Pajak',      formatCurrency(receipt.tax),                 false]] : []),
+      ...(receipt.ongkir > 0      ? [['Ongkir',     formatCurrency(receipt.ongkir),               false]] : []),
+    ].map(([label, value]) => `
+      <div class="summary-row"><span>${label}</span><span>${value}</span></div>
+    `).join('');
+
+    const receiptHTML = `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Struk ${receipt.saleNumber}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #111;
+    padding: 16px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .center  { text-align: center; }
+  .store-name { font-size: 15px; font-weight: bold; }
+  .meta    { font-size: 11px; color: #444; margin-top: 2px; }
+  .divider { border-top: 1px dashed #999; margin: 10px 0; }
+  .item    { margin-bottom: 6px; }
+  .item-name { font-size: 12px; }
+  .item-line { display: flex; justify-content: space-between; font-size: 12px; color: #333; }
+  .summary-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; }
+  .total-row {
+    display: flex; justify-content: space-between;
+    font-size: 14px; font-weight: bold;
+    border-top: 1px solid #111; margin-top: 6px; padding-top: 6px;
+  }
+  .footer  { text-align: center; font-size: 11px; color: #555; margin-top: 14px; }
+  .btn-wrap { text-align: center; margin-top: 20px; }
+  .btn {
+    font-family: Arial, sans-serif;
+    background: #028697; color: #fff; border: none;
+    padding: 8px 20px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  @media print {
+    .btn-wrap { display: none; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="center">
+    <div class="store-name">${storeName}</div>
+    <div class="meta">${receipt.saleNumber}</div>
+    <div class="meta">${formatDateTime(receipt.createdAt)}</div>
+    ${cashierName ? `<div class="meta">Kasir: ${cashierName}</div>` : ''}
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="meta">Pelanggan: ${receipt.customerName}</div>
+  <div class="meta">Bayar: ${receipt.paymentMethod}${receipt.paymentStatus === 'PENDING' ? ' (Pending)' : ''}</div>
+
+  <div class="divider"></div>
+
+  ${itemsHTML}
+
+  <div class="divider"></div>
+
+  ${summaryRows}
+  <div class="total-row"><span>TOTAL</span><span>${formatCurrency(receipt.total)}</span></div>
+
+  ${receipt.pointsEarned > 0 ? `<div class="footer">Poin didapat: ${receipt.pointsEarned}</div>` : ''}
+
+  <div class="footer">Terima kasih atas kunjungan Anda 🙏</div>
+
+  <div class="btn-wrap">
+    <button class="btn" onclick="window.print()">Cetak Struk</button>
+  </div>
+</body>
+</html>`;
+
+    printWindow.document.write(receiptHTML);
+    printWindow.document.close();
+  };
 
   // ─── Cart panel (reused in desktop right column & mobile bottom sheet) ────
 
@@ -765,8 +887,10 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
       {receipt && (
         <ReceiptDialog
           data={receipt}
+          storeName={storeName}
+          cashierName={cashierName}
           onClose={handleCloseReceipt}
-          onNewTransaction={handleNewTransaction}
+          onPrint={handlePrintReceipt}
         />
       )}
 
