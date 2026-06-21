@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTransition, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2 } from 'lucide-react';
+import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt } from 'lucide-react';
 import { logoutAction } from '@/actions/auth';
 import { triggerLoader } from '@/components/layouts/navigation-loader';
 import { PlanBadge } from '@/components/plan/plan-badge';
@@ -166,6 +166,12 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       label: 'POS Kasir',
       mobileLabel: 'POS',
       icon: <ShoppingCart className="w-4 h-4" />,
+    },
+    {
+      href: `${base}/cashier/transactions`,
+      label: 'Transaksi Saya',
+      mobileLabel: 'Transaksi',
+      icon: <Receipt className="w-4 h-4" />,
     },
   ];
 

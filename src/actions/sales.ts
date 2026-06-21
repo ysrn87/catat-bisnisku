@@ -198,7 +198,7 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
   try {
     const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER' && storeRole !== 'CASHIER') {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -213,6 +213,11 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
 
     const originalSale = await db.sale.findFirst({ where: { id, storeId }, include: { items: true } });
     if (!originalSale) return { success: false, error: 'Penjualan tidak ditemukan' };
+
+    // Cashier hanya boleh mengedit transaksi yang dia buat sendiri
+    if (storeRole === 'CASHIER' && originalSale.cashierId !== userId) {
+      return { success: false, error: 'Anda hanya bisa mengedit transaksi milik sendiri' };
+    }
 
     let pointsEarned = 0;
     const shouldEarnPoints = Number(originalSale.pointsRedeemed) === 0 && paymentStatus === 'PAID';
@@ -272,7 +277,7 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
         if (updated.count === 0) {
           throw new Error(`Stok tidak mencukupi untuk varian ${item.variantId}`);
         }
-        await tx.stockMovement.create({ data: { storeId, variantId: item.variantId, quantity: -item.quantity, type: 'OUT', notes: `Updated sale ${originalSale.saleNumber}` } });
+        await tx.stockMovement.create({ data: { storeId, variantId: item.variantId, quantity: -item.quantity, type: 'OUT', notes: `PERBARUI PENJUALAN ${originalSale.saleNumber}` } });
       }
 
       if (originalSale.customerId && originalSale.customerId === customerId) {
@@ -314,6 +319,7 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
     revalidatePath(`/${storeSlug}/admin/inventory/stock`);
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
+    revalidatePath(`/${storeSlug}/cashier/transactions`);
     return { success: true };
   } catch (error) {
     console.error('Update sale error:', error);
