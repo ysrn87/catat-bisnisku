@@ -130,7 +130,11 @@ export default async function SalesPage({
     getPointsConversionRate(),
   ]);
 
-  const userRole = session?.user?.role ?? 'MANAGER';
+  const storeUser = await db.storeUser.findUnique({
+    where: { storeId_userId: { storeId, userId: session!.user.id } },
+    select: { role: true },
+  });
+  const userRole = storeUser?.role ?? 'MANAGER';
 
   return (
     <div className="space-y-6 md:space-y-8">

@@ -629,7 +629,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   <Pencil className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Edit</span>
                 </Button>
-                {(userRole === 'ADMINISTRATOR' || userRole === 'MANAGER') && (
+                {(userRole === 'OWNER' || userRole === 'ADMINISTRATOR' || userRole === 'MANAGER') && (
                   confirmDelete ? (
                     <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1">
                       <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />

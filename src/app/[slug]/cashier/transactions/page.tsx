@@ -131,7 +131,11 @@ export default async function CashierTransactionsPage({
     getPointsConversionRate(),
   ]);
 
-  const userRole = session?.user?.role ?? 'CASHIER';
+  const storeUser = await db.storeUser.findUnique({
+    where: { storeId_userId: { storeId, userId: cashierId } },
+    select: { role: true },
+  });
+  const userRole = storeUser?.role ?? 'CASHIER';
 
   return (
     <div className="space-y-6 md:space-y-8">

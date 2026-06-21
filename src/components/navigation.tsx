@@ -172,6 +172,14 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       label: 'Transaksi Saya',
       mobileLabel: 'Transaksi',
       icon: <Receipt className="w-4 h-4" />,
+      matchPaths: [
+        `${base}/cashier/transactions`,
+        `${base}/cashier/transactions/customers`,
+      ],
+      subItems: [
+        { href: `${base}/cashier/transactions`,           label: 'Penjualan' },
+        { href: `${base}/cashier/transactions/customers`, label: 'Customer' },
+      ],
     },
   ];
 

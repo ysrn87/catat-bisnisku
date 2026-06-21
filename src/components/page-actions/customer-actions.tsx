@@ -73,19 +73,24 @@ export function CustomerActions({ isAdmin }: CustomerActionsProps) {
 
   // Manager — hanya bisa tambah non-member
   return (
-    <NonMemberDialog
-      mode="create"
-      trigger={
-        <>
-          <Button className="hidden sm:inline-flex bg-[#028697] hover:bg-[#017585] text-white shadow-sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Tambah Non-Member
-          </Button>
-          <button type="button" aria-label="Tambah Non-Member" className={FAB_BTN_CLASS}>
-            <PlusIcon />
-          </button>
-        </>
-      }
-    />
+    <>
+      <NonMemberDialog mode="create" open={nonMemberOpen} onOpenChange={setNonMemberOpen} trigger={null} />
+
+      <Button
+        className="hidden sm:inline-flex bg-[#028697] hover:bg-[#017585] text-white shadow-sm"
+        onClick={() => setNonMemberOpen(true)}
+      >
+        <Plus className="w-4 h-4 mr-2" />
+        Tambah Non-Member
+      </Button>
+      <button
+        type="button"
+        aria-label="Tambah Non-Member"
+        className={FAB_BTN_CLASS}
+        onClick={() => setNonMemberOpen(true)}
+      >
+        <PlusIcon />
+      </button>
+    </>
   );
 }

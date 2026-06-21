@@ -173,6 +173,10 @@ export async function checkPlanLimit(
   return { allowed: current < limit, current, limit };
 }
 
+// Batas jumlah store yang boleh diikuti satu user (sebagai Manager/Kasir/dll)
+// Mencegah satu akun "menumpuk" terlalu banyak store sekaligus
+export const MAX_STORES_PER_USER = 3;
+
 // ─── Plan limits ──────────────────────────────────────────────────────────────
 export const PLAN_LIMITS = {
   FREE: {

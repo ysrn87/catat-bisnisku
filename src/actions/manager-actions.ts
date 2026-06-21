@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
-import { requireStoreAccess, checkPlanLimit, PLAN_LIMITS } from '@/lib/store-context';
+import { requireStoreAccess, checkPlanLimit, MAX_STORES_PER_USER } from '@/lib/store-context';
 import bcrypt from 'bcryptjs';
 
 export interface ManagerData {
@@ -35,35 +35,80 @@ export async function getManagers(): Promise<ManagerData[]> {
   return storeUsers.map((su) => su.user);
 }
 
-export async function createManager(data: {
-  name: string;
-  phone: string;
-  password: string;
-  email?: string;
-  address?: string;
-}) {
+export interface CreateManagerResult {
+  success: boolean;
+  error?: string;
+  requiresConfirmation?: boolean;
+  existingName?: string;
+  linked?: boolean;
+}
+
+export async function createManager(
+  data: { name: string; phone: string; password: string; email?: string; address?: string },
+  linkExisting = false
+): Promise<CreateManagerResult> {
   const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
   if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
-    throw new Error('Unauthorized');
+    return { success: false, error: 'Unauthorized' };
   }
 
-  // Cek limit manager
+  if (!data.name.trim())  return { success: false, error: 'Nama wajib diisi' };
+  if (!data.phone.trim()) return { success: false, error: 'Nomor telepon wajib diisi' };
+
+  // ── Cek apakah nomor ini sudah terdaftar di sistem (mungkin di store lain) ───
+  const existingUser = await db.user.findFirst({ where: { phone: data.phone } });
+
+  if (existingUser) {
+    const existingStoreUser = await db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId: existingUser.id } },
+    });
+    if (existingStoreUser) {
+      return { success: false, error: `Nomor sudah terdaftar di toko ini atas nama ${existingUser.name}` };
+    }
+
+    if (!linkExisting) {
+      return {
+        success: false,
+        requiresConfirmation: true,
+        existingName: existingUser.name,
+        error: `Nomor HP ini sudah terdaftar atas nama "${existingUser.name}".`,
+      };
+    }
+
+    // Batas jumlah store yang boleh diikuti satu user
+    const storeCount = await db.storeUser.count({ where: { userId: existingUser.id } });
+    if (storeCount >= MAX_STORES_PER_USER) {
+      return { success: false, error: `${existingUser.name} sudah tergabung di ${MAX_STORES_PER_USER} toko (batas maksimal).` };
+    }
+
+    // Cek limit manager toko ini
+    const limit = await checkPlanLimit('managers');
+    if (!limit.allowed) {
+      return { success: false, error: `Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak manager.` };
+    }
+
+    await db.$transaction(async (tx) => {
+      await tx.storeUser.create({ data: { storeId, userId: existingUser.id, role: 'MANAGER' } });
+      // Sinkronkan Role global (dipakai beberapa flag UI ringan)
+      await tx.user.update({ where: { id: existingUser.id }, data: { role: 'MANAGER' } });
+    });
+
+    revalidatePath(`/${storeSlug}/admin/settings/profile`);
+    return { success: true, linked: true, existingName: existingUser.name };
+  }
+
+  // ── User belum ada → buat akun baru ───────────────────────────────────────────
+  if (data.password.length < 6) return { success: false, error: 'Password minimal 6 karakter' };
+
   const limit = await checkPlanLimit('managers');
   if (!limit.allowed) {
-    throw new Error(`Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak manager.`);
+    return { success: false, error: `Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak manager.` };
   }
-
-  if (!data.name.trim())        throw new Error('Nama wajib diisi');
-  if (!data.phone.trim())       throw new Error('Nomor telepon wajib diisi');
-  if (data.password.length < 6) throw new Error('Password minimal 6 karakter');
-
-  const existingPhone = await db.user.findFirst({ where: { phone: data.phone } });
-  if (existingPhone) throw new Error('Nomor telepon sudah digunakan');
 
   if (data.email) {
     const existingEmail = await db.user.findFirst({ where: { email: data.email } });
-    if (existingEmail) throw new Error('Email sudah digunakan');
+    if (existingEmail) return { success: false, error: 'Email sudah digunakan' };
   }
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -87,6 +132,7 @@ export async function createManager(data: {
   });
 
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
+  return { success: true, linked: false };
 }
 
 export async function updateManager(

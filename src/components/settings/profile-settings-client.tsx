@@ -26,10 +26,11 @@ import {
   deleteCashier,
   type CashierData,
 } from '@/actions/cashier-actions';
+import { switchTeamMemberRole } from '@/actions/team-actions';
 import {
   User, Lock, Mail, Phone, MapPin, Save,
   Eye, EyeOff, Users, Plus, Pencil, Trash2,
-  X, ShieldCheck, Palette, Wallet,
+  X, ShieldCheck, Palette, Wallet, UserCheck, ArrowRightLeft,
 } from 'lucide-react';
 import { BrandingTab } from '@/components/settings/branding-tab';
 
@@ -96,18 +97,19 @@ function ManagerModal({
       : emptyManagerForm
   );
   const [loading, setLoading] = useState(false);
+  const [existingName, setExistingName] = useState<string | null>(null);
   const { toast } = useToast();
 
   function set(field: keyof ManagerForm, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(linkExisting = false) {
     if (!form.name.trim() || !form.phone.trim()) {
       toast({ title: 'Nama dan nomor telepon wajib diisi', variant: 'destructive' });
       return;
     }
-    if (!isEdit && form.password.length < 6) {
+    if (!isEdit && !linkExisting && form.password.length < 6) {
       toast({ title: 'Password minimal 6 karakter', variant: 'destructive' });
       return;
     }
@@ -124,21 +126,36 @@ function ManagerModal({
           newPassword: form.password || undefined,
         });
         toast({ title: 'Manager berhasil diperbarui' });
+        onSaved();
+        onClose();
       } else {
-        await createManager({
+        const result = await createManager({
           name: form.name, phone: form.phone, password: form.password,
           email: form.email || undefined, address: form.address || undefined,
-        });
-        toast({ title: 'Manager berhasil ditambahkan' });
+        }, linkExisting);
+
+        if (result.success) {
+          toast({
+            title: result.linked
+              ? `${result.existingName} berhasil ditambahkan sebagai Manager`
+              : 'Manager berhasil ditambahkan',
+          });
+          onSaved();
+          onClose();
+        } else if (result.requiresConfirmation) {
+          setExistingName(result.existingName ?? null);
+        } else {
+          toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
+        }
       }
-      onSaved();
-      onClose();
     } catch (err: any) {
       toast({ title: 'Gagal', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   }
+
+  const showLinkConfirm = !isEdit && !!existingName;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -147,59 +164,89 @@ function ManagerModal({
           <h2 className="font-semibold text-base">{isEdit ? 'Edit Manager' : 'Tambah Manager'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-5 space-y-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="m-name" className="text-xs font-medium flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-gray-400" />Nama <span className="text-red-400">*</span>
-            </Label>
-            <Input id="m-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nama manager" className="h-10 text-sm" />
+
+        {showLinkConfirm ? (
+          <div className="p-5">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5">
+              <UserCheck className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  Nomor ini terdaftar atas nama "{existingName}"
+                </p>
+                <p className="text-xs text-amber-600 mt-1">
+                  Tambahkan sebagai Manager di toko ini tanpa membuat akun baru? Profil (nama, email, alamat) tetap memakai data akun yang sudah ada.
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="m-phone" className="text-xs font-medium flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-gray-400" />No. Telepon <span className="text-red-400">*</span>
-            </Label>
-            <Input id="m-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="08123456789" className="h-10 text-sm" />
+        ) : (
+          <div className="p-5 space-y-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="m-name" className="text-xs font-medium flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-gray-400" />Nama <span className="text-red-400">*</span>
+              </Label>
+              <Input id="m-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nama manager" className="h-10 text-sm" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="m-phone" className="text-xs font-medium flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-gray-400" />No. Telepon <span className="text-red-400">*</span>
+              </Label>
+              <Input id="m-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="08123456789" className="h-10 text-sm" />
+              {!isEdit && (
+                <p className="text-[11px] text-gray-400">Sudah punya akun di toko lain? Cukup masukkan nomor yang sama, kami akan menawarkan untuk menghubungkannya.</p>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="m-email" className="text-xs font-medium flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-gray-400" />Email
+              </Label>
+              <Input id="m-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="manager@example.com" className="h-10 text-sm" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="m-address" className="text-xs font-medium flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat
+              </Label>
+              <Input id="m-address" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
+            </div>
+            <hr className="border-t border-gray-100" />
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium">
+                {isEdit ? 'Password Baru (kosongkan jika tidak diubah)' : <span>Password <span className="text-red-400">*</span></span>}
+              </Label>
+              <PasswordInput id="m-password" value={form.password} onChange={(v) => set('password', v)} placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Min. 6 karakter'} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium">
+                Konfirmasi Password {!isEdit && <span className="text-red-400">*</span>}
+              </Label>
+              <PasswordInput id="m-confirm" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Ulangi password" />
+              {form.confirmPassword && form.password !== form.confirmPassword && <p className="text-xs text-red-500">Password tidak cocok</p>}
+              {form.confirmPassword && form.password === form.confirmPassword && form.password.length >= 6 && <p className="text-xs text-emerald-600">Password cocok ✓</p>}
+            </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="m-email" className="text-xs font-medium flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-gray-400" />Email
-            </Label>
-            <Input id="m-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="manager@example.com" className="h-10 text-sm" />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="m-address" className="text-xs font-medium flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat
-            </Label>
-            <Input id="m-address" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
-          </div>
-          <hr className="border-t border-gray-100" />
-          <div className="grid gap-1.5">
-            <Label className="text-xs font-medium">
-              {isEdit ? 'Password Baru (kosongkan jika tidak diubah)' : <span>Password <span className="text-red-400">*</span></span>}
-            </Label>
-            <PasswordInput id="m-password" value={form.password} onChange={(v) => set('password', v)} placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Min. 6 karakter'} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs font-medium">
-              Konfirmasi Password {!isEdit && <span className="text-red-400">*</span>}
-            </Label>
-            <PasswordInput id="m-confirm" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Ulangi password" />
-            {form.confirmPassword && form.password !== form.confirmPassword && <p className="text-xs text-red-500">Password tidak cocok</p>}
-            {form.confirmPassword && form.password === form.confirmPassword && form.password.length >= 6 && <p className="text-xs text-emerald-600">Password cocok ✓</p>}
-          </div>
-        </div>
+        )}
+
         <div className="flex justify-end gap-2 p-5 border-t">
-          <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
-          <Button onClick={handleSubmit} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
-            <Save className="w-4 h-4 mr-2" />{loading ? 'Menyimpan...' : 'Simpan'}
-          </Button>
+          {showLinkConfirm ? (
+            <>
+              <Button variant="outline" onClick={() => setExistingName(null)} disabled={loading}>Batal</Button>
+              <Button onClick={() => handleSubmit(true)} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
+                <UserCheck className="w-4 h-4 mr-2" />{loading ? 'Menambahkan...' : 'Tambahkan sebagai Manager'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
+              <Button onClick={() => handleSubmit(false)} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
+                <Save className="w-4 h-4 mr-2" />{loading ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-// ─── Cashier Modal ────────────────────────────────────────────────────────────
 
 function CashierModal({
   cashier, onClose, onSaved,
@@ -215,18 +262,19 @@ function CashierModal({
       : emptyCashierForm
   );
   const [loading, setLoading] = useState(false);
+  const [existingName, setExistingName] = useState<string | null>(null);
   const { toast } = useToast();
 
   function set(field: keyof CashierForm, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(linkExisting = false) {
     if (!form.name.trim() || !form.phone.trim()) {
       toast({ title: 'Nama dan nomor telepon wajib diisi', variant: 'destructive' });
       return;
     }
-    if (!isEdit && form.password.length < 6) {
+    if (!isEdit && !linkExisting && form.password.length < 6) {
       toast({ title: 'Password minimal 6 karakter', variant: 'destructive' });
       return;
     }
@@ -243,21 +291,36 @@ function CashierModal({
           newPassword: form.password || undefined,
         });
         toast({ title: 'Kasir berhasil diperbarui' });
+        onSaved();
+        onClose();
       } else {
-        await createCashier({
+        const result = await createCashier({
           name: form.name, phone: form.phone, password: form.password,
           email: form.email || undefined, address: form.address || undefined,
-        });
-        toast({ title: 'Kasir berhasil ditambahkan' });
+        }, linkExisting);
+
+        if (result.success) {
+          toast({
+            title: result.linked
+              ? `${result.existingName} berhasil ditambahkan sebagai Kasir`
+              : 'Kasir berhasil ditambahkan',
+          });
+          onSaved();
+          onClose();
+        } else if (result.requiresConfirmation) {
+          setExistingName(result.existingName ?? null);
+        } else {
+          toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
+        }
       }
-      onSaved();
-      onClose();
     } catch (err: any) {
       toast({ title: 'Gagal', description: err.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   }
+
+  const showLinkConfirm = !isEdit && !!existingName;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -266,52 +329,84 @@ function CashierModal({
           <h2 className="font-semibold text-base">{isEdit ? 'Edit Kasir' : 'Tambah Kasir'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-5 space-y-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="c-name" className="text-xs font-medium flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-gray-400" />Nama <span className="text-red-400">*</span>
-            </Label>
-            <Input id="c-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nama kasir" className="h-10 text-sm" />
+
+        {showLinkConfirm ? (
+          <div className="p-5">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5">
+              <UserCheck className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">
+                  Nomor ini terdaftar atas nama "{existingName}"
+                </p>
+                <p className="text-xs text-amber-600 mt-1">
+                  Tambahkan sebagai Kasir di toko ini tanpa membuat akun baru? Profil (nama, email, alamat) tetap memakai data akun yang sudah ada.
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="c-phone" className="text-xs font-medium flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-gray-400" />No. Telepon <span className="text-red-400">*</span>
-            </Label>
-            <Input id="c-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="08123456789" className="h-10 text-sm" />
+        ) : (
+          <div className="p-5 space-y-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="c-name" className="text-xs font-medium flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-gray-400" />Nama <span className="text-red-400">*</span>
+              </Label>
+              <Input id="c-name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Nama kasir" className="h-10 text-sm" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="c-phone" className="text-xs font-medium flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-gray-400" />No. Telepon <span className="text-red-400">*</span>
+              </Label>
+              <Input id="c-phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="08123456789" className="h-10 text-sm" />
+              {!isEdit && (
+                <p className="text-[11px] text-gray-400">Sudah punya akun di toko lain? Cukup masukkan nomor yang sama, kami akan menawarkan untuk menghubungkannya.</p>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="c-email" className="text-xs font-medium flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-gray-400" />Email
+              </Label>
+              <Input id="c-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="kasir@example.com" className="h-10 text-sm" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="c-address" className="text-xs font-medium flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat
+              </Label>
+              <Input id="c-address" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
+            </div>
+            <hr className="border-t border-gray-100" />
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium">
+                {isEdit ? 'Password Baru (kosongkan jika tidak diubah)' : <span>Password <span className="text-red-400">*</span></span>}
+              </Label>
+              <PasswordInput id="c-password" value={form.password} onChange={(v) => set('password', v)} placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Min. 6 karakter'} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-medium">
+                Konfirmasi Password {!isEdit && <span className="text-red-400">*</span>}
+              </Label>
+              <PasswordInput id="c-confirm" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Ulangi password" />
+              {form.confirmPassword && form.password !== form.confirmPassword && <p className="text-xs text-red-500">Password tidak cocok</p>}
+              {form.confirmPassword && form.password === form.confirmPassword && form.password.length >= 6 && <p className="text-xs text-emerald-600">Password cocok ✓</p>}
+            </div>
           </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="c-email" className="text-xs font-medium flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-gray-400" />Email
-            </Label>
-            <Input id="c-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="kasir@example.com" className="h-10 text-sm" />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="c-address" className="text-xs font-medium flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat
-            </Label>
-            <Input id="c-address" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
-          </div>
-          <hr className="border-t border-gray-100" />
-          <div className="grid gap-1.5">
-            <Label className="text-xs font-medium">
-              {isEdit ? 'Password Baru (kosongkan jika tidak diubah)' : <span>Password <span className="text-red-400">*</span></span>}
-            </Label>
-            <PasswordInput id="c-password" value={form.password} onChange={(v) => set('password', v)} placeholder={isEdit ? 'Kosongkan jika tidak diubah' : 'Min. 6 karakter'} />
-          </div>
-          <div className="grid gap-1.5">
-            <Label className="text-xs font-medium">
-              Konfirmasi Password {!isEdit && <span className="text-red-400">*</span>}
-            </Label>
-            <PasswordInput id="c-confirm" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Ulangi password" />
-            {form.confirmPassword && form.password !== form.confirmPassword && <p className="text-xs text-red-500">Password tidak cocok</p>}
-            {form.confirmPassword && form.password === form.confirmPassword && form.password.length >= 6 && <p className="text-xs text-emerald-600">Password cocok ✓</p>}
-          </div>
-        </div>
+        )}
+
         <div className="flex justify-end gap-2 p-5 border-t">
-          <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
-          <Button onClick={handleSubmit} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
-            <Save className="w-4 h-4 mr-2" />{loading ? 'Menyimpan...' : 'Simpan'}
-          </Button>
+          {showLinkConfirm ? (
+            <>
+              <Button variant="outline" onClick={() => setExistingName(null)} disabled={loading}>Batal</Button>
+              <Button onClick={() => handleSubmit(true)} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
+                <UserCheck className="w-4 h-4 mr-2" />{loading ? 'Menambahkan...' : 'Tambahkan sebagai Kasir'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
+              <Button onClick={() => handleSubmit(false)} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
+                <Save className="w-4 h-4 mr-2" />{loading ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -344,6 +439,8 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
   const [cashiers, setCashiers] = useState<CashierData[]>([]);
   const [modalCashier, setModalCashier] = useState<CashierData | null | undefined>(undefined);
   const [deletingCashierId, setDeletingCashierId] = useState<string | null>(null);
+
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -418,6 +515,27 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
     } catch (err: any) {
       toast({ title: 'Gagal menghapus', description: err.message, variant: 'destructive' });
     } finally { setDeletingCashierId(null); }
+  }
+
+  async function handleSwitchRole(id: string, toRole: 'MANAGER' | 'CASHIER') {
+    const label = toRole === 'MANAGER' ? 'Manager' : 'Kasir';
+    if (!window.confirm(`Pindahkan peran orang ini menjadi ${label}?`)) return;
+
+    setSwitchingId(id);
+    try {
+      const result = await switchTeamMemberRole(id, toRole);
+      if (result.success) {
+        toast({ title: `Berhasil dipindah menjadi ${label}` });
+        loadManagers();
+        loadCashiers();
+      } else {
+        toast({ title: 'Gagal', description: result.error, variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Gagal', description: err.message, variant: 'destructive' });
+    } finally {
+      setSwitchingId(null);
+    }
   }
 
   const initials = adminName
@@ -580,6 +698,15 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
                             </p>
                           </div>
                           <div className="flex gap-1.5 shrink-0">
+                            <Button
+                              variant="outline" size="icon"
+                              className="h-8 w-8 border-amber-200 text-amber-600 hover:bg-amber-50"
+                              disabled={switchingId === m.id}
+                              onClick={() => handleSwitchRole(m.id, 'CASHIER')}
+                              title="Jadikan Kasir"
+                            >
+                              <ArrowRightLeft className="w-3.5 h-3.5" />
+                            </Button>
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setModalManager(m)}>
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>
@@ -643,6 +770,15 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
                             </p>
                           </div>
                           <div className="flex gap-1.5 shrink-0">
+                            <Button
+                              variant="outline" size="icon"
+                              className="h-8 w-8 border-amber-200 text-amber-600 hover:bg-amber-50"
+                              disabled={switchingId === c.id}
+                              onClick={() => handleSwitchRole(c.id, 'MANAGER')}
+                              title="Jadikan Manager"
+                            >
+                              <ArrowRightLeft className="w-3.5 h-3.5" />
+                            </Button>
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setModalCashier(c)}>
                               <Pencil className="w-3.5 h-3.5" />
                             </Button>

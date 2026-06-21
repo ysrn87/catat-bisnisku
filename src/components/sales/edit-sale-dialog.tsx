@@ -104,7 +104,7 @@ export function EditSaleDialog({
 
   const { toast } = useToast();
 
-  const canManageProducts = userRole === 'ADMINISTRATOR' || userRole === 'MANAGER';
+  const canManageProducts = userRole === 'OWNER' || userRole === 'ADMINISTRATOR' || userRole === 'MANAGER';
   const pointsRedeemed = sale.pointsRedeemed || 0;
   const pointDiscount = pointsRedeemed * conversionRate;
   const customerName = sale.customer?.name ?? sale.nonMemberCustomer?.name ?? 'Pelanggan Umum';

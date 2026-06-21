@@ -12,7 +12,7 @@ export async function createNonMemberCustomerAction(formData: FormData) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER' && storeRole !== 'CASHIER') {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -31,6 +31,7 @@ export async function createNonMemberCustomerAction(formData: FormData) {
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
+    revalidatePath(`/${storeSlug}/cashier/transactions/customers`);
     return { success: true, data: customer };
   } catch (error) {
     console.error('Create non-member customer error:', error);
@@ -64,7 +65,7 @@ export async function getCustomerPurchaseHistory(customerId: string, isNonMember
   try {
     const { storeId, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER' && storeRole !== 'CASHIER') {
       throw new Error('Unauthorized');
     }
 
@@ -181,7 +182,7 @@ export async function updateNonMemberCustomerAction(customerId: string, formData
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER' && storeRole !== 'CASHIER') {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -204,6 +205,7 @@ export async function updateNonMemberCustomerAction(customerId: string, formData
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
+    revalidatePath(`/${storeSlug}/cashier/transactions/customers`);
     return { success: true };
   } catch (error) {
     console.error('Update non-member customer error:', error);
