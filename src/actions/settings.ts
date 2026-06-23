@@ -162,6 +162,7 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
   const session = await auth();
   const admin = await db.user.findUnique({ where: { id: session!.user.id } });
   if (!admin) throw new Error('Admin not found');
+  if (!admin.password) throw new Error('Akun ini belum memiliki password. Silakan set password melalui halaman profil.');
 
   const isValid = await bcrypt.compare(currentPassword, admin.password);
   if (!isValid) throw new Error('Password saat ini tidak benar');

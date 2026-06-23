@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const features = [
-  { icon: ShoppingCart, title: 'Kasir & Penjualan',    desc: 'Catat transaksi cepat, support member & walk-in customer, barcode scan.' },
+  { icon: ShoppingCart, title: 'Kasir & Penjualan',    desc: 'Catat transaksi cepat, support member & customer, barcode scan.' },
   { icon: Package,      title: 'Manajemen Inventori',  desc: 'Kelola produk, varian, dan stok. Alert otomatis saat stok menipis.' },
   { icon: Users,        title: 'Loyalty Member',       desc: 'Sistem poin otomatis. Member dapat poin setiap pembelian, bisa ditukar diskon.' },
   { icon: TrendingUp,   title: 'Laporan Keuangan',     desc: 'Cashflow income & expense real-time. Lihat profit bersih setiap saat.' },

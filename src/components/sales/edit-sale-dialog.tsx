@@ -29,7 +29,6 @@ interface EditSaleDialogProps {
     notes: string | null;
     pointsRedeemed?: number;
     customer?: { name: string } | null;
-    nonMemberCustomer?: { name: string } | null;
     items: Array<{
       id: string;
       quantity: number;
@@ -107,7 +106,7 @@ export function EditSaleDialog({
   const canManageProducts = userRole === 'OWNER' || userRole === 'ADMINISTRATOR' || userRole === 'MANAGER';
   const pointsRedeemed = sale.pointsRedeemed || 0;
   const pointDiscount = pointsRedeemed * conversionRate;
-  const customerName = sale.customer?.name ?? sale.nonMemberCustomer?.name ?? 'Pelanggan Umum';
+  const customerName = sale.customer?.name ?? 'Pelanggan Umum';
 
   useEffect(() => {
     setItems(

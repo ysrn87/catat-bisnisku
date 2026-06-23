@@ -35,7 +35,6 @@ async function getRecentActivity(storeId: string) {
       orderBy: { createdAt: 'desc' },
       include: {
         customer:          { select: { name: true } },
-        nonMemberCustomer: { select: { name: true } },
       },
     }),
     db.productVariant.findMany({
@@ -122,7 +121,7 @@ export default async function RingkasanPage() {
                   <div key={sale.id} className="flex items-center justify-between">
                     <div className="min-w-0 flex-1 mr-3">
                       <p className="text-xs font-semibold truncate">
-                        {sale.customer?.name || sale.nonMemberCustomer?.name || 'Pelanggan Umum'}
+                        {sale.customer?.name || 'Pelanggan Umum'}
                       </p>
                       <p className="text-xs text-muted-foreground italic truncate">{sale.saleNumber}</p>
                     </div>

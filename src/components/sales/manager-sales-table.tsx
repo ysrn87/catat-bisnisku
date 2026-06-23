@@ -87,7 +87,7 @@ export function ManagerSalesTable({
               >
                 <TableCell className="font-medium">{sale.saleNumber}</TableCell>
                 <TableCell>{formatDateTime(sale.createdAt)}</TableCell>
-                <TableCell>{sale.customer?.name || sale.nonMemberCustomer?.name || 'Pelanggan umum'}</TableCell>
+                <TableCell>{sale.customer?.name || 'Pelanggan umum'}</TableCell>
                 <TableCell>{sale.cashier?.name || '-'}</TableCell>
                 <TableCell>{sale.items.reduce((sum: number, item: any) => sum + item.quantity, 0)} unit</TableCell>
                 <TableCell>{formatCurrency(sale.total)}</TableCell>

@@ -50,18 +50,22 @@ async function getPosVariants(storeId: string) {
 async function getMembers(storeId: string) {
   const storeUsers = await db.storeUser.findMany({
     where: { storeId, role: 'MEMBER' },
-    include: { user: { select: { id: true, name: true, points: true } } },
+    include: { user: { select: { id: true, name: true } } },
   });
-  return storeUsers.map((su) => su.user);
+  return storeUsers.map((su) => ({ ...su.user, points: su.points }));
 }
 
 async function getNonMembers(storeId: string) {
-  const customers = await db.customer.findMany({
-    where: { storeId },
-    select: { id: true, name: true, phone: true, address: true },
-    orderBy: { name: 'asc' },
+  // CUSTOMER customers are now StoreUsers with role CUSTOMER — same User table
+  const storeUsers = await db.storeUser.findMany({
+    where: { storeId, role: 'CUSTOMER' },
+    include: { user: { select: { id: true, name: true, phone: true, address: true } } },
+    orderBy: { user: { name: 'asc' } },
   });
-  return customers.map((c) => ({ ...c, address: c.address ?? null }));
+  return storeUsers.map((su) => ({
+    id: su.user.id, name: su.user.name,
+    phone: su.user.phone, address: su.user.address ?? null,
+  }));
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────────

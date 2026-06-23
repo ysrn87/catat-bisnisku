@@ -7,7 +7,7 @@ import { Plus } from 'lucide-react';
 interface SalesActionsProps {
   variants: any[];
   customers: any[];
-  nonMemberCustomers: any[];
+  walkInCustomers: any[];
   conversionRate: number;
 }
 
@@ -19,13 +19,13 @@ const FAB_CLASS = [
 ].join(' ');
 
 export function SalesActions({
-  variants, customers, nonMemberCustomers, conversionRate,
+  variants, customers, walkInCustomers, conversionRate,
 }: SalesActionsProps) {
   return (
     <NewSaleDialog
       variants={variants}
       customers={customers}
-      nonMemberCustomers={nonMemberCustomers}
+      walkInCustomers={walkInCustomers}
       conversionRate={conversionRate}
       trigger={
         <div>

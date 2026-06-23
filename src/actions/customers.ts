@@ -4,11 +4,14 @@ import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { sanitizeName, sanitizeText } from '@/lib/sanitize';
 import { requireStoreAccess } from '@/lib/store-context';
+import bcrypt from 'bcryptjs';
 
 const normalizePhone = (phone: string) =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
 
-export async function createNonMemberCustomerAction(formData: FormData) {
+// ─── Customer customer (CUSTOMER role) ─────────────────────────────────────────
+
+export async function createWalkInCustomerAction(formData: FormData) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
@@ -16,52 +19,130 @@ export async function createNonMemberCustomerAction(formData: FormData) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const name    = formData.get('name')    as string;
+    const name    = sanitizeName(formData.get('name') as string, 100);
     const phone   = normalizePhone(formData.get('phone') as string);
-    const address = formData.get('address') as string;
+    const address = sanitizeText(formData.get('address') as string, 200);
 
-    if (!name || !phone || !address) return { success: false, error: 'Nama, telepon, dan alamat wajib diisi' };
-    if (phone.length < 10 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
+    if (!name || !phone) return { success: false, error: 'Nama dan nomor telepon wajib diisi' };
+    if (phone.length < 9 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
 
-    // Cek duplikat phone per store (tidak cek store lain)
-    const existing = await db.customer.findUnique({ where: { storeId_phone: { storeId, phone } } });
-    if (existing) return { success: false, error: 'Nomor telepon sudah terdaftar sebagai customer' };
+    // Check if a User with this phone already exists anywhere in the platform
+    let user = await db.user.findFirst({ where: { phone } });
 
-    const customer = await db.customer.create({ data: { storeId, name, phone, address } });
+    if (user) {
+      // User exists — check if they already have a role at this store
+      const existingStoreUser = await db.storeUser.findUnique({
+        where: { storeId_userId: { storeId, userId: user.id } },
+      });
+
+      if (existingStoreUser) {
+        // Already at this store — update name/address if they differ
+        if (existingStoreUser.role === 'CUSTOMER') {
+          await db.user.update({ where: { id: user.id }, data: { name, address: address || null } });
+        }
+        return { success: false, error: `${user.name} sudah terdaftar di toko ini` };
+      }
+
+      // Not yet at this store → add as CUSTOMER
+      await db.storeUser.create({ data: { storeId, userId: user.id, role: 'CUSTOMER', points: 0 } });
+    } else {
+      // No user with this phone → create a passwordless User
+      user = await db.user.create({
+        data: { name, phone, address: address || null, password: null, role: 'MEMBER' },
+      });
+      await db.storeUser.create({ data: { storeId, userId: user.id, role: 'CUSTOMER', points: 0 } });
+    }
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     revalidatePath(`/${storeSlug}/cashier/transactions/customers`);
-    return { success: true, data: customer };
+    return { success: true, data: { id: user.id, name: user.name, phone: user.phone, address: user.address ?? '' } };
   } catch (error) {
-    console.error('Create non-member customer error:', error);
+    console.error('Create customer error:', error);
     return { success: false, error: 'Gagal membuat customer' };
   }
 }
 
-export async function getAllNonMemberCustomers() {
-  try {
-    const { storeId, storeRole } = await requireStoreAccess();
+// Keep old name as alias so existing call-sites compile without changes
+export const createNonMemberCustomerAction = createWalkInCustomerAction;
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
-      throw new Error('Unauthorized');
+export async function updateWalkInCustomerAction(userId: string, formData: FormData) {
+  try {
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER' && storeRole !== 'CASHIER') {
+      return { success: false, error: 'Unauthorized' };
     }
 
-    return db.customer.findMany({
-      where: { storeId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        sales: { select: { id: true, total: true } },
-        _count: { select: { sales: true } },
-      },
+    const name    = sanitizeName((formData.get('name') as string)?.trim(), 100);
+    const phone   = normalizePhone(formData.get('phone') as string);
+    const address = sanitizeText((formData.get('address') as string)?.trim(), 200);
+
+    if (!name || !phone) return { success: false, error: 'Nama dan nomor telepon wajib diisi' };
+    if (phone.length < 9 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
+
+    const storeUser = await db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId } },
     });
+    if (!storeUser || storeUser.role !== 'CUSTOMER') {
+      return { success: false, error: 'Customer tidak ditemukan di toko ini' };
+    }
+
+    // Guard phone uniqueness across all users
+    const phoneConflict = await db.user.findFirst({ where: { phone, NOT: { id: userId } } });
+    if (phoneConflict) return { success: false, error: 'Nomor telepon sudah digunakan akun lain' };
+
+    await db.user.update({ where: { id: userId }, data: { name, phone, address: address || null } });
+
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
+    revalidatePath(`/${storeSlug}/cashier/transactions/customers`);
+    return { success: true };
   } catch (error) {
-    console.error('Get non-member customers error:', error);
-    throw error;
+    console.error('Update customer error:', error);
+    return { success: false, error: 'Gagal mengupdate customer' };
   }
 }
 
-export async function getCustomerPurchaseHistory(customerId: string, isNonMember = false) {
+export const updateNonMemberCustomerAction = updateWalkInCustomerAction;
+
+export async function deleteWalkInCustomerAction(userId: string) {
+  try {
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const storeUser = await db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId } },
+    });
+    if (!storeUser || storeUser.role !== 'CUSTOMER') {
+      return { success: false, error: 'Customer tidak ditemukan di toko ini' };
+    }
+
+    const salesCount = await db.sale.count({ where: { customerId: userId, storeId } });
+    if (salesCount > 0) {
+      return { success: false, error: 'Tidak bisa hapus customer yang punya riwayat penjualan' };
+    }
+
+    await db.storeUser.delete({ where: { storeId_userId: { storeId, userId } } });
+
+    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
+    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
+    revalidatePath(`/${storeSlug}/cashier/transactions/customers`);
+    return { success: true };
+  } catch (error) {
+    console.error('Delete customer error:', error);
+    return { success: false, error: 'Gagal menghapus customer' };
+  }
+}
+
+export const deleteNonMemberCustomerAction = deleteWalkInCustomerAction;
+
+// ─── Purchase history (works for both CUSTOMER and MEMBER) ────────────────────
+
+export async function getCustomerPurchaseHistory(userId: string) {
   try {
     const { storeId, storeRole } = await requireStoreAccess();
 
@@ -70,10 +151,7 @@ export async function getCustomerPurchaseHistory(customerId: string, isNonMember
     }
 
     const sales = await db.sale.findMany({
-      where: {
-        storeId,
-        ...(isNonMember ? { nonMemberCustomerId: customerId } : { customerId }),
-      },
+      where: { storeId, customerId: userId },
       orderBy: { createdAt: 'desc' },
       include: {
         items: { include: { variant: { include: { product: true } } } },
@@ -83,8 +161,7 @@ export async function getCustomerPurchaseHistory(customerId: string, isNonMember
 
     return sales.map((sale) => {
       const { subtotal, discount, tax, total, items, ...rest } = sale;
-      const ongkir = (rest as any).ongkir;
-      delete (rest as any).ongkir;
+      const ongkir = (rest as any).ongkir; delete (rest as any).ongkir;
       return {
         ...rest,
         subtotal: Number(subtotal),
@@ -105,7 +182,9 @@ export async function getCustomerPurchaseHistory(customerId: string, isNonMember
   }
 }
 
-export async function upgradeToMemberAction(customerId: string, formData: FormData) {
+// ─── Upgrade CUSTOMER → MEMBER ─────────────────────────────────────────────────
+
+export async function upgradeToMemberAction(userId: string, formData: FormData) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
@@ -113,60 +192,86 @@ export async function upgradeToMemberAction(customerId: string, formData: FormDa
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    const password = formData.get('password') as string;
-    const email    = formData.get('email')    as string;
-    const birthday = formData.get('birthday') as string;
-    const photoUrl = formData.get('photoUrl') as string;
-    const name     = sanitizeName(formData.get('name') as string, 100);
-    const phone    = (formData.get('phone') as string)?.trim();
-    const address  = sanitizeText(formData.get('address') as string, 200);
+    const storeUser = await db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId } },
+    });
 
-    if (!password || password.length < 6) return { success: false, error: 'Password wajib diisi (min. 6 karakter)' };
-    if (!name)    return { success: false, error: 'Nama wajib diisi' };
-    if (!phone)   return { success: false, error: 'Nomor telepon wajib diisi' };
-    if (!address) return { success: false, error: 'Alamat wajib diisi' };
-
-    const customer = await db.customer.findFirst({ where: { id: customerId, storeId }, include: { sales: true } });
-    if (!customer) return { success: false, error: 'Customer tidak ditemukan' };
-
-    const existingPhone = await db.user.findFirst({ where: { phone } });
-    if (existingPhone) return { success: false, error: 'Nomor telepon sudah terdaftar sebagai member' };
-
-    if (email) {
-      const existingEmail = await db.user.findFirst({ where: { email: email.trim().toLowerCase() } });
-      if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
+    if (!storeUser) return { success: false, error: 'Customer tidak ditemukan di toko ini' };
+    if (storeUser.role !== 'CUSTOMER') {
+      return { success: false, error: 'Customer sudah menjadi member' };
     }
 
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) return { success: false, error: 'User tidak ditemukan' };
+
+    const password    = formData.get('password')  as string | null;
+    const email       = formData.get('email')     as string | null;
+    const birthday    = formData.get('birthday')  as string | null;
+    const photoUrl    = formData.get('photoUrl')  as string | null;
+    const name        = sanitizeName(formData.get('name') as string, 100);
+    const phone       = normalizePhone(formData.get('phone') as string);
+    const address     = sanitizeText(formData.get('address') as string, 200);
+    const grantRetro  = formData.get('grantRetroPoints') === 'true';
+
+    if (!name || !phone || !address) return { success: false, error: 'Nama, telepon, dan alamat wajib diisi' };
+
+    // Password only required if the user doesn't already have one
+    const needsPassword = !user.password;
+    if (needsPassword) {
+      if (!password || password.length < 6) {
+        return { success: false, error: 'Password wajib diisi (min. 6 karakter) agar member bisa login' };
+      }
+    }
+
+    // Phone uniqueness — only check if changed
+    if (phone !== user.phone) {
+      const phoneConflict = await db.user.findFirst({ where: { phone, NOT: { id: userId } } });
+      if (phoneConflict) return { success: false, error: 'Nomor telepon sudah digunakan akun lain' };
+    }
+
+    // Email uniqueness
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+    if (normalizedEmail) {
+      const emailConflict = await db.user.findFirst({ where: { email: normalizedEmail, NOT: { id: userId } } });
+      if (emailConflict) return { success: false, error: 'Email sudah terdaftar' };
+    }
 
     await db.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          name, phone, address,
-          email:    email ? email.trim().toLowerCase() : null,
-          birthday: birthday ? new Date(birthday) : null,
-          photoUrl: photoUrl || null,
-          password: hashedPassword,
-          role:     'MEMBER',
-          points:   0,
-        },
+      const userUpdate: any = { name, phone, address, email: normalizedEmail };
+      if (birthday) userUpdate.birthday = new Date(birthday);
+      if (photoUrl) userUpdate.photoUrl = photoUrl;
+      if (needsPassword && password) userUpdate.password = await bcrypt.hash(password, 10);
+
+      await tx.user.update({ where: { id: userId }, data: userUpdate });
+
+      // Promote role at this store — this is the core of the upgrade
+      await tx.storeUser.update({
+        where: { storeId_userId: { storeId, userId } },
+        data: { role: 'MEMBER' },
       });
 
-      // Daftarkan ke store sebagai MEMBER
-      await tx.storeUser.create({
-        data: { storeId, userId: newUser.id, role: 'MEMBER' },
-      });
-
-      // Transfer sales
-      if (customer.sales.length > 0) {
-        await tx.sale.updateMany({
-          where: { nonMemberCustomerId: customerId, storeId },
-          data:  { customerId: newUser.id, nonMemberCustomerId: null },
+      // Optionally backfill points from past customer purchases
+      if (grantRetro) {
+        const pastSales = await tx.sale.findMany({
+          where: { storeId, customerId: userId },
+          select: { id: true, saleNumber: true, pointsEarned: true },
         });
+        const retroPoints = pastSales.reduce((sum, s) => sum + s.pointsEarned, 0);
+        if (retroPoints > 0) {
+          await tx.storeUser.update({
+            where: { storeId_userId: { storeId, userId } },
+            data: { points: { increment: retroPoints } },
+          });
+          await tx.pointHistory.create({
+            data: {
+              userId, storeId,
+              points:      retroPoints,
+              type:        'ADJUSTED',
+              description: `Poin retroaktif dari ${pastSales.length} transaksi sebelum upgrade ke member`,
+            },
+          });
+        }
       }
-
-      await tx.customer.delete({ where: { id: customerId } });
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
@@ -178,62 +283,38 @@ export async function upgradeToMemberAction(customerId: string, formData: FormDa
   }
 }
 
-export async function updateNonMemberCustomerAction(customerId: string, formData: FormData) {
+// Legacy alias — upgrade dialog currently calls this name
+export const upgradeToMemberActionLegacy = upgradeToMemberAction;
+
+// ─── Get all customers ────────────────────────────────────────────────
+
+export async function getAllNonMemberCustomers() {
   try {
-    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+    const { storeId, storeRole } = await requireStoreAccess();
 
     if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER' && storeRole !== 'CASHIER') {
-      return { success: false, error: 'Unauthorized' };
+      throw new Error('Unauthorized');
     }
 
-    const name    = (formData.get('name')    as string)?.trim();
-    const phone   = normalizePhone(formData.get('phone') as string);
-    const address = (formData.get('address') as string)?.trim();
-
-    if (!name || !phone || !address) return { success: false, error: 'Nama, telepon, dan alamat wajib diisi' };
-    if (phone.length < 10 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
-
-    const customer = await db.customer.findFirst({ where: { id: customerId, storeId } });
-    if (!customer) return { success: false, error: 'Customer tidak ditemukan' };
-
-    const existing = await db.customer.findFirst({
-      where: { storeId, phone, NOT: { id: customerId } },
+    const storeUsers = await db.storeUser.findMany({
+      where: { storeId, role: 'CUSTOMER' },
+      include: {
+        user: {
+          select: { id: true, name: true, phone: true, address: true, createdAt: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
-    if (existing) return { success: false, error: 'Nomor telepon sudah digunakan customer lain' };
 
-    await db.customer.update({ where: { id: customerId }, data: { name, phone, address } });
-
-    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
-    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
-    revalidatePath(`/${storeSlug}/cashier/transactions/customers`);
-    return { success: true };
+    return storeUsers.map((su) => ({
+      id:        su.user.id,
+      name:      su.user.name,
+      phone:     su.user.phone,
+      address:   su.user.address ?? '',
+      createdAt: su.user.createdAt,
+    }));
   } catch (error) {
-    console.error('Update non-member customer error:', error);
-    return { success: false, error: 'Gagal mengupdate customer' };
-  }
-}
-
-export async function deleteNonMemberCustomerAction(customerId: string) {
-  try {
-    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
-
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
-      return { success: false, error: 'Unauthorized - Admin access required' };
-    }
-
-    const customer = await db.customer.findFirst({ where: { id: customerId, storeId } });
-    if (!customer) return { success: false, error: 'Customer tidak ditemukan' };
-
-    const salesCount = await db.sale.count({ where: { nonMemberCustomerId: customerId, storeId } });
-    if (salesCount > 0) return { success: false, error: 'Tidak bisa hapus customer yang punya riwayat penjualan' };
-
-    await db.customer.delete({ where: { id: customerId } });
-
-    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
-    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
-    return { success: true };
-  } catch (error) {
-    console.error('Delete non-member customer error:', error);
-    return { success: false, error: 'Gagal menghapus customer' };
+    console.error('Get customers error:', error);
+    throw error;
   }
 }

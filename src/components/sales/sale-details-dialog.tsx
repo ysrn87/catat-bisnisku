@@ -106,11 +106,10 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
     const statusColor = sale.paymentStatus === 'PAID' ? '#16a34a' : sale.paymentStatus === 'PENDING' ? '#d97706' : '#dc2626';
     const statusBg   = sale.paymentStatus === 'PAID' ? '#f0fdf4' : sale.paymentStatus === 'PENDING' ? '#fffbeb' : '#fef2f2';
 
-    const customerName = sale.customer?.name ?? sale.nonMemberCustomer?.name ?? 'Pelanggan Umum';
+    const customerName = sale.customer?.name ?? 'Pelanggan Umum';
     const customerSub  = sale.customer
       ? [sale.customer.email, sale.customer.phone, sale.customer.address].filter(Boolean).join(' · ')
-      : sale.nonMemberCustomer
-      ? [sale.nonMemberCustomer.phone, sale.nonMemberCustomer.address].filter(Boolean).join(' · ')
+
       : '';
 
     const invoiceHTML = `

@@ -12,10 +12,14 @@ async function getMemberData(userId: string, storeId: string, page = 1, limit = 
   const today     = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
 
-  const [user, pointsHistory, pointsTotal, todayPurchases, yesterdayPurchases] = await Promise.all([
+  const [user, storeUser, pointsHistory, pointsTotal, todayPurchases, yesterdayPurchases] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
-      select: { id: true, points: true, name: true, email: true, phone: true, address: true, birthday: true, photoUrl: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, address: true, birthday: true, photoUrl: true, createdAt: true },
+    }),
+    db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId } },
+      select: { points: true },
     }),
     db.pointHistory.findMany({ where: { userId }, skip, take: limit, orderBy: { createdAt: 'desc' } }),
     db.pointHistory.count({ where: { userId } }),
@@ -29,7 +33,9 @@ async function getMemberData(userId: string, storeId: string, page = 1, limit = 
     }),
   ]);
 
-  return { user, pointsHistory, pointsTotal, todayPurchases, yesterdayPurchases };
+  if (!user) throw new Error('Member tidak ditemukan');
+
+  return { user: { ...user, points: storeUser?.points ?? 0 }, pointsHistory, pointsTotal, todayPurchases, yesterdayPurchases };
 }
 
 export default async function MemberDashboard({

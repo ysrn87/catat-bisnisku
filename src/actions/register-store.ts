@@ -78,6 +78,15 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
     if (existingUser) {
       // ── User sudah ada → verifikasi password, lalu buat store baru ──────────
 
+      // CUSTOMER (walk-in) accounts have no password — they can't register a store
+      // until they set one via the /register page first.
+      if (!existingUser.password) {
+        return {
+          success: false,
+          error: `Nomor ini terdaftar atas nama "${existingUser.name}" namun belum memiliki password. Silakan daftar sebagai member terlebih dahulu melalui halaman registrasi.`,
+        };
+      }
+
       const isPasswordValid = await bcrypt.compare(ownerPassword, existingUser.password);
       if (!isPasswordValid) {
         return {

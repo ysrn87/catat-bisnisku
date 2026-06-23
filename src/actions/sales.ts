@@ -5,7 +5,7 @@ import { PaymentStatus } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess } from '@/lib/store-context';
 import { generateSaleNumber } from '@/lib/utils';
-import { getAvailablePoints, getPointsExpiryDate } from '@/lib/points-utils';
+import { getPointsExpiryDate } from '@/lib/points-utils';
 import { getPointsConversionRate } from './settings';
 import { sanitizeText } from '@/lib/sanitize';
 
@@ -18,7 +18,6 @@ interface SaleItemInput {
 interface CreateSaleInput {
   items: SaleItemInput[];
   customerId: string | null;
-  nonMemberCustomerId?: string | null;
   paymentMethod: string;
   paymentStatus?: PaymentStatus;
   discount?: number;
@@ -37,7 +36,7 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     const {
-      items, customerId, nonMemberCustomerId,
+      items, customerId,
       paymentMethod, paymentStatus = 'PAID',
       discount = 0, tax = 0, ongkir = 0,
       notes, pointsRedeemed = 0,
@@ -46,14 +45,19 @@ export async function createSaleAction(input: CreateSaleInput) {
     if (!items?.length) return { success: false, error: 'Tidak ada item dalam penjualan' };
     const notesSanitized = sanitizeText(notes, 500);
     if (notesSanitized.length > 500) return { success: false, error: 'Catatan maksimal 500 karakter' };
-    if (customerId && nonMemberCustomerId) return { success: false, error: 'Tidak bisa memilih dua tipe customer sekaligus' };
 
+    // Points can only be redeemed by MEMBER customers (not CUSTOMER)
     if (pointsRedeemed > 0 && customerId) {
-      const available = await getAvailablePoints(customerId);
-      if (pointsRedeemed > available) return { success: false, error: `Poin tidak cukup. Tersedia: ${available}` };
-    }
-    if (pointsRedeemed > 0 && nonMemberCustomerId) {
-      return { success: false, error: 'Penukaran poin hanya untuk member' };
+      const storeUser = await db.storeUser.findUnique({
+        where: { storeId_userId: { storeId, userId: customerId } },
+        select: { role: true, points: true },
+      });
+      if (!storeUser || storeUser.role !== 'MEMBER') {
+        return { success: false, error: 'Penukaran poin hanya untuk member' };
+      }
+      if (pointsRedeemed > storeUser.points) {
+        return { success: false, error: `Poin tidak cukup. Tersedia: ${storeUser.points}` };
+      }
     }
 
     let pointsEarned = 0;
@@ -95,7 +99,6 @@ export async function createSaleAction(input: CreateSaleInput) {
           saleNumber: generateSaleNumber(),
           cashierId: userId,
           customerId,
-          nonMemberCustomerId,
           subtotal, discount, tax, ongkir, total,
           paymentMethod,
           paymentStatus: paymentStatus as PaymentStatus,
@@ -140,10 +143,10 @@ export async function createSaleAction(input: CreateSaleInput) {
 
       if (customerId) {
         if (pointsRedeemed > 0) {
-          await tx.user.update({ where: { id: customerId }, data: { points: { decrement: pointsRedeemed } } });
+          await tx.storeUser.update({ where: { storeId_userId: { storeId, userId: customerId } }, data: { points: { decrement: pointsRedeemed } } });
           await tx.pointHistory.create({ data: { userId: customerId, storeId, points: -pointsRedeemed, type: 'REDEEMED', description: `Penukaran poin ${newSale.saleNumber}` } });
         } else if (pointsEarned > 0) {
-          await tx.user.update({ where: { id: customerId }, data: { points: { increment: pointsEarned } } });
+          await tx.storeUser.update({ where: { storeId_userId: { storeId, userId: customerId } }, data: { points: { increment: pointsEarned } } });
           await tx.pointHistory.create({ data: { userId: customerId, storeId, points: pointsEarned, type: 'EARNED', description: `Poin pembelian ${newSale.saleNumber}`, expiresAt: getPointsExpiryDate() } });
         }
       }
@@ -293,16 +296,16 @@ export async function updateSaleAction(id: string, input: CreateSaleInput) {
       if (originalSale.customerId && originalSale.customerId === customerId) {
         const diff = pointsEarned - Number(originalSale.pointsEarned);
         if (diff !== 0) {
-          await tx.user.update({ where: { id: customerId! }, data: { points: { increment: diff } } });
+          await tx.storeUser.update({ where: { storeId_userId: { storeId, userId: customerId! } }, data: { points: { increment: diff } } });
           await tx.pointHistory.create({ data: { userId: customerId!, storeId, points: diff, type: diff > 0 ? 'EARNED' : 'ADJUSTED', description: `Penyesuaian pembelian ${originalSale.saleNumber}` } });
         }
       } else {
         if (originalSale.customerId) {
-          await tx.user.update({ where: { id: originalSale.customerId }, data: { points: { decrement: Number(originalSale.pointsEarned) } } });
+          await tx.storeUser.update({ where: { storeId_userId: { storeId, userId: originalSale.customerId } }, data: { points: { decrement: Number(originalSale.pointsEarned) } } });
           await tx.pointHistory.create({ data: { userId: originalSale.customerId, storeId, points: -Number(originalSale.pointsEarned), type: 'ADJUSTED', description: `Removed from edited sale ${originalSale.saleNumber}` } });
         }
         if (customerId && pointsEarned > 0) {
-          await tx.user.update({ where: { id: customerId }, data: { points: { increment: pointsEarned } } });
+          await tx.storeUser.update({ where: { storeId_userId: { storeId, userId: customerId } }, data: { points: { increment: pointsEarned } } });
           await tx.pointHistory.create({ data: { userId: customerId, storeId, points: pointsEarned, type: 'EARNED', description: `Didapat dari perubahan pembelian ${originalSale.saleNumber}` } });
         }
       }
@@ -361,11 +364,11 @@ export async function deleteSaleAction(id: string) {
         const redeemed = Number(sale.pointsRedeemed);
 
         if (earned > 0) {
-          await tx.user.update({ where: { id: sale.customerId }, data: { points: { decrement: earned } } });
+          await tx.storeUser.update({ where: { storeId_userId: { storeId, userId: sale.customerId } }, data: { points: { decrement: earned } } });
           await tx.pointHistory.create({ data: { userId: sale.customerId, storeId, points: -earned, type: 'ADJUSTED', description: `Poin dikembalikan dari penghapusan ${sale.saleNumber}` } });
         }
         if (redeemed > 0) {
-          await tx.user.update({ where: { id: sale.customerId }, data: { points: { increment: redeemed } } });
+          await tx.storeUser.update({ where: { storeId_userId: { storeId, userId: sale.customerId } }, data: { points: { increment: redeemed } } });
           await tx.pointHistory.create({ data: { userId: sale.customerId, storeId, points: redeemed, type: 'ADJUSTED', description: `Poin dikembalikan dari penghapusan ${sale.saleNumber}` } });
         }
       }

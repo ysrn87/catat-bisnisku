@@ -12,7 +12,7 @@ import { CustomerDeleteButton } from './customer-delete-button';
 import { NonMemberDialog } from './non-member-dialog';
 import { UpgradeToMemberDialog } from './upgrade-to-member-dialog';
 import { DeleteConfirmDialog } from '@/components/delete-confirm-dialog';
-import { deleteNonMemberCustomerAction } from '@/actions/customers';
+import { deleteWalkInCustomerAction as deleteNonMemberCustomerAction } from '@/actions/customers';
 import { DialogTitle } from '@radix-ui/react-dialog';
 
 interface MemberCustomer {
@@ -200,7 +200,7 @@ export function CustomerDetailsDialog({
   useEffect(() => {
     if (open) {
       setLoading(true);
-      getCustomerPurchaseHistory(customer.id, !isMember)
+      getCustomerPurchaseHistory(customer.id)
         .then(setPurchaseHistory)
         .catch(console.error)
         .finally(() => setLoading(false));

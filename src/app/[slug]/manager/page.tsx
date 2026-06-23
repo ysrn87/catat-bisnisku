@@ -35,7 +35,6 @@ async function getRecentActivity(storeId: string) {
       orderBy: { createdAt: 'desc' },
       include: {
         customer:          { select: { name: true } },
-        nonMemberCustomer: { select: { name: true } },
       },
     }),
     db.productVariant.findMany({
@@ -91,18 +90,22 @@ async function getPosVariants(storeId: string) {
 async function getMembers(storeId: string) {
   const storeUsers = await db.storeUser.findMany({
     where: { storeId, role: 'MEMBER' },
-    include: { user: { select: { id: true, name: true, points: true } } },
+    include: { user: { select: { id: true, name: true } } },
   });
-  return storeUsers.map((su) => su.user);
+  return storeUsers.map((su) => ({ ...su.user, points: su.points }));
 }
 
 async function getNonMembers(storeId: string) {
-  const customers = await db.customer.findMany({
-    where: { storeId },
-    select: { id: true, name: true, phone: true, address: true },
-    orderBy: { name: 'asc' },
+  // CUSTOMER customers are now StoreUsers with role CUSTOMER — same User table
+  const storeUsers = await db.storeUser.findMany({
+    where: { storeId, role: 'CUSTOMER' },
+    include: { user: { select: { id: true, name: true, phone: true, address: true } } },
+    orderBy: { user: { name: 'asc' } },
   });
-  return customers.map((c) => ({ ...c, address: c.address ?? null }));
+  return storeUsers.map((su) => ({
+    id: su.user.id, name: su.user.name,
+    phone: su.user.phone, address: su.user.address ?? null,
+  }));
 }
 
 export default async function ManagerDashboard({ params }: { params: Promise<{ slug: string }> }) {
@@ -192,7 +195,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
                   <div key={sale.id} className="flex items-center justify-between">
                     <div className="min-w-0 flex-1 mr-3">
                       <p className="text-xs font-semibold truncate">
-                        {sale.customer?.name || sale.nonMemberCustomer?.name || 'Pelanggan Umum'}
+                        {sale.customer?.name || 'Pelanggan Umum'}
                       </p>
                       <p className="text-xs text-muted-foreground italic truncate">{sale.saleNumber}</p>
                     </div>

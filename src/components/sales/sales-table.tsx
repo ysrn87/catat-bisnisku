@@ -93,7 +93,7 @@ export function SalesTable({ sales, currentPage, pageSize, totalItems, conversio
                 >
                   <TableCell className="font-medium truncate">{sale.saleNumber}</TableCell>
                   <TableCell className='truncate'>{formatDateTime(sale.createdAt)}</TableCell>
-                  <TableCell className='truncate'>{sale.customer?.name || sale.nonMemberCustomer?.name || 'Pelanggan-umum'}</TableCell>
+                  <TableCell className='truncate'>{sale.customer?.name || 'Pelanggan-umum'}</TableCell>
                   <TableCell className='truncate'>{sale.cashier.name}</TableCell>
                   <TableCell className='truncate'>{sale.items.reduce((sum: any, item: any) => sum + item.quantity, 0)} pc(s)</TableCell>
                   <TableCell>{formatCurrency(sale.total)}</TableCell>
@@ -143,7 +143,7 @@ export function SalesTable({ sales, currentPage, pageSize, totalItems, conversio
               <div className="space-y-2 mb-1">
                 <div className="flex items-center text-sm pt-2">
                   <span className="font-medium text-gray-900 truncate max-w-[180px]">
-                    {sale.customer?.name || sale.nonMemberCustomer?.name || 'Pelanggan-umum'}
+                    {sale.customer?.name || 'Pelanggan-umum'}
                   </span>
                 </div>
                 <div className="flex items-center text-[11px]">

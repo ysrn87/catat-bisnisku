@@ -2,105 +2,105 @@
 import { db } from '@/lib/db';
 
 /**
- * Calculate available (non-expired) points for a user
- * Points expire on Dec 31 of the year they were earned
- */
-export async function getAvailablePoints(userId: string): Promise<number> {
-  const now = new Date();
-
-  // Get all point history for the user
-  const history = await db.pointHistory.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  let availablePoints = 0;
-
-  for (const entry of history) {
-    // Skip expired points
-    if (entry.expiresAt && entry.expiresAt < now) {
-      continue;
-    }
-
-    // All types: just add the points (REDEEMED are already negative)
-    availablePoints += entry.points;
-  }
-
-  return Math.max(0, availablePoints);
-}
-
-/**
- * Get the expiry date for points earned today
- * Points expire on December 31 of the current year
+ * Get the expiry date for points earned today.
+ * Points expire on December 31 of the current year.
  */
 export function getPointsExpiryDate(earnedDate: Date = new Date()): Date {
   const year = earnedDate.getFullYear();
-  // Dec 31, 23:59:59 of the earning year
   return new Date(year, 11, 31, 23, 59, 59);
 }
 
 /**
- * Expire old points (run this on Jan 1 or periodically)
+ * Calculate available (non-expired) points for a user at a specific store.
+ * Reads directly from PointHistory so expiry is always accurate.
+ */
+export async function getAvailablePoints(userId: string, storeId?: string): Promise<number> {
+  const now = new Date();
+
+  const history = await db.pointHistory.findMany({
+    where: {
+      userId,
+      ...(storeId ? { storeId } : {}),
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  let available = 0;
+  for (const entry of history) {
+    if (entry.expiresAt && entry.expiresAt < now) continue;
+    available += entry.points; // REDEEMED/EXPIRED entries are already negative
+  }
+
+  return Math.max(0, available);
+}
+
+/**
+ * Expire old points for all stores.
+ * Finds PointHistory EARNED entries that have passed their expiresAt date,
+ * then decrements StoreUser.points and records an EXPIRED entry.
+ *
+ * Run this on Jan 1 or periodically via a cron job.
  */
 export async function expireOldPoints() {
   const now = new Date();
 
-  // Find all users with points
-  const users = await db.user.findMany({
-    where: { points: { gt: 0 } },
-    include: {
-      pointsHistory: {
-        where: {
-          expiresAt: { lt: now },
-          type: 'EARNED',
-        },
-      },
+  // Find all un-expired EARNED entries that are now past their expiry date
+  const expiredEntries = await db.pointHistory.findMany({
+    where: {
+      type: 'EARNED',
+      expiresAt: { lt: now },
+      storeId: { not: null },
+    },
+    select: {
+      userId: true,
+      storeId: true,
+      points: true,
     },
   });
 
+  // Group by (userId, storeId) and sum expired points
+  const grouped = new Map<string, { userId: string; storeId: string; total: number }>();
+  for (const entry of expiredEntries) {
+    if (!entry.storeId) continue;
+    const key = `${entry.userId}::${entry.storeId}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, { userId: entry.userId, storeId: entry.storeId, total: 0 });
+    }
+    grouped.get(key)!.total += entry.points;
+  }
+
   const results = [];
 
-  for (const user of users) {
-    let expiredPoints = 0;
+  for (const { userId, storeId, total } of grouped.values()) {
+    if (total <= 0) continue;
 
-    // Calculate expired points
-    for (const history of user.pointsHistory) {
-      if (history.expiresAt && history.expiresAt < now) {
-        expiredPoints += history.points;
-      }
-    }
+    // Deduct from StoreUser.points (floor at 0 — can't go negative)
+    await db.storeUser.updateMany({
+      where: { userId, storeId, points: { gt: 0 } },
+      data: { points: { decrement: total } },
+    });
 
-    if (expiredPoints > 0) {
-      // Deduct expired points from user
-      await db.user.update({
-        where: { id: user.id },
-        data: { points: { decrement: expiredPoints } },
-      });
+    // Record the expiry
+    await db.pointHistory.create({
+      data: {
+        userId,
+        storeId,
+        points: -total,
+        type: 'EXPIRED',
+        description: `Poin expired pada ${now.toLocaleDateString('id-ID')}`,
+        createdAt: now,
+      },
+    });
 
-      // Record expiry in history
-      await db.pointHistory.create({
-        data: {
-          userId: user.id,
-          points: -expiredPoints,
-          type: 'EXPIRED',
-          description: `Points expired on ${now.toLocaleDateString()}`,
-          createdAt: now,
-        },
-      });
-
-      results.push({
-        userId: user.id,
-        userName: user.name,
-        expiredPoints,
-      });
-    }
+    const user = await db.user.findUnique({ where: { id: userId }, select: { name: true } });
+    results.push({ userId, storeId, expiredPoints: total, userName: user?.name ?? userId });
   }
 
   return results;
 }
 
 /**
- * Convert points to discount value
+ * Convert points to discount value (Rupiah).
  * Example: 1 point = Rp 1,000 discount
  */
 export function pointsToDiscount(points: number, conversionRate: number = 1000): number {
@@ -108,7 +108,7 @@ export function pointsToDiscount(points: number, conversionRate: number = 1000):
 }
 
 /**
- * Convert discount value to points needed
+ * Convert discount value to points needed.
  */
 export function discountToPoints(discount: number, conversionRate: number = 1000): number {
   return Math.floor(discount / conversionRate);

@@ -28,23 +28,25 @@ async function getCustomers(storeId: string, params: {
   }
   if (points !== 'all') {
     switch (points) {
-      case 'low':    memberUserWhere.points = { lt: 100 }; break;
-      case 'medium': memberUserWhere.points = { gte: 100, lt: 500 }; break;
-      case 'high':   memberUserWhere.points = { gte: 500 }; break;
+      case 'low':    memberWhere.points = { lt: 100 }; break;
+      case 'medium': memberWhere.points = { gte: 100, lt: 500 }; break;
+      case 'high':   memberWhere.points = { gte: 500 }; break;
     }
   }
 
-  // ── Non-members: Customer table, scoped ke storeId ──────────────────────────
-  const nonMemberWhere: any = { storeId };
+  // ── Customer customers: StoreUser with role CUSTOMER ──────────────────────────
+  const customerWhere: any = { storeId, role: 'CUSTOMER' as const };
   if (search) {
-    nonMemberWhere.OR = [
-      { name:    { contains: search, mode: 'insensitive' as const } },
-      { phone:   { contains: search, mode: 'insensitive' as const } },
-      { address: { contains: search, mode: 'insensitive' as const } },
-    ];
+    customerWhere.user = {
+      OR: [
+        { name:    { contains: search, mode: 'insensitive' as const } },
+        { phone:   { contains: search, mode: 'insensitive' as const } },
+        { address: { contains: search, mode: 'insensitive' as const } },
+      ],
+    };
   }
 
-  const [storeUsers, nonMembers] = await Promise.all([
+  const [memberStoreUsers, customerStoreUsers] = await Promise.all([
     db.storeUser.findMany({
       where: Object.keys(memberUserWhere).length > 0
         ? { ...memberWhere, user: memberUserWhere }
@@ -58,26 +60,31 @@ async function getCustomers(storeId: string, params: {
         },
       },
     }),
-    db.customer.findMany({
-      where: nonMemberWhere,
+    db.storeUser.findMany({
+      where: customerWhere,
       include: {
-        sales: { where: { storeId }, select: { id: true, total: true } },
-        _count: { select: { sales: true } },
+        user: {
+          include: {
+            sales: { where: { storeId }, select: { id: true, total: true } },
+            _count: { select: { sales: true } },
+          },
+        },
       },
     }),
   ]);
 
-  const members = storeUsers.map((su) => ({
+  const members = memberStoreUsers.map((su) => ({
     ...su.user,
+    points: su.points,
     type: 'member' as const,
     sales: su.user.sales.map((s) => ({ id: s.id, total: Number(s.total) })),
   }));
 
-  const nonMembersSerialized = nonMembers.map((c) => ({
-    ...c,
-    address: c.address ?? '',
+  const nonMembersSerialized = customerStoreUsers.map((su) => ({
+    ...su.user,
+    address: su.user.address ?? '',
     type: 'non-member' as const,
-    sales: c.sales.map((s) => ({ id: s.id, total: Number(s.total) })),
+    sales: su.user.sales.map((s) => ({ id: s.id, total: Number(s.total) })),
   }));
 
   let allCustomers = [...members, ...nonMembersSerialized];

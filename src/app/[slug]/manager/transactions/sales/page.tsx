@@ -19,7 +19,6 @@ async function getSales(storeId: string, params: {
   if (search) {
     where.OR = [
       { customer: { name: { contains: search, mode: 'insensitive' as const } } },
-      { nonMemberCustomer: { name: { contains: search, mode: 'insensitive' as const } } },
       { saleNumber: { contains: search, mode: 'insensitive' as const } },
       { cashier: { name: { contains: search, mode: 'insensitive' as const } } },
     ];
@@ -41,7 +40,6 @@ async function getSales(storeId: string, params: {
       where, skip, take: limit, orderBy,
       include: {
         customer: { select: { name: true, email: true, phone: true, address: true } },
-        nonMemberCustomer: { select: { name: true, phone: true, address: true } },
         cashier: { select: { name: true } },
         items: { include: { variant: { include: { product: true } } } },
       },
@@ -90,18 +88,21 @@ async function getVariants(storeId: string) {
 async function getMembers(storeId: string) {
   const storeUsers = await db.storeUser.findMany({
     where: { storeId, role: 'MEMBER' },
-    include: { user: { select: { id: true, name: true, points: true } } },
+    include: { user: { select: { id: true, name: true } } },
   });
-  return storeUsers.map((su) => su.user);
+  return storeUsers.map((su) => ({ ...su.user, points: su.points }));
 }
 
 async function getNonMembers(storeId: string) {
-  const customers = await db.customer.findMany({
-    where: { storeId },
-    select: { id: true, name: true, phone: true, address: true },
-    orderBy: { name: 'asc' },
+  const storeUsers = await db.storeUser.findMany({
+    where: { storeId, role: 'CUSTOMER' },
+    include: { user: { select: { id: true, name: true, phone: true, address: true } } },
+    orderBy: { user: { name: 'asc' } },
   });
-  return customers.map((c) => ({ ...c, address: c.address ?? '' }));
+  return storeUsers.map((su) => ({
+    id: su.user.id, name: su.user.name,
+    phone: su.user.phone, address: su.user.address ?? '',
+  }));
 }
 
 export default async function SalesPage({
@@ -141,7 +142,7 @@ export default async function SalesPage({
       <SalesActions
         variants={variants}
         customers={members}
-        nonMemberCustomers={nonMembers}
+        walkInCustomers={nonMembers}
         conversionRate={conversionRate}
       />
 

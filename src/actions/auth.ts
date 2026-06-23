@@ -88,16 +88,47 @@ export async function registerMemberAction(formData: FormData) {
     const { db } = await import('@/lib/db');
     const bcrypt  = await import('bcryptjs');
 
-    const existingPhone = await db.user.findFirst({ where: { phone } });
-    if (existingPhone) {
-      return { success: false, error: 'Nomor telepon sudah terdaftar' };
+    const existingUser = await db.user.findFirst({ where: { phone } });
+
+    if (existingUser) {
+      // Phone already in the system — two sub-cases:
+      if (existingUser.password) {
+        // Has a password → full account already exists, can't re-register
+        return { success: false, error: 'Nomor telepon sudah terdaftar. Silakan login.' };
+      }
+
+      // Passwordless (CUSTOMER) → set password and upgrade to MEMBER at this store
+      if (email) {
+        const emailConflict = await db.user.findFirst({ where: { email, NOT: { id: existingUser.id } } });
+        if (emailConflict) return { success: false, error: 'Email sudah terdaftar' };
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      await db.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name, email, address, password: hashedPassword,
+            birthday: birthday ? new Date(birthday) : null,
+          },
+        });
+
+        // Upgrade or create StoreUser to MEMBER at this store
+        await tx.storeUser.upsert({
+          where: { storeId_userId: { storeId, userId: existingUser.id } },
+          create: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
+          update: { role: 'MEMBER' },
+        });
+      });
+
+      return { success: true };
     }
 
+    // Brand new user — no account at all
     if (email) {
       const existingEmail = await db.user.findFirst({ where: { email } });
-      if (existingEmail) {
-        return { success: false, error: 'Email sudah terdaftar' };
-      }
+      if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -109,13 +140,11 @@ export async function registerMemberAction(formData: FormData) {
           password: hashedPassword,
           birthday: birthday ? new Date(birthday) : null,
           role: 'MEMBER',
-          points: 0,
         },
       });
 
-      // Daftarkan ke store sebagai MEMBER
       await tx.storeUser.create({
-        data: { storeId, userId: newUser.id, role: 'MEMBER' },
+        data: { storeId, userId: newUser.id, role: 'MEMBER', points: 0 },
       });
     });
 

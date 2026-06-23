@@ -20,11 +20,13 @@ export async function getMemberPoints() {
   const session = await auth();
   if (!session) throw new Error('Unauthorized');
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
+  const { storeId } = await getStoreContext();
+
+  const storeUser = await db.storeUser.findUnique({
+    where: { storeId_userId: { storeId, userId: session.user.id } },
     select: { points: true },
   });
-  return user?.points || 0;
+  return storeUser?.points ?? 0;
 }
 
 export async function getPointsHistory() {
@@ -77,18 +79,18 @@ export async function redeemPoints(points: number, description: string) {
   const session = await auth();
   if (!session) throw new Error('Unauthorized');
 
-  // Validasi: harus bilangan bulat positif
-  if (!Number.isInteger(points) || points <= 0) {
-    throw new Error('Jumlah poin tidak valid');
-  }
+  if (!Number.isInteger(points) || points <= 0) throw new Error('Jumlah poin tidak valid');
 
   const { storeId } = await getStoreContext();
 
-  const user = await db.user.findUnique({ where: { id: session.user.id } });
-  if (!user || user.points < points) throw new Error('Poin tidak mencukupi');
+  const storeUser = await db.storeUser.findUnique({
+    where: { storeId_userId: { storeId, userId: session.user.id } },
+    select: { points: true },
+  });
+  if (!storeUser || storeUser.points < points) throw new Error('Poin tidak mencukupi');
 
-  await db.user.update({
-    where: { id: session.user.id },
+  await db.storeUser.update({
+    where: { storeId_userId: { storeId, userId: session.user.id } },
     data: { points: { decrement: points } },
   });
 
@@ -108,18 +110,17 @@ export async function getAllCustomers() {
     throw new Error('Unauthorized');
   }
 
-  // Member = StoreUser dengan role MEMBER di store ini
   const storeUsers = await db.storeUser.findMany({
     where: { storeId, role: 'MEMBER' },
     include: {
       user: {
-        select: { id: true, name: true, email: true, phone: true, birthday: true, photoUrl: true, points: true, createdAt: true },
+        select: { id: true, name: true, email: true, phone: true, birthday: true, photoUrl: true, createdAt: true },
       },
     },
     orderBy: { user: { name: 'asc' } },
   });
 
-  return storeUsers.map((su) => su.user);
+  return storeUsers.map((su) => ({ ...su.user, points: su.points }));
 }
 
 export async function getCustomerDetails(customerId: string) {
@@ -263,10 +264,9 @@ export async function createCustomerAction(formData: FormData) {
           birthday: birthday ? new Date(birthday) : null,
           photoUrl: photoUrl || null,
           role: 'MEMBER',
-          points: 0,
         },
       });
-      await tx.storeUser.create({ data: { storeId, userId: newUser.id, role: 'MEMBER' } });
+      await tx.storeUser.create({ data: { storeId, userId: newUser.id, role: 'MEMBER', points: 0 } });
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
@@ -304,18 +304,10 @@ export async function updateCustomerAction(id: string, formData: FormData) {
     if (phone.length < 10 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
 
     // Pastikan customer adalah member di store ini
-    const storeUser = await db.storeUser.findUnique({ where: { storeId_userId: { storeId, userId: id } } });
-    if (!storeUser) return { success: false, error: 'Customer tidak ditemukan di store ini' };
+    const currentStoreUser = await db.storeUser.findUnique({ where: { storeId_userId: { storeId, userId: id } } });
+    if (!currentStoreUser) return { success: false, error: 'Customer tidak ditemukan di store ini' };
 
-    const existingPhone = await db.user.findFirst({ where: { phone, id: { not: id } } });
-    if (existingPhone) return { success: false, error: 'Nomor telepon sudah digunakan' };
-
-    if (email) {
-      const existingEmail = await db.user.findFirst({ where: { email, id: { not: id } } });
-      if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
-    }
-
-    const currentUser = await db.user.findUnique({ where: { id }, select: { points: true } });
+    const currentUser = await db.user.findUnique({ where: { id } });
     if (!currentUser) return { success: false, error: 'Customer tidak ditemukan' };
 
     const updateData: any = { name, phone, email, address: address || null, birthday: birthday ? new Date(birthday) : null, photoUrl: photoUrl || null };
@@ -325,11 +317,11 @@ export async function updateCustomerAction(id: string, formData: FormData) {
       updateData.password = await bcrypt.hash(newPassword, 10);
     }
 
-    if (points !== undefined && points !== currentUser.points) {
+    if (points !== undefined && points !== currentStoreUser.points) {
       if (!pointsReason?.trim()) return { success: false, error: 'Alasan wajib diisi saat mengubah poin' };
-      updateData.points = points;
+      await db.storeUser.update({ where: { storeId_userId: { storeId, userId: id } }, data: { points } });
       await db.pointHistory.create({
-        data: { userId: id, storeId, points: points - currentUser.points, type: 'ADJUSTED', description: pointsReason },
+        data: { userId: id, storeId, points: points - currentStoreUser.points, type: 'ADJUSTED', description: pointsReason },
       });
     }
 

@@ -248,7 +248,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
   // Customer
-  const [customerType, setCustomerType] = useState<'walk-in' | 'member' | 'non-member'>('walk-in');
+  const [customerType, setCustomerType] = useState<'customer' | 'member' | 'non-member'>('customer');
   const [customerId, setCustomerId] = useState('');
   const [nonMemberId, setNonMemberId] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
@@ -316,7 +316,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
 
   const customerName = useMemo(() => {
-    if (customerType === 'walk-in') return 'Pelanggan Umum';
+    if (customerType === 'customer') return 'Pelanggan Umum';
     if (customerType === 'member' && selectedMember) return selectedMember.name;
     if (customerType === 'non-member' && selectedNonMember) return selectedNonMember.name;
     return 'Pelanggan Umum';
@@ -390,7 +390,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     setOngkir(0); setOngkirDisplay('');
     setPointsToRedeem(0); setPointsDisplay('');
     setNotes('');
-    setCustomerType('walk-in');
+    setCustomerType('customer');
     setCustomerId('');
     setNonMemberId('');
     setCustomerSearch('');
@@ -414,7 +414,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
 
   // ─── Customer selection ────────────────────────────────────────────────────
 
-  const handleCustomerTypeChange = (type: 'walk-in' | 'member' | 'non-member') => {
+  const handleCustomerTypeChange = (type: 'customer' | 'member' | 'non-member') => {
     setCustomerType(type);
     setCustomerId('');
     setNonMemberId('');
@@ -441,7 +441,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
   const canCheckout =
     cart.length > 0 &&
     !loading &&
-    (customerType === 'walk-in' ||
+    (customerType === 'customer' ||
       (customerType === 'member' && !!customerId) ||
       (customerType === 'non-member' && !!nonMemberId)) &&
     discount + pointDiscount <= subtotal &&
@@ -454,7 +454,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
       const result = await createSaleAction({
         items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.price })),
         customerId: customerType === 'member' ? customerId || null : null,
-        nonMemberCustomerId: customerType === 'non-member' ? nonMemberId || null : null,
+
         paymentMethod,
         paymentStatus,
         discount,
@@ -663,7 +663,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
               <User className="w-3 h-3" /> Pelanggan
             </Label>
             <div className="flex gap-1 mb-2">
-              {(['walk-in', 'member', 'non-member'] as const).map((t) => (
+              {(['customer', 'member', 'non-member'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => handleCustomerTypeChange(t)}
@@ -674,13 +674,13 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                       : 'bg-background border-border text-muted-foreground hover:border-[#028697]/50'
                   )}
                 >
-                  {t === 'walk-in' ? 'Umum' : t === 'member' ? 'Member' : 'Non-Member'}
+                  {t === 'customer' ? 'Umum' : t === 'member' ? 'Member' : 'Non-Member'}
                 </button>
               ))}
             </div>
 
             {/* Customer search dropdown */}
-            {customerType !== 'walk-in' && (
+            {customerType !== 'customer' && (
               <div className="relative">
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
