@@ -5,12 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, checkPlanLimit, MAX_STORES_PER_USER } from '@/lib/store-context';
 import bcrypt from 'bcryptjs';
 
+// FIX: hapus address dari ManagerData — tidak ada di User lagi
 export interface ManagerData {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string;
-  address: string | null;
+  id:        string;
+  name:      string;
+  email:     string | null;
+  phone:     string;
   createdAt: Date;
 }
 
@@ -21,12 +21,12 @@ export async function getManagers(): Promise<ManagerData[]> {
     throw new Error('Unauthorized');
   }
 
-  // Ambil user yang punya StoreRole MANAGER di store ini
   const storeUsers = await db.storeUser.findMany({
-    where: { storeId, role: 'MANAGER' },
+    where:   { storeId, role: 'MANAGER' },
     include: {
       user: {
-        select: { id: true, name: true, email: true, phone: true, address: true, createdAt: true },
+        // FIX: hapus address dari select
+        select: { id: true, name: true, email: true, phone: true, createdAt: true },
       },
     },
     orderBy: { user: { name: 'asc' } },
@@ -36,15 +36,16 @@ export async function getManagers(): Promise<ManagerData[]> {
 }
 
 export interface CreateManagerResult {
-  success: boolean;
-  error?: string;
+  success:              boolean;
+  error?:               string;
   requiresConfirmation?: boolean;
-  existingName?: string;
-  linked?: boolean;
+  existingName?:        string;
+  linked?:              boolean;
 }
 
 export async function createManager(
-  data: { name: string; phone: string; password: string; email?: string; address?: string },
+  // FIX: hapus address dari parameter
+  data: { name: string; phone: string; password: string; email?: string },
   linkExisting = false
 ): Promise<CreateManagerResult> {
   const { storeId, storeSlug, storeRole } = await requireStoreAccess();
@@ -56,7 +57,6 @@ export async function createManager(
   if (!data.name.trim())  return { success: false, error: 'Nama wajib diisi' };
   if (!data.phone.trim()) return { success: false, error: 'Nomor telepon wajib diisi' };
 
-  // ── Cek apakah nomor ini sudah terdaftar di sistem (mungkin di store lain) ───
   const existingUser = await db.user.findFirst({ where: { phone: data.phone } });
 
   if (existingUser) {
@@ -69,41 +69,36 @@ export async function createManager(
 
     if (!linkExisting) {
       return {
-        success: false,
+        success:              false,
         requiresConfirmation: true,
-        existingName: existingUser.name,
-        error: `Nomor HP ini sudah terdaftar atas nama "${existingUser.name}".`,
+        existingName:         existingUser.name,
+        error:                `Nomor HP ini sudah terdaftar atas nama "${existingUser.name}".`,
       };
     }
 
-    // Batas jumlah store yang boleh diikuti satu user
     const storeCount = await db.storeUser.count({ where: { userId: existingUser.id } });
     if (storeCount >= MAX_STORES_PER_USER) {
       return { success: false, error: `${existingUser.name} sudah tergabung di ${MAX_STORES_PER_USER} toko (batas maksimal).` };
     }
 
-    // Cek limit manager toko ini
     const limit = await checkPlanLimit('managers');
     if (!limit.allowed) {
-      return { success: false, error: `Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak manager.` };
+      return { success: false, error: `Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO.` };
     }
 
-    await db.$transaction(async (tx) => {
-      await tx.storeUser.create({ data: { storeId, userId: existingUser.id, role: 'MANAGER' } });
-      // Sinkronkan Role global (dipakai beberapa flag UI ringan)
-      await tx.user.update({ where: { id: existingUser.id }, data: { role: 'MANAGER' } });
-    });
+    // FIX: hapus syncGlobalRole dan tx.user.update({ role }) — tidak diperlukan lagi
+    await db.storeUser.create({ data: { storeId, userId: existingUser.id, role: 'MANAGER' } });
 
     revalidatePath(`/${storeSlug}/admin/settings/profile`);
     return { success: true, linked: true, existingName: existingUser.name };
   }
 
-  // ── User belum ada → buat akun baru ───────────────────────────────────────────
+  // ── User belum ada ─────────────────────────────────────────────────────────
   if (data.password.length < 6) return { success: false, error: 'Password minimal 6 karakter' };
 
   const limit = await checkPlanLimit('managers');
   if (!limit.allowed) {
-    return { success: false, error: `Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak manager.` };
+    return { success: false, error: `Batas manager tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO.` };
   }
 
   if (data.email) {
@@ -119,16 +114,12 @@ export async function createManager(
         name:     data.name,
         phone:    data.phone,
         password: hashedPassword,
-        role:     'MANAGER',
-        email:    data.email   || null,
-        address:  data.address || null,
+        email:    data.email || null,
+        // FIX: hapus role dan address — tidak ada di User lagi
       },
     });
 
-    // Daftarkan sebagai MANAGER di store ini
-    await tx.storeUser.create({
-      data: { storeId, userId: newUser.id, role: 'MANAGER' },
-    });
+    await tx.storeUser.create({ data: { storeId, userId: newUser.id, role: 'MANAGER' } });
   });
 
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
@@ -137,7 +128,8 @@ export async function createManager(
 
 export async function updateManager(
   managerId: string,
-  data: { name: string; phone: string; email?: string; address?: string; newPassword?: string }
+  // FIX: hapus address dari parameter
+  data: { name: string; phone: string; email?: string; newPassword?: string }
 ) {
   const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
@@ -145,7 +137,6 @@ export async function updateManager(
     throw new Error('Unauthorized');
   }
 
-  // Pastikan manager ini memang di store kita
   const storeUser = await db.storeUser.findUnique({
     where: { storeId_userId: { storeId, userId: managerId } },
   });
@@ -162,11 +153,11 @@ export async function updateManager(
     if (existingEmail) throw new Error('Email sudah digunakan');
   }
 
+  // FIX: hapus address dari updateData
   const updateData: Record<string, unknown> = {
-    name:    data.name,
-    phone:   data.phone,
-    email:   data.email   || null,
-    address: data.address || null,
+    name:  data.name,
+    phone: data.phone,
+    email: data.email || null,
   };
 
   if (data.newPassword) {
@@ -175,7 +166,6 @@ export async function updateManager(
   }
 
   await db.user.update({ where: { id: managerId }, data: updateData });
-
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
 }
 
@@ -191,10 +181,8 @@ export async function deleteManager(managerId: string) {
   });
   if (!storeUser || storeUser.role !== 'MANAGER') throw new Error('Manager tidak ditemukan di store ini');
 
-  // Hapus StoreUser saja (user-nya tetap ada, mungkin punya store lain)
-  await db.storeUser.delete({
-    where: { storeId_userId: { storeId, userId: managerId } },
-  });
+  await db.storeUser.delete({ where: { storeId_userId: { storeId, userId: managerId } } });
+  // FIX: hapus syncGlobalRole — tidak diperlukan lagi
 
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
 }

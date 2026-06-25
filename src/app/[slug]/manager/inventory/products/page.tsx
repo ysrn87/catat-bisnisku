@@ -1,36 +1,30 @@
 import { db } from '@/lib/db';
+import { auth } from '@/auth';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProductDialog } from '@/components/products/product-dialog';
 import { ProductCard } from '@/components/products/product-card';
 import { SearchFilterBar } from '@/components/filters/search-filter-bar';
-import { auth } from '@/auth';
 import { Suspense } from 'react';
-import { getStoreContext } from '@/lib/store-context';
+import { getStoreContext, requireStoreAccess } from '@/lib/store-context';
 import { ProductActions } from '@/components/page-actions/product-actions';
 
-async function getProducts(storeId: string, params: {
-  search?: string;
-  status?: string;
-  sort?: string;
-  category?: string;
-}) {
-  const { search = '', status = 'all', sort = 'name_asc' } = params;
-
-  const { category = 'all' } = params;
+async function getProducts(storeId: string, params: { search?: string; status?: string; sort?: string; category?: string }) {
+  const { search = '', status = 'all', sort = 'name_asc', category = 'all' } = params;
 
   const where: any = { storeId };
   if (category !== 'all') where.categoryId = category === 'none' ? null : category;
 
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' as const } },
-      { sku: { contains: search, mode: 'insensitive' as const } },
+      { name:        { contains: search, mode: 'insensitive' as const } },
       { description: { contains: search, mode: 'insensitive' as const } },
+      // FIX: hapus { sku: ... } — sku tidak ada di Product, ada di ProductVariant
       { variants: { some: { name: { contains: search, mode: 'insensitive' as const } } } },
+      { variants: { some: { sku:  { contains: search, mode: 'insensitive' as const } } } },
     ];
   }
 
-  if (status === 'active') where.isActive = true;
+  if (status === 'active')   where.isActive = true;
   if (status === 'inactive') where.isActive = false;
 
   const orderBy: any = [];
@@ -45,44 +39,44 @@ async function getProducts(storeId: string, params: {
     where,
     include: {
       variants: true,
-      createdBy: { select: { name: true } },
+      // FIX: hapus createdBy — tidak ada di Product lagi
       category: { select: { id: true, name: true, color: true, icon: true } },
     },
     orderBy,
   });
 
-  return products.map((product: typeof products[number]) => ({
+  return products.map((product) => ({
     ...product,
-    variants: product.variants.map((v: typeof product.variants[number]) => ({
+    variants: product.variants.map((v) => ({
       ...v,
       price: Number(v.price),
-      cost: Number(v.cost),
+      cost:  Number(v.cost),
     })),
   }));
 }
 
-export default async function ProductsPage({
-  searchParams,
-}: {
+export default async function ProductsPage({ searchParams }: {
   searchParams: Promise<{ search?: string; status?: string; sort?: string; category?: string }>;
 }) {
-  const params = await searchParams;
+  const params   = await searchParams;
   const search   = params.search   || '';
   const status   = params.status   || 'all';
   const sort     = params.sort     || 'name_asc';
   const category = params.category || 'all';
 
-  const [{ storeId }, session] = await Promise.all([
-    getStoreContext(),
-    auth(),
-  ]);
+  const [{ storeId }, session] = await Promise.all([getStoreContext(), auth()]);
 
   const [products, categories] = await Promise.all([
     getProducts(storeId, { search, status, sort, category }),
     db.category.findMany({ where: { storeId }, orderBy: { name: 'asc' }, select: { id: true, name: true, color: true, icon: true } }),
   ]);
 
-  const isAdmin = session?.user?.role === 'ADMINISTRATOR';
+  // FIX: isAdmin dari StoreUser, bukan session.user.role
+  const storeUser = await db.storeUser.findUnique({
+    where:  { storeId_userId: { storeId, userId: session!.user.id } },
+    select: { role: true },
+  });
+  const isAdmin = storeUser?.role === 'OWNER' || storeUser?.role === 'ADMINISTRATOR';
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -91,49 +85,27 @@ export default async function ProductsPage({
       <SearchFilterBar
         searchPlaceholder="Cari produk berdasarkan nama, SKU, atau varian..."
         filters={[
-          {
-            key: 'status',
-            label: 'Status Produk',
-            defaultValue: 'all',
-            options: [
-              { value: 'all',      label: 'Semua Produk' },
-              { value: 'active',   label: 'Aktif' },
-              { value: 'inactive', label: 'Nonaktif' },
-            ],
-          },
-          ...(categories.length > 0 ? [{
-            key: 'category',
-            label: 'Kategori',
-            defaultValue: 'all',
-            options: [
-              { value: 'all',  label: 'Semua Kategori' },
-              { value: 'none', label: 'Tanpa Kategori' },
-              ...categories.map((c) => ({ value: c.id, label: `${c.icon ?? ''} ${c.name}`.trim() })),
-            ],
-          }] : []),
+          { key: 'status', label: 'Status Produk', defaultValue: 'all', options: [
+            { value: 'all', label: 'Semua Produk' }, { value: 'active', label: 'Aktif' }, { value: 'inactive', label: 'Nonaktif' },
+          ]},
+          ...(categories.length > 0 ? [{ key: 'category', label: 'Kategori', defaultValue: 'all', options: [
+            { value: 'all',  label: 'Semua Kategori' },
+            { value: 'none', label: 'Tanpa Kategori' },
+            ...categories.map((c) => ({ value: c.id, label: `${c.icon ?? ''} ${c.name}`.trim() })),
+          ]}] : []),
         ]}
         sortOptions={[
-          { value: 'name_asc',  label: 'Nama (A-Z)' },
-          { value: 'name_desc', label: 'Nama (Z-A)' },
-          { value: 'newest',    label: 'Terbaru' },
-          { value: 'oldest',    label: 'Terlama' },
+          { value: 'name_asc', label: 'Nama (A-Z)' }, { value: 'name_desc', label: 'Nama (Z-A)' },
+          { value: 'newest',   label: 'Terbaru' },     { value: 'oldest',   label: 'Terlama' },
         ]}
         defaultSort="name_asc"
       />
 
       <div className="space-y-4 md:space-y-6">
         {products.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">
-                {search
-                  ? `Tidak ada produk yang cocok dengan "${search}"`
-                  : 'Belum ada produk tersedia. Buat produk pertama!'}
-              </p>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">{search ? `Tidak ada produk yang cocok dengan "${search}"` : 'Belum ada produk tersedia. Buat produk pertama!'}</p></CardContent></Card>
         ) : (
-          products.map((product: typeof products[number]) => (
+          products.map((product) => (
             <ProductCard key={product.id} product={product} filterStatus={status} categories={categories} isAdmin={isAdmin} />
           ))
         )}

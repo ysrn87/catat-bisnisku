@@ -1,48 +1,29 @@
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
+import { DashboardTabs } from '@/components/pos/dashboard-tabs';
 import { PosPanel } from '@/components/pos/pos-panel';
 import { getPointsConversionRate } from '@/actions/settings';
 
-// ─── Data fetchers ─────────────────────────────────────────────────────────────
-
-async function getPosVariants(storeId: string) {
+async function getPosData(storeId: string) {
   const variants = await db.productVariant.findMany({
-    where: {
-      storeId,
-      isActive: true,
-      product: { isActive: true },
-      OR: [{ stock: { gt: 0 } }, { type: 'PREORDER' }],
-    },
+    where: { storeId, isActive: true, product: { isActive: true }, OR: [{ stock: { gt: 0 } }, { type: 'PREORDER' }] },
     include: { product: { select: { name: true, categoryId: true } } },
     orderBy: { product: { name: 'asc' } },
   });
 
-  const categoryIds = [...new Set(
-    variants.map(v => v.product.categoryId).filter((id): id is string => !!id)
-  )];
-  const categories = categoryIds.length
-    ? await db.category.findMany({
-        where: { id: { in: categoryIds } },
-        select: { id: true, name: true, icon: true, color: true },
-      })
-    : [];
-  const catMap = new Map(categories.map(c => [c.id, c]));
+  const categoryIds = [...new Set(variants.map(v => v.product.categoryId).filter((id): id is string => !!id))];
+  const categories  = categoryIds.length ? await db.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, name: true, icon: true, color: true } }) : [];
+  const catMap      = new Map(categories.map(c => [c.id, c]));
 
   return variants.map((v) => {
     const cat = v.product.categoryId ? catMap.get(v.product.categoryId) ?? null : null;
     return {
-      id: v.id,
-      name: v.name,
-      price: Number(v.price),
-      stock: v.stock,
-      points: v.points,
-      barcode: v.barcode ?? null,
-      type: v.type,
-      product: { name: v.product.name },
-      category: cat
-        ? { name: cat.name, icon: cat.icon ?? null, color: cat.color ?? null }
-        : null,
+      id: v.id, name: v.name, price: Number(v.price), stock: v.stock,
+      pointsPerUnit: v.pointsPerUnit, // FIX: points → pointsPerUnit
+      barcode: v.barcode ?? null, type: v.type,
+      product:  { name: v.product.name },
+      category: cat ? { name: cat.name, icon: cat.icon ?? null, color: cat.color ?? null } : null,
     };
   });
 }
@@ -56,34 +37,34 @@ async function getMembers(storeId: string) {
 }
 
 async function getNonMembers(storeId: string) {
-  // CUSTOMER customers are now StoreUsers with role CUSTOMER — same User table
   const storeUsers = await db.storeUser.findMany({
     where: { storeId, role: 'CUSTOMER' },
+    // FIX: address sekarang ada di User (sudah ditambah balik ke schema)
     include: { user: { select: { id: true, name: true, phone: true, address: true } } },
     orderBy: { user: { name: 'asc' } },
   });
-  return storeUsers.map((su) => ({
-    id: su.user.id, name: su.user.name,
-    phone: su.user.phone, address: su.user.address ?? null,
-  }));
+  return storeUsers.map((su) => ({ id: su.user.id, name: su.user.name, phone: su.user.phone, address: su.user.address ?? null }));
 }
 
-// ─── Page ──────────────────────────────────────────────────────────────────────
+export default async function AdminDashboard({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug }    = await params;
+  const [{ storeId }, session] = await Promise.all([getStoreContext(), auth()]);
 
-export default async function PosKasirPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const { storeId } = await getStoreContext();
-
-  const [posVariants, members, nonMembers, conversionRate, store, session] = await Promise.all([
-    getPosVariants(storeId),
+  const [posVariants, members, nonMembers, conversionRate, store] = await Promise.all([
+    getPosData(storeId),
     getMembers(storeId),
     getNonMembers(storeId),
     getPointsConversionRate(),
     db.store.findUnique({ where: { id: storeId }, select: { name: true } }),
-    auth(),
   ]);
 
-  return (
+  const SummaryContent = (
+    <div className="p-4 text-muted-foreground text-sm">
+      Pilih menu Ringkasan dari sidebar untuk melihat statistik toko.
+    </div>
+  );
+
+  const PosContent = (
     <PosPanel
       variants={posVariants}
       members={members}
@@ -94,6 +75,6 @@ export default async function PosKasirPage({ params }: { params: Promise<{ slug:
       cashierName={session?.user?.name ?? undefined}
     />
   );
+
+  return <DashboardTabs ringkasanContent={SummaryContent} posContent={PosContent} />;
 }
-
-

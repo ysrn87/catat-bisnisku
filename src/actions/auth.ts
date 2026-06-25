@@ -17,7 +17,6 @@ export async function loginAction(formData: FormData) {
   const identifier = formData.get('identifier') as string;
   const password   = formData.get('password')   as string;
 
-  // Rate limit: max 5 percobaan per 15 menit per IP
   const ip          = getIP(await headers());
   const rateLimited = await checkLoginLimit(ip);
   if (!rateLimited.success) {
@@ -25,11 +24,7 @@ export async function loginAction(formData: FormData) {
   }
 
   try {
-    await signIn('credentials', {
-      identifier,
-      password,
-      redirect: false,
-    });
+    await signIn('credentials', { identifier, password, redirect: false });
     return { success: true };
   } catch (error) {
     if (error instanceof AuthError) {
@@ -48,21 +43,16 @@ export async function logoutAction() {
   await signOut({ redirectTo: '/login' });
 }
 
-/**
- * Register member baru (dipanggil dari halaman /register di dalam toko).
- * User akan otomatis didaftarkan sebagai MEMBER di store yang bersangkutan.
- */
 export async function registerMemberAction(formData: FormData) {
   try {
     const name     = formData.get('name')     as string;
     const rawPhone = formData.get('phone')    as string;
     const rawEmail = formData.get('email')    as string;
-    const address  = formData.get('address')  as string;
+    // FIX: hapus address — tidak ada di User lagi
     const password = formData.get('password') as string;
     const birthday = formData.get('birthday') as string;
     const storeId  = formData.get('storeId')  as string;
 
-    // Rate limit: max 10 register member per jam per IP
     const ip          = getIP(await headers());
     const rateLimited = await checkRegisterMemberLimit(ip);
     if (!rateLimited.success) {
@@ -91,13 +81,11 @@ export async function registerMemberAction(formData: FormData) {
     const existingUser = await db.user.findFirst({ where: { phone } });
 
     if (existingUser) {
-      // Phone already in the system — two sub-cases:
       if (existingUser.password) {
-        // Has a password → full account already exists, can't re-register
         return { success: false, error: 'Nomor telepon sudah terdaftar. Silakan login.' };
       }
 
-      // Passwordless (CUSTOMER) → set password and upgrade to MEMBER at this store
+      // Passwordless (CUSTOMER) → set password and upgrade to MEMBER
       if (email) {
         const emailConflict = await db.user.findFirst({ where: { email, NOT: { id: existingUser.id } } });
         if (emailConflict) return { success: false, error: 'Email sudah terdaftar' };
@@ -109,14 +97,16 @@ export async function registerMemberAction(formData: FormData) {
         await tx.user.update({
           where: { id: existingUser.id },
           data: {
-            name, email, address, password: hashedPassword,
+            name, email,
+            // FIX: hapus address — tidak ada di User lagi
+            // FIX: hapus role — tidak ada di User lagi
+            password: hashedPassword,
             birthday: birthday ? new Date(birthday) : null,
           },
         });
 
-        // Upgrade or create StoreUser to MEMBER at this store
         await tx.storeUser.upsert({
-          where: { storeId_userId: { storeId, userId: existingUser.id } },
+          where:  { storeId_userId: { storeId, userId: existingUser.id } },
           create: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
           update: { role: 'MEMBER' },
         });
@@ -125,7 +115,7 @@ export async function registerMemberAction(formData: FormData) {
       return { success: true };
     }
 
-    // Brand new user — no account at all
+    // Brand new user
     if (email) {
       const existingEmail = await db.user.findFirst({ where: { email } });
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
@@ -136,10 +126,10 @@ export async function registerMemberAction(formData: FormData) {
     await db.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
-          name, phone, email, address,
+          name, phone, email,
+          // FIX: hapus address dan role — tidak ada di User lagi
           password: hashedPassword,
           birthday: birthday ? new Date(birthday) : null,
-          role: 'MEMBER',
         },
       });
 

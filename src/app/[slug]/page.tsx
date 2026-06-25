@@ -1,42 +1,33 @@
 import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
+import { redirect } from 'next/navigation';
 
-export default async function StoreRootPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function StoreRootPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const session = await auth();
+  const session  = await auth();
 
-  if (!session) {
+  if (!session?.user?.id) {
     redirect(`/login?callbackUrl=/${slug}`);
   }
 
-  const storeUser = await db.storeUser.findFirst({
-    where: {
-      userId: session.user.id,
-      store: { slug },
-    },
+  const store = await db.store.findUnique({ where: { slug }, select: { id: true } });
+  if (!store) redirect('/store-select');
+
+  // FIX: routing berdasarkan StoreUser.role, bukan session.user.role
+  const storeUser = await db.storeUser.findUnique({
+    where:  { storeId_userId: { storeId: store.id, userId: session.user.id } },
+    select: { role: true },
   });
 
-  if (!storeUser) {
-    redirect('/unauthorized');
-  }
+  if (!storeUser) redirect('/store-select');
 
-  // Redirect ke halaman yang sesuai dengan role
   switch (storeUser.role) {
     case 'OWNER':
-    case 'ADMINISTRATOR':
-      redirect(`/${slug}/admin`);
-    case 'MANAGER':
-      redirect(`/${slug}/manager`);
-    case 'CASHIER':
-      redirect(`/${slug}/cashier`);
+    case 'ADMINISTRATOR': redirect(`/${slug}/admin`);         break;
+    case 'MANAGER':       redirect(`/${slug}/manager`);       break;
+    case 'CASHIER':       redirect(`/${slug}/cashier`);       break;
     case 'MEMBER':
-      redirect(`/${slug}/member`);
-    default:
-      redirect('/unauthorized');
+    case 'CUSTOMER':      redirect(`/${slug}/member`);        break;
+    default:              redirect('/store-select');
   }
 }

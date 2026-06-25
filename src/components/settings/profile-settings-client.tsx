@@ -42,13 +42,12 @@ interface ManagerForm {
   name: string;
   phone: string;
   email: string;
-  address: string;
   password: string;
   confirmPassword: string;
 }
 
 const emptyManagerForm: ManagerForm = {
-  name: '', phone: '', email: '', address: '', password: '', confirmPassword: '',
+  name: '', phone: '', email: '', password: '', confirmPassword: '',
 };
 
 type CashierForm = ManagerForm;
@@ -93,7 +92,7 @@ function ManagerModal({
   const isEdit = !!manager;
   const [form, setForm] = useState<ManagerForm>(
     manager
-      ? { name: manager.name, phone: manager.phone, email: manager.email ?? '', address: manager.address ?? '', password: '', confirmPassword: '' }
+      ? { name: manager.name, phone: manager.phone, email: manager.email ?? '', password: '', confirmPassword: '' }
       : emptyManagerForm
   );
   const [loading, setLoading] = useState(false);
@@ -122,7 +121,7 @@ function ManagerModal({
       if (isEdit) {
         await updateManager(manager!.id, {
           name: form.name, phone: form.phone,
-          email: form.email || undefined, address: form.address || undefined,
+          email: form.email || undefined,
           newPassword: form.password || undefined,
         });
         toast({ title: 'Manager berhasil diperbarui' });
@@ -131,7 +130,7 @@ function ManagerModal({
       } else {
         const result = await createManager({
           name: form.name, phone: form.phone, password: form.password,
-          email: form.email || undefined, address: form.address || undefined,
+          email: form.email || undefined,
         }, linkExisting);
 
         if (result.success) {
@@ -202,12 +201,6 @@ function ManagerModal({
               </Label>
               <Input id="m-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="manager@example.com" className="h-10 text-sm" />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="m-address" className="text-xs font-medium flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat
-              </Label>
-              <Input id="m-address" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
-            </div>
             <hr className="border-t border-gray-100" />
             <div className="grid gap-1.5">
               <Label className="text-xs font-medium">
@@ -258,7 +251,7 @@ function CashierModal({
   const isEdit = !!cashier;
   const [form, setForm] = useState<CashierForm>(
     cashier
-      ? { name: cashier.name, phone: cashier.phone, email: cashier.email ?? '', address: cashier.address ?? '', password: '', confirmPassword: '' }
+      ? { name: cashier.name, phone: cashier.phone, email: cashier.email ?? '', password: '', confirmPassword: '' }
       : emptyCashierForm
   );
   const [loading, setLoading] = useState(false);
@@ -287,7 +280,7 @@ function CashierModal({
       if (isEdit) {
         await updateCashier(cashier!.id, {
           name: form.name, phone: form.phone,
-          email: form.email || undefined, address: form.address || undefined,
+          email: form.email || undefined,
           newPassword: form.password || undefined,
         });
         toast({ title: 'Kasir berhasil diperbarui' });
@@ -296,7 +289,7 @@ function CashierModal({
       } else {
         const result = await createCashier({
           name: form.name, phone: form.phone, password: form.password,
-          email: form.email || undefined, address: form.address || undefined,
+          email: form.email || undefined,
         }, linkExisting);
 
         if (result.success) {
@@ -367,12 +360,6 @@ function CashierModal({
               </Label>
               <Input id="c-email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="kasir@example.com" className="h-10 text-sm" />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="c-address" className="text-xs font-medium flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat
-              </Label>
-              <Input id="c-address" value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
-            </div>
             <hr className="border-t border-gray-100" />
             <div className="grid gap-1.5">
               <Label className="text-xs font-medium">
@@ -427,7 +414,6 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPhone, setAdminPhone] = useState('');
-  const [adminAddress, setAdminAddress] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -455,7 +441,6 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
       setAdminName(profile.name);
       setAdminEmail(profile.email || '');
       setAdminPhone(profile.phone);
-      setAdminAddress(profile.address || '');
     } catch (error) { console.error(error); }
   }
 
@@ -474,7 +459,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
     try {
       if (!adminName.trim()) { toast({ title: 'Nama wajib diisi', variant: 'destructive' }); return; }
       if (!adminPhone.trim()) { toast({ title: 'Nomor telepon wajib diisi', variant: 'destructive' }); return; }
-      await updateAdminProfile({ name: adminName, email: adminEmail || undefined, phone: adminPhone, address: adminAddress || undefined });
+      await updateAdminProfile({ name: adminName, email: adminEmail || undefined, phone: adminPhone });
       toast({ title: 'Profil berhasil disimpan' });
     } catch (error: any) {
       toast({ title: 'Gagal menyimpan profil', description: error.message, variant: 'destructive' });
@@ -600,10 +585,6 @@ export function ProfileSettingsClient({ storePlan, storeSlug }: ProfileSettingsP
                 <div className="grid gap-1.5">
                   <Label htmlFor="adminPhone" className="text-xs font-medium flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-gray-400" />No. Telepon <span className="text-red-400">*</span></Label>
                   <Input id="adminPhone" type="tel" value={adminPhone} onChange={(e) => setAdminPhone(e.target.value)} placeholder="08123456789" className="h-10 text-sm" />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="adminAddress" className="text-xs font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-gray-400" />Alamat</Label>
-                  <Input id="adminAddress" value={adminAddress} onChange={(e) => setAdminAddress(e.target.value)} placeholder="Alamat lengkap" className="h-10 text-sm" />
                 </div>
               </div>
               <div className="flex justify-end pt-1">

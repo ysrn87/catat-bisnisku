@@ -4,7 +4,6 @@ import { db } from './lib/db';
 import bcrypt from 'bcryptjs';
 import { authConfig } from './auth.config';
 
-// Validasi konfigurasi kritis saat startup — gagal cepat daripada silent misconfiguration
 if (!process.env.NEXTAUTH_SECRET || process.env.NEXTAUTH_SECRET.length < 32) {
   throw new Error(
     '[auth] NEXTAUTH_SECRET tidak diset atau terlalu pendek (min 32 karakter). ' +
@@ -45,10 +44,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!isPasswordValid) return null;
 
         return {
-          id:    user.id,
-          email: user.email || user.phone,
-          name:  user.name,
-          role:  user.role,
+          id:          user.id,
+          email:       user.email || user.phone,
+          name:        user.name,
+          isSuperAdmin: user.isSuperAdmin, // ← ganti dari role
         };
       },
     }),

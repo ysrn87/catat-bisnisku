@@ -7,13 +7,13 @@ import { requireStoreAccess, checkPlanLimit } from '@/lib/store-context';
 
 export async function createProductAction(formData: FormData) {
   try {
-    const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+    // FIX: hapus userId — createdById tidak ada di schema baru
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    // Cek plan limit FREE: maks 50 produk
     const limit = await checkPlanLimit('products');
     if (!limit.allowed) {
       return {
@@ -24,17 +24,19 @@ export async function createProductAction(formData: FormData) {
 
     const name        = sanitizeName(formData.get('name') as string, 100);
     const description = sanitizeText(formData.get('description') as string, 500);
-    const sku         = sanitizeSku(formData.get('sku') as string);
-    const type        = (formData.get('type') as string) || 'READY_STOCK';
+    // FIX: type dihapus dari Product — ada di ProductVariant
     const categoryId  = (formData.get('categoryId') as string) || null;
 
-    if (!name || !sku) return { success: false, error: 'Nama dan SKU wajib diisi' };
-
-    const existingSKU = await db.product.findUnique({ where: { storeId_sku: { storeId, sku } } });
-    if (existingSKU) return { success: false, error: 'SKU sudah digunakan' };
+    if (!name) return { success: false, error: 'Nama wajib diisi' };
 
     await db.product.create({
-      data: { storeId, name, description: description || null, sku, type: type as 'READY_STOCK' | 'PREORDER', createdById: userId, categoryId },
+      data: {
+        storeId,
+        name,
+        description: description || null,
+        categoryId,
+        // FIX: hapus sku, type, createdById
+      },
     });
 
     revalidatePath(`/${storeSlug}/admin/inventory/products`);
@@ -48,30 +50,30 @@ export async function createProductAction(formData: FormData) {
 
 export async function updateProductAction(id: string, formData: FormData) {
   try {
-    const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+    // FIX: hapus userId — updatedById tidak ada di schema baru
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
     const name        = sanitizeName(formData.get('name') as string, 100);
     const description = sanitizeText(formData.get('description') as string, 500);
-    const sku         = sanitizeSku(formData.get('sku') as string);
-    const type        = (formData.get('type') as string) || 'READY_STOCK';
     const categoryId  = (formData.get('categoryId') as string) || null;
 
-    if (!name || !sku) return { success: false, error: 'Nama dan SKU wajib diisi' };
+    if (!name) return { success: false, error: 'Nama wajib diisi' };
 
-    // Pastikan produk milik store ini
     const product = await db.product.findFirst({ where: { id, storeId } });
     if (!product) return { success: false, error: 'Produk tidak ditemukan' };
 
-    const existingSKU = await db.product.findFirst({ where: { storeId, sku, NOT: { id } } });
-    if (existingSKU) return { success: false, error: 'SKU sudah digunakan' };
-
     await db.product.update({
       where: { id },
-      data: { name, description: description || null, sku, type: type as 'READY_STOCK' | 'PREORDER', categoryId, updatedById: userId },
+      data: {
+        name,
+        description: description || null,
+        categoryId,
+        // FIX: hapus sku, type, updatedById
+      },
     });
 
     revalidatePath(`/${storeSlug}/admin/inventory/products`);
@@ -87,7 +89,7 @@ export async function deleteProductAction(id: string) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -107,35 +109,36 @@ export async function deleteProductAction(id: string) {
 
 export async function createVariantAction(formData: FormData) {
   try {
-    const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const productId  = formData.get('productId')  as string;
-    const name       = sanitizeName(formData.get('name') as string, 100);
-    const sku        = sanitizeSku(formData.get('sku')  as string);
-    const barcodeRaw = (formData.get('barcode') as string)?.trim().replace(/[^a-zA-Z0-9\-_.]/g, '') || '';
-    const barcode    = barcodeRaw !== '' ? barcodeRaw : null;
-    const price      = parseFloat(formData.get('price')    as string);
-    const cost       = parseFloat(formData.get('cost')     as string);
-    const stock      = parseInt(formData.get('stock')      as string);
-    const lowStock   = parseInt(formData.get('lowStock')   as string);
-    const points     = parseInt(formData.get('points')     as string) || 0;
-    const type       = (formData.get('type') as string) || 'READY_STOCK';
+    const productId   = formData.get('productId')  as string;
+    const name        = sanitizeName(formData.get('name') as string, 100);
+    const sku         = sanitizeSku(formData.get('sku')   as string);
+    const barcodeRaw  = (formData.get('barcode') as string)?.trim().replace(/[^a-zA-Z0-9\-_.]/g, '') || '';
+    const barcode     = barcodeRaw !== '' ? barcodeRaw : null;
+    const price       = parseFloat(formData.get('price')         as string);
+    const cost        = parseFloat(formData.get('cost')          as string);
+    const stock       = parseInt(formData.get('stock')           as string);
+    // FIX: lowStock → lowStockAt
+    const lowStockAt  = parseInt(formData.get('lowStockAt') as string ?? formData.get('lowStock') as string);
+    // FIX: points → pointsPerUnit
+    const pointsPerUnit = parseInt(formData.get('pointsPerUnit') as string ?? formData.get('points') as string) || 0;
+    // FIX: type sekarang ada di Variant (bukan Product)
+    const type        = (formData.get('type') as string) || 'READY_STOCK';
 
-    if (!productId || !name || !sku || isNaN(price) || isNaN(cost) || isNaN(stock) || isNaN(lowStock)) {
+    if (!productId || !name || !sku || isNaN(price) || isNaN(cost) || isNaN(stock) || isNaN(lowStockAt)) {
       return { success: false, error: 'Semua field wajib diisi' };
     }
-    if (price < 0 || cost < 0) return { success: false, error: 'Harga tidak boleh negatif' };
-    if (stock < 0 || lowStock < 0) return { success: false, error: 'Stok tidak boleh negatif' };
+    if (price < 0 || cost < 0)      return { success: false, error: 'Harga tidak boleh negatif' };
+    if (stock < 0 || lowStockAt < 0) return { success: false, error: 'Stok tidak boleh negatif' };
 
-    // Pastikan product milik store ini
     const product = await db.product.findFirst({ where: { id: productId, storeId } });
     if (!product) return { success: false, error: 'Produk tidak ditemukan' };
 
-    // Cek plan limit: maks varian per produk (FREE = 3, PRO = 10)
     const limit = await checkPlanLimit('variantsPerProduct', productId);
     if (!limit.allowed) {
       return {
@@ -152,29 +155,38 @@ export async function createVariantAction(formData: FormData) {
       if (existingBarcode) return { success: false, error: 'Barcode sudah digunakan oleh varian lain' };
     }
 
-    const variant = await db.productVariant.create({
-      data: { storeId, productId, name, sku, barcode, price, cost, stock, lowStock, points, type: type as 'READY_STOCK' | 'PREORDER' },
-    });
-
     const isPreorder = type === 'PREORDER';
 
-    if (!isPreorder && stock > 0) {
-      await db.stockMovement.create({
-        data: { storeId, variantId: variant.id, quantity: stock, type: 'IN', notes: 'Stok Awal' },
-      });
-
-      await db.cashflow.create({
+    await db.$transaction(async (tx) => {
+      const variant = await tx.productVariant.create({
         data: {
-          storeId,
-          type: 'EXPENSE',
-          category: 'Pembelian Inventaris',
-          amount: cost * stock,
-          description: `Penambahan Stok Awal: ${name} (${sku}) - ${stock} units`,
-          date: new Date(),
-          createdById: userId,
+          storeId, productId, name, sku, barcode, price, cost, stock,
+          lowStockAt,    // FIX: lowStock → lowStockAt
+          pointsPerUnit, // FIX: points → pointsPerUnit
+          type: type as 'READY_STOCK' | 'PREORDER',
         },
       });
-    }
+
+      if (!isPreorder && stock > 0) {
+        // FIX: type pakai MovementType enum (PURCHASE, bukan 'IN')
+        // FIX: quantity signed — positif = masuk
+        await tx.stockMovement.create({
+          data: { storeId, variantId: variant.id, type: 'PURCHASE', quantity: stock, notes: 'Stok Awal' },
+        });
+
+        // FIX: hapus createdById, ganti date → occurredAt
+        await tx.cashflow.create({
+          data: {
+            storeId,
+            type:        'EXPENSE',
+            category:    'Pembelian Inventaris',
+            amount:      cost * stock,
+            description: `Penambahan Stok Awal: ${name} (${sku}) - ${stock} unit`,
+            occurredAt:  new Date(), // FIX: was date: new Date()
+          },
+        });
+      }
+    });
 
     revalidatePath(`/${storeSlug}/admin/inventory/products`);
     revalidatePath(`/${storeSlug}/manager/inventory/products`);
@@ -192,25 +204,27 @@ export async function updateVariantAction(id: string, formData: FormData) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const name       = formData.get('name')      as string;
-    const sku        = formData.get('sku')        as string;
-    const barcodeRaw = (formData.get('barcode') as string)?.trim() || '';
-    const barcode    = barcodeRaw !== '' ? barcodeRaw : null;
-    const price      = parseFloat(formData.get('price')    as string);
-    const cost       = parseFloat(formData.get('cost')     as string);
-    const lowStock   = parseInt(formData.get('lowStock')   as string);
-    const points     = parseInt(formData.get('points')     as string) || 0;
-    const type       = (formData.get('type') as string) || 'READY_STOCK';
+    const name        = formData.get('name')    as string;
+    const sku         = formData.get('sku')     as string;
+    const barcodeRaw  = (formData.get('barcode') as string)?.trim() || '';
+    const barcode     = barcodeRaw !== '' ? barcodeRaw : null;
+    const price       = parseFloat(formData.get('price')         as string);
+    const cost        = parseFloat(formData.get('cost')          as string);
+    // FIX: lowStock → lowStockAt
+    const lowStockAt  = parseInt(formData.get('lowStockAt') as string ?? formData.get('lowStock') as string);
+    // FIX: points → pointsPerUnit
+    const pointsPerUnit = parseInt(formData.get('pointsPerUnit') as string ?? formData.get('points') as string) || 0;
+    const type        = (formData.get('type') as string) || 'READY_STOCK';
 
-    if (!name || !sku || isNaN(price) || isNaN(cost) || isNaN(lowStock)) {
+    if (!name || !sku || isNaN(price) || isNaN(cost) || isNaN(lowStockAt)) {
       return { success: false, error: 'Semua field wajib diisi' };
     }
-    if (price < 0 || cost < 0) return { success: false, error: 'Harga tidak boleh negatif' };
-    if (lowStock < 0) return { success: false, error: 'Stok minimum tidak boleh negatif' };
+    if (price < 0 || cost < 0)  return { success: false, error: 'Harga tidak boleh negatif' };
+    if (lowStockAt < 0)          return { success: false, error: 'Stok minimum tidak boleh negatif' };
 
     const variant = await db.productVariant.findFirst({ where: { id, storeId } });
     if (!variant) return { success: false, error: 'Varian tidak ditemukan' };
@@ -223,7 +237,10 @@ export async function updateVariantAction(id: string, formData: FormData) {
       if (existingBarcode) return { success: false, error: 'Barcode sudah digunakan oleh varian lain' };
     }
 
-    await db.productVariant.update({ where: { id }, data: { name, sku, barcode, price, cost, lowStock, points, type: type as 'READY_STOCK' | 'PREORDER' } });
+    await db.productVariant.update({
+      where: { id },
+      data:  { name, sku, barcode, price, cost, lowStockAt, pointsPerUnit, type: type as 'READY_STOCK' | 'PREORDER' },
+    });
 
     revalidatePath(`/${storeSlug}/admin/inventory/products`);
     revalidatePath(`/${storeSlug}/manager/inventory/products`);
@@ -238,7 +255,7 @@ export async function deleteVariantAction(id: string) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -262,7 +279,7 @@ export async function toggleProductActiveAction(id: string, isActive: boolean) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -284,7 +301,7 @@ export async function toggleVariantActiveAction(id: string, isActive: boolean) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR' && storeRole !== 'MANAGER') {
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 

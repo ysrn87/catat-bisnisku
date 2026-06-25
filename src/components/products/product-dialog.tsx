@@ -22,7 +22,7 @@ interface ProductDialogProps {
     id: string;
     name: string;
     description: string | null;
-    sku: string;
+    sku?: string;
     type?: string;
     categoryId?: string | null;
   };

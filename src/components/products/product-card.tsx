@@ -26,9 +26,9 @@ interface Variant {
   price: number;
   cost: number;
   stock: number;
-  lowStock: number;
+  lowStockAt: number;
   isActive: boolean;
-  points: number;
+  pointsPerUnit: number;
   type: string;
 }
 
@@ -37,9 +37,7 @@ interface ProductCardProps {
     id: string;
     name: string;
     description: string | null;
-    sku: string;
     isActive: boolean;
-    type: string;
     variants: Variant[];
     category?: { id: string; name: string; color: string | null; icon: string | null } | null;
   };
@@ -96,7 +94,6 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                 )}
               </div>
               <p className="text-[11px] sm:text-sm text-muted-foreground mt-1">
-                SKU: {product.sku} •{' '}
                 <button
                   onClick={() => setVariantsOpen((v) => !v)}
                   className="hover:text-[#028697] transition-colors"
@@ -133,8 +130,6 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                 id: product.id,
                 name: product.name,
                 description: product.description,
-                sku: product.sku,
-                type: product.type,
                 categoryId: product.category?.id ?? null,
               }}
             />
@@ -160,7 +155,7 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
               )}
               Varian
             </Button>
-            <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
+            <VariantDialog mode="create" productId={product.id} productSku={undefined} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
           </div>
         )}
 
@@ -197,7 +192,7 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                     ? 'Belum ada varian tersedia'
                     : `No ${filterStatus} variants found`}
                 </p>
-                <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
+                <VariantDialog mode="create" productId={product.id} productSku={undefined} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
               </div>
             ) : (
               <>
@@ -237,9 +232,9 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                             {vIsPreorder ? (
                               <span className="text-amber-500 font-medium">—</span>
                             ) : (
-                              <span className={variant.stock <= variant.lowStock ? 'text-red-600 font-semibold' : ''}>
+                              <span className={variant.stock <= variant.lowStockAt ? 'text-red-600 font-semibold' : ''}>
                                 {variant.stock}
-                                {variant.stock <= variant.lowStock && (
+                                {variant.stock <= variant.lowStockAt && (
                                   <span className="ml-1 text-[10px] text-red-500">⚠</span>
                                 )}
                               </span>
@@ -265,8 +260,8 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                                   price: variant.price,
                                   cost: variant.cost,
                                   stock: variant.stock,
-                                  lowStock: variant.lowStock,
-                                  points: variant.points,
+                                  lowStockAt: variant.lowStockAt,
+                                  pointsPerUnit: variant.pointsPerUnit,
                                 }}
                               />
                               <VariantDeleteButton variantId={variant.id} />
@@ -317,13 +312,13 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                             <p className="text-[10px] text-gray-500">Stok</p>
                             <p
                               className={`text-[12px] font-semibold ${
-                                variant.stock <= variant.lowStock
+                                variant.stock <= variant.lowStockAt
                                   ? 'text-red-600'
                                   : 'text-gray-900'
                               }`}
                             >
                               {variant.stock} unit
-                              {variant.stock <= variant.lowStock && (
+                              {variant.stock <= variant.lowStockAt && (
                                 <span className="ml-1 text-[10px]">⚠</span>
                               )}
                             </p>
@@ -350,8 +345,8 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                             price: variant.price,
                             cost: variant.cost,
                             stock: variant.stock,
-                            lowStock: variant.lowStock,
-                            points: variant.points,
+                            lowStockAt: variant.lowStockAt,
+                            pointsPerUnit: variant.pointsPerUnit,
                           }}
                         />
                         <VariantDeleteButton variantId={variant.id} />

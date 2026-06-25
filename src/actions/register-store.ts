@@ -5,7 +5,6 @@ import bcrypt from 'bcryptjs';
 import { headers } from 'next/headers';
 import { checkRegisterStoreLimit, getIP } from '@/lib/ratelimit';
 
-
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -120,12 +119,14 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
         ];
 
         for (const s of defaultSettings) {
-          await tx.settings.upsert({
+          await tx.storeSetting.upsert({
             where:  { storeId_key: { storeId: newStore.id, key: s.key } },
             update: {},
             create: { storeId: newStore.id, key: s.key, value: s.value, description: s.description, updatedAt: new Date() },
           });
         }
+
+        // FIX: hapus syncGlobalRole — tidak diperlukan lagi (otorisasi 100% dari StoreUser.role)
 
         return newStore;
       });
@@ -152,7 +153,6 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
           phone:    ownerPhone,
           email:    ownerEmail,
           password: hashedPassword,
-          role:     'ADMINISTRATOR',
         },
       });
 
@@ -177,12 +177,14 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
       ];
 
       for (const s of defaultSettings) {
-        await tx.settings.upsert({
+        await tx.storeSetting.upsert({
           where:  { storeId_key: { storeId: newStore.id, key: s.key } },
           update: {},
           create: { storeId: newStore.id, key: s.key, value: s.value, description: s.description, updatedAt: new Date() },
         });
       }
+
+      // FIX: hapus syncGlobalRole — tidak diperlukan lagi (otorisasi 100% dari StoreUser.role)
 
       return newStore;
     });

@@ -10,9 +10,9 @@ import { auth } from '@/auth';
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 export async function getSetting(key: string): Promise<string | null> {
-  // requireStoreAccess memastikan user terautentikasi dan punya akses ke store
   const { storeId } = await requireStoreAccess();
-  const setting = await db.settings.findUnique({
+  // FIX: db.settings → db.storeSetting
+  const setting = await db.storeSetting.findUnique({
     where: { storeId_key: { storeId, key } },
   });
   return setting?.value ?? null;
@@ -25,8 +25,9 @@ export async function getPointsConversionRate(): Promise<number> {
 
 export async function getAllSettings() {
   const { storeId } = await requireStoreAccess();
-  const settings = await db.settings.findMany({
-    where: { storeId },
+  // FIX: db.settings → db.storeSetting
+  const settings = await db.storeSetting.findMany({
+    where:   { storeId },
     orderBy: { key: 'asc' },
   });
 
@@ -47,10 +48,11 @@ export async function updateSetting(key: string, value: string, description?: st
     throw new Error('Unauthorized - Admin access required');
   }
 
-  await db.settings.upsert({
+  // FIX: db.settings → db.storeSetting (tidak ada field updatedAt manual, sudah @updatedAt)
+  await db.storeSetting.upsert({
     where:  { storeId_key: { storeId, key } },
     update: { value, description: description ?? undefined },
-    create: { storeId, key, value, description: description ?? undefined, updatedAt: new Date() },
+    create: { storeId, key, value, description: description ?? undefined },
   });
 
   revalidatePath(`/${storeSlug}/admin/settings`);
@@ -87,10 +89,11 @@ export async function initializeSettings() {
   ];
 
   for (const s of defaults) {
-    await db.settings.upsert({
+    // FIX: db.settings → db.storeSetting
+    await db.storeSetting.upsert({
       where:  { storeId_key: { storeId, key: s.key } },
       update: {},
-      create: { storeId, key: s.key, value: s.value, description: s.description, updatedAt: new Date() },
+      create: { storeId, key: s.key, value: s.value, description: s.description },
     });
   }
 
@@ -107,8 +110,9 @@ export async function getAdminProfile() {
 
   const session = await auth();
   const admin = await db.user.findUnique({
-    where: { id: session!.user.id },
-    select: { id: true, name: true, email: true, phone: true, address: true },
+    where:  { id: session!.user.id },
+    // FIX: hapus address — field ini tidak ada di User lagi
+    select: { id: true, name: true, email: true, phone: true },
   });
 
   if (!admin) throw new Error('Admin not found');
@@ -116,7 +120,8 @@ export async function getAdminProfile() {
 }
 
 export async function updateAdminProfile(data: {
-  name?: string; email?: string; phone?: string; address?: string;
+  name?: string; email?: string; phone?: string;
+  // FIX: address dihapus dari parameter
 }) {
   const { storeSlug, storeRole } = await requireStoreAccess();
   if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
@@ -124,7 +129,7 @@ export async function updateAdminProfile(data: {
   }
 
   const session = await auth();
-  const userId = session!.user.id;
+  const userId  = session!.user.id;
 
   if (data.email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -143,10 +148,10 @@ export async function updateAdminProfile(data: {
   await db.user.update({
     where: { id: userId },
     data: {
-      ...(data.name    && { name:    data.name }),
-      ...(data.email   && { email:   data.email }),
-      ...(data.phone   && { phone:   data.phone }),
-      ...(data.address !== undefined && { address: data.address }),
+      ...(data.name  && { name:  data.name }),
+      ...(data.email && { email: data.email }),
+      ...(data.phone && { phone: data.phone }),
+      // FIX: hapus address
     },
   });
 
@@ -160,9 +165,9 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
   }
 
   const session = await auth();
-  const admin = await db.user.findUnique({ where: { id: session!.user.id } });
+  const admin   = await db.user.findUnique({ where: { id: session!.user.id } });
   if (!admin) throw new Error('Admin not found');
-  if (!admin.password) throw new Error('Akun ini belum memiliki password. Silakan set password melalui halaman profil.');
+  if (!admin.password) throw new Error('Akun ini belum memiliki password.');
 
   const isValid = await bcrypt.compare(currentPassword, admin.password);
   if (!isValid) throw new Error('Password saat ini tidak benar');
@@ -170,7 +175,7 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
 
   await db.user.update({
     where: { id: admin.id },
-    data: { password: await bcrypt.hash(newPassword, 10) },
+    data:  { password: await bcrypt.hash(newPassword, 10) },
   });
 
   revalidatePath(`/${storeSlug}/admin/settings`);
@@ -178,11 +183,6 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
 
 // ─── Branding ─────────────────────────────────────────────────────────────────
 
-/**
- * Update logo toko — hanya PRO.
- * Menerima base64 string dari client (max ~100KB setelah kompresi).
- * Disimpan langsung di kolom logoUrl sebagai data URL.
- */
 export async function updateStoreBrandingAction(logoBase64: string | null): Promise<
   { success: true } | { success: false; error: string }
 > {
@@ -193,33 +193,28 @@ export async function updateStoreBrandingAction(logoBase64: string | null): Prom
       return { success: false, error: 'Fitur custom branding hanya tersedia untuk plan PRO.' };
     }
 
-    // Validasi ukuran: base64 ≈ 4/3 ukuran asli, 150KB base64 ≈ 112KB file
     if (logoBase64 && logoBase64.length > 150_000) {
-      return { success: false, error: 'Ukuran logo maksimal 100KB. Kompres gambar terlebih dahulu.' };
+      return { success: false, error: 'Ukuran logo maksimal 100KB.' };
     }
 
     await db.store.update({
       where: { id: storeId },
-      data: { logoUrl: logoBase64 },
+      data:  { logoUrl: logoBase64 },
     });
 
     revalidatePath(`/${storeSlug}/admin`);
     revalidatePath(`/${storeSlug}/admin/settings/profile`);
     return { success: true };
-
   } catch (error) {
     console.error('updateStoreBranding error:', error);
     return { success: false, error: 'Gagal menyimpan logo.' };
   }
 }
 
-/**
- * Ambil data branding toko saat ini.
- */
 export async function getStoreBranding(): Promise<{ logoUrl: string | null; storeName: string }> {
   const { storeId } = await requireStoreAccess();
   const store = await db.store.findUnique({
-    where: { id: storeId },
+    where:  { id: storeId },
     select: { name: true, logoUrl: true },
   });
   return { logoUrl: store?.logoUrl ?? null, storeName: store?.name ?? '' };

@@ -46,7 +46,7 @@ interface EditSaleDialogProps {
     name: string;
     price: number;
     stock: number;
-    points: number;
+    pointsPerUnit: number;
     product: { name: string };
   }>;
   conversionRate?: number;

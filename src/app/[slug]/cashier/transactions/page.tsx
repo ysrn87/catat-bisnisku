@@ -2,7 +2,6 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { NewSaleDialog } from '@/components/sales/new-sale-dialog';
 import { SalesTable } from '@/components/sales/sales-table';
 import { getPointsConversionRate } from '@/actions/settings';
 import { SearchFilterBar } from '@/components/filters/search-filter-bar';
@@ -14,18 +13,19 @@ async function getSales(storeId: string, cashierId: string, params: {
 }) {
   const { page = 1, limit = 10, search = '', payment = 'all', paymentStatus = 'all', sort = 'date_desc' } = params;
   const skip = (page - 1) * limit;
-  // Hanya transaksi yang dibuat oleh kasir ini sendiri
+  // Hanya transaksi kasir ini
   const where: any = { storeId, cashierId };
 
   if (search) {
     where.OR = [
-      { customer: { name: { contains: search, mode: 'insensitive' as const } } },
+      { customer:   { name: { contains: search, mode: 'insensitive' as const } } },
       { saleNumber: { contains: search, mode: 'insensitive' as const } },
     ];
   }
 
-  if (payment !== 'all') where.paymentMethod = payment;
-  if (paymentStatus !== 'all') where.paymentStatus = paymentStatus;
+  // FIX: filter via Payment relation
+  if (payment !== 'all')       where.payment = { method: payment };
+  if (paymentStatus !== 'all') where.payment = { ...(where.payment ?? {}), status: paymentStatus };
 
   const orderBy: any = [];
   switch (sort) {
@@ -40,25 +40,24 @@ async function getSales(storeId: string, cashierId: string, params: {
       where, skip, take: limit, orderBy,
       include: {
         customer: { select: { name: true, email: true, phone: true, address: true } },
-        cashier: { select: { name: true } },
-        items: { include: { variant: { include: { product: true } } } },
+        cashier:  { select: { name: true } },
+        payment:  { select: { method: true, status: true } }, // FIX
+        items:    { include: { variant: { include: { product: true } } } },
       },
     }),
     db.sale.count({ where }),
   ]);
 
   return {
-    sales: sales.map((sale: typeof sales[number]) => {
+    sales: sales.map((sale) => {
       const { subtotal, discount, tax, total, items, ...rest } = sale;
-      const ongkir = (rest as any).ongkir; delete (rest as any).ongkir;
       return {
         ...rest,
         subtotal: Number(subtotal), discount: Number(discount),
-        tax: Number(tax), ongkir: Number(ongkir), total: Number(total),
-        items: items.map((item: typeof items[number]) => {
-          const { price, subtotal: s, variant, ...ir } = item;
-          const { price: vp, cost: vc, ...vr } = variant;
-          return { ...ir, price: Number(price), subtotal: Number(s), variant: { ...vr, price: Number(vp), cost: Number(vc) } };
+        tax: Number(tax), ongkir: Number(sale.ongkir), total: Number(total),
+        items: items.map((item) => {
+          const { price: vp, cost: vc, ...vr } = item.variant;
+          return { ...item, price: Number(item.price), subtotal: Number(item.subtotal), variant: { ...vr, price: Number(vp), cost: Number(vc) } };
         }),
       };
     }),
@@ -68,28 +67,20 @@ async function getSales(storeId: string, cashierId: string, params: {
 
 async function getVariants(storeId: string) {
   const variants = await db.productVariant.findMany({
-    where: {
-      storeId,
-      isActive: true,
-      product: { isActive: true },
-      OR: [{ stock: { gt: 0 } }, { type: 'PREORDER' }],
-    },
+    where: { storeId, isActive: true, product: { isActive: true }, OR: [{ stock: { gt: 0 } }, { type: 'PREORDER' }] },
     include: { product: { select: { name: true } } },
     orderBy: { product: { name: 'asc' } },
   });
-  return variants.map((v: typeof variants[number]) => ({
-    id: v.id, name: v.name, price: Number(v.price),
-    stock: v.stock, points: v.points, barcode: v.barcode ?? null,
-    type: v.type,
+  return variants.map((v) => ({
+    id: v.id, name: v.name, price: Number(v.price), stock: v.stock,
+    pointsPerUnit: v.pointsPerUnit, // FIX
+    barcode: v.barcode ?? null, type: v.type,
     product: { name: v.product.name },
   }));
 }
 
 async function getMembers(storeId: string) {
-  const storeUsers = await db.storeUser.findMany({
-    where: { storeId, role: 'MEMBER' },
-    include: { user: { select: { id: true, name: true } } },
-  });
+  const storeUsers = await db.storeUser.findMany({ where: { storeId, role: 'MEMBER' }, include: { user: { select: { id: true, name: true } } } });
   return storeUsers.map((su) => ({ ...su.user, points: su.points }));
 }
 
@@ -99,21 +90,13 @@ async function getNonMembers(storeId: string) {
     include: { user: { select: { id: true, name: true, phone: true, address: true } } },
     orderBy: { user: { name: 'asc' } },
   });
-  return storeUsers.map((su) => ({
-    id: su.user.id, name: su.user.name,
-    phone: su.user.phone, address: su.user.address ?? '',
-  }));
+  return storeUsers.map((su) => ({ id: su.user.id, name: su.user.name, phone: su.user.phone, address: su.user.address ?? '' }));
 }
 
-export default async function CashierTransactionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    page?: string; limit?: string; search?: string;
-    payment?: string; paymentStatus?: string; sort?: string;
-  }>;
+export default async function CashierTransactionsPage({ searchParams }: {
+  searchParams: Promise<{ page?: string; limit?: string; search?: string; payment?: string; paymentStatus?: string; sort?: string }>;
 }) {
-  const p = await searchParams;
+  const p             = await searchParams;
   const page          = Number(p.page)  || 1;
   const limit         = Number(p.limit) || 10;
   const search        = p.search        || '';
@@ -132,6 +115,7 @@ export default async function CashierTransactionsPage({
     getPointsConversionRate(),
   ]);
 
+  // FIX: userRole dari StoreUser, bukan session.user.role
   const storeUser = await db.storeUser.findUnique({
     where: { storeId_userId: { storeId, userId: cashierId } },
     select: { role: true },
@@ -140,35 +124,21 @@ export default async function CashierTransactionsPage({
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <SalesActions
-        variants={variants}
-        customers={members}
-        walkInCustomers={nonMembers}
-        conversionRate={conversionRate}
-      />
-
+      <SalesActions variants={variants} customers={members} walkInCustomers={nonMembers} conversionRate={conversionRate} />
       <Card>
-        <CardHeader>
-          <CardTitle className="text-sm sm:text-xl">Transaksi Saya</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-sm sm:text-xl">Transaksi Saya</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <SearchFilterBar
             searchPlaceholder="Cari customer atau nomor penjualan..."
             filters={[
-              {
-                key: 'payment', label: 'Metode Pembayaran', defaultValue: 'all',
-                options: [
-                  { value: 'all', label: 'Semua Metode' }, { value: 'CASH', label: 'Cash' },
-                  { value: 'CARD', label: 'Card' }, { value: 'TRANSFER', label: 'Transfer Bank' },
-                ],
-              },
-              {
-                key: 'paymentStatus', label: 'Status Pembayaran', defaultValue: 'all',
-                options: [
-                  { value: 'all', label: 'Semua Status' }, { value: 'PAID', label: 'Lunas' },
-                  { value: 'PENDING', label: 'Pending' }, { value: 'UNPAID', label: 'Belum Lunas' },
-                ],
-              },
+              { key: 'payment', label: 'Metode Pembayaran', defaultValue: 'all', options: [
+                { value: 'all', label: 'Semua Metode' }, { value: 'CASH', label: 'Cash' },
+                { value: 'QRIS', label: 'QRIS' }, { value: 'TRANSFER', label: 'Transfer Bank' },
+              ]},
+              { key: 'paymentStatus', label: 'Status Pembayaran', defaultValue: 'all', options: [
+                { value: 'all', label: 'Semua Status' }, { value: 'PAID', label: 'Lunas' },
+                { value: 'PENDING', label: 'Pending' }, { value: 'FAILED', label: 'Gagal' },
+              ]},
             ]}
             sortOptions={[
               { value: 'date_desc', label: 'Terbaru' }, { value: 'date_asc', label: 'Terlama' },
@@ -176,15 +146,7 @@ export default async function CashierTransactionsPage({
             ]}
             defaultSort="date_desc"
           />
-          <SalesTable
-            sales={sales}
-            currentPage={page}
-            pageSize={limit}
-            totalItems={total}
-            conversionRate={conversionRate}
-            userRole={userRole}
-            variants={variants}
-          />
+          <SalesTable sales={sales} currentPage={page} pageSize={limit} totalItems={total} conversionRate={conversionRate} userRole={userRole} variants={variants} />
         </CardContent>
       </Card>
     </div>

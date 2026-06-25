@@ -7,7 +7,7 @@ import { Pagination } from '@/components/ui/pagination';
 
 interface PointHistory {
   id: string;
-  points: number;
+  delta: number;
   description: string;
   createdAt: Date;
 }
@@ -57,12 +57,12 @@ export function PointsHistoryTable({
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`p-2 rounded-full ${history.points > 0
+                    className={`p-2 rounded-full ${history.delta > 0
                       ? 'bg-green-100 text-green-600'
                       : 'bg-red-100 text-red-600'
                       }`}
                   >
-                    {history.points > 0 ? (
+                    {history.delta > 0 ? (
                       <TrendingUp className="w-4 h-4" />
                     ) : (
                       <TrendingDown className="w-4 h-4" />
@@ -76,11 +76,11 @@ export function PointsHistoryTable({
                   </div>
                 </div>
                 <div
-                  className={`text-lg font-bold ${history.points > 0 ? 'text-green-600' : 'text-red-600'
+                  className={`text-lg font-bold ${history.delta > 0 ? 'text-green-600' : 'text-red-600'
                     }`}
                 >
-                  {history.points > 0 ? '+' : ''}
-                  {history.points}
+                  {history.delta > 0 ? '+' : ''}
+                  {history.delta}
                 </div>
               </div>
             ))}

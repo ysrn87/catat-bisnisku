@@ -23,19 +23,22 @@ async function getCashflowData(storeId: string, params: {
   }
   if (type !== 'all') where.type = type;
   if (dateFrom || dateTo) {
-    where.date = {};
-    if (dateFrom) where.date.gte = new Date(dateFrom);
-    if (dateTo)   where.date.lte = new Date(dateTo + 'T23:59:59');
+    // FIX: where.date → where.occurredAt
+    where.occurredAt = {};
+    if (dateFrom) where.occurredAt.gte = new Date(dateFrom);
+    if (dateTo)   where.occurredAt.lte = new Date(dateTo + 'T23:59:59');
   }
 
+  // FIX: orderBy date → occurredAt
   const orderBy: any =
-    sort === 'date_asc'    ? [{ date: 'asc' }] :
+    sort === 'date_asc'    ? [{ occurredAt: 'asc' }] :
     sort === 'amount_asc'  ? [{ amount: 'asc' }] :
     sort === 'amount_desc' ? [{ amount: 'desc' }] :
-    [{ date: 'desc' }];
+    [{ occurredAt: 'desc' }];
 
   const [transactions, total] = await Promise.all([
-    db.cashflow.findMany({ where, skip, take: limit, orderBy, include: { createdBy: { select: { name: true } } } }),
+    // FIX: hapus include createdBy — tidak ada di schema baru
+    db.cashflow.findMany({ where, skip, take: limit, orderBy }),
     db.cashflow.count({ where }),
   ]);
 
@@ -48,9 +51,10 @@ async function getCashflowData(storeId: string, params: {
 async function getCashflowStats(storeId: string, dateFrom?: string, dateTo?: string) {
   const dateFilter: any = {};
   if (dateFrom || dateTo) {
-    dateFilter.date = {};
-    if (dateFrom) dateFilter.date.gte = new Date(dateFrom);
-    if (dateTo)   dateFilter.date.lte = new Date(dateTo + 'T23:59:59');
+    // FIX: where.date → where.occurredAt
+    dateFilter.occurredAt = {};
+    if (dateFrom) dateFilter.occurredAt.gte = new Date(dateFrom);
+    if (dateTo)   dateFilter.occurredAt.lte = new Date(dateTo + 'T23:59:59');
   }
 
   const [inc, exp] = await Promise.all([
@@ -62,13 +66,12 @@ async function getCashflowStats(storeId: string, dateFrom?: string, dateTo?: str
   return { income, expense, balance: income - expense };
 }
 
-// Get distinct categories for the combobox (manual entries only, excludes sale-generated categories)
 async function getCashflowCategories(storeId: string): Promise<string[]> {
   const rows = await db.cashflow.findMany({
-    where: { storeId, saleId: null },
-    select: { category: true },
+    where:    { storeId, saleId: null },
+    select:   { category: true },
     distinct: ['category'],
-    orderBy: { category: 'asc' },
+    orderBy:  { category: 'asc' },
   });
   return rows.map((r) => r.category);
 }
@@ -80,15 +83,7 @@ export default async function CashflowPage({ searchParams }: {
   const { storeId } = await getStoreContext();
 
   const [{ transactions, total }, stats, existingCategories] = await Promise.all([
-    getCashflowData(storeId, {
-      page: Number(p.page) || 1,
-      limit: Number(p.limit) || 10,
-      search: p.search,
-      type: p.type,
-      sort: p.sort,
-      dateFrom: p.dateFrom,
-      dateTo: p.dateTo,
-    }),
+    getCashflowData(storeId, { page: Number(p.page) || 1, limit: Number(p.limit) || 10, search: p.search, type: p.type, sort: p.sort, dateFrom: p.dateFrom, dateTo: p.dateTo }),
     getCashflowStats(storeId, p.dateFrom, p.dateTo),
     getCashflowCategories(storeId),
   ]);
@@ -99,7 +94,6 @@ export default async function CashflowPage({ searchParams }: {
     <div className="space-y-6 md:space-y-8">
       <CashflowActions existingCategories={existingCategories} />
 
-      {/* Stats — scoped to current date filter */}
       <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -154,12 +148,7 @@ export default async function CashflowPage({ searchParams }: {
             defaultSort="date_desc"
             dateRangeKeys={{ from: 'dateFrom', to: 'dateTo' }}
           />
-          <CashflowTable
-            transactions={transactions}
-            currentPage={Number(p.page) || 1}
-            pageSize={Number(p.limit) || 10}
-            totalItems={total}
-          />
+          <CashflowTable transactions={transactions} currentPage={Number(p.page) || 1} pageSize={Number(p.limit) || 10} totalItems={total} />
         </CardContent>
       </Card>
     </div>

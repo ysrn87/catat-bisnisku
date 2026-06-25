@@ -13,7 +13,8 @@ async function getInventoryReport(storeId: string, page = 1, limit = 10) {
   const [inventory, totalProducts, lowStockCount] = await Promise.all([
     db.productVariant.findMany({ where: { storeId }, skip, take: limit, include: { product: true }, orderBy: { stock: 'asc' } }),
     db.productVariant.count({ where: { storeId } }),
-    db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStock } } }),
+    // FIX: lowStock → lowStockAt
+    db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } } }),
   ]);
 
   const serialized = inventory.map((i) => ({ ...i, price: Number(i.price), cost: Number(i.cost) }));
@@ -38,36 +39,9 @@ export default async function InventoryReportsPage({ params, searchParams }: {
   return (
     <div className="space-y-8">
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Nilai Inventori</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(data.inventoryValue)}</div>
-            <p className="text-xs text-muted-foreground">{data.totalProducts} produk</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estimasi Harga Jual</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(data.inventoryPrice)}</div>
-            <p className="text-xs text-muted-foreground">{data.totalProducts} produk</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stok Menipis</CardTitle>
-            <Package className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{data.lowStockCount}</div>
-            <p className="text-xs text-muted-foreground">Butuh penambahan</p>
-          </CardContent>
-        </Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Nilai Inventori</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(data.inventoryValue)}</div><p className="text-xs text-muted-foreground">{data.totalProducts} produk</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Estimasi Harga Jual</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(data.inventoryPrice)}</div><p className="text-xs text-muted-foreground">{data.totalProducts} produk</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Stok Menipis</CardTitle><Package className="h-4 w-4 text-red-500" /></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">{data.lowStockCount}</div><p className="text-xs text-muted-foreground">Butuh penambahan</p></CardContent></Card>
       </div>
 
       <Tabs defaultValue="inventory" className="space-y-4">

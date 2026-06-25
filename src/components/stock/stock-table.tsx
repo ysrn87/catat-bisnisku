@@ -11,7 +11,7 @@ interface StockItem {
   name: string;
   sku: string;
   stock: number;
-  lowStock: number;
+  lowStockAt: number;
   type: string;
   product: {
     name: string;
@@ -75,7 +75,7 @@ export function StockTable({
             ) : (
               stockItems.map((item) => {
                 const isPreorder = item.type === 'PREORDER';
-                const isLowStock = !isPreorder && item.stock <= item.lowStock;
+                const isLowStock = !isPreorder && item.stock <= item.lowStockAt;
                 return (
                   <TableRow key={item.id} className={isPreorder ? 'bg-amber-50/40' : ''}>
                     <TableCell className="font-mono">{item.sku}</TableCell>
@@ -94,7 +94,7 @@ export function StockTable({
                       {isPreorder ? (
                         <span className="text-amber-500/60">—</span>
                       ) : (
-                        item.lowStock
+                        item.lowStockAt
                       )}
                     </TableCell>
                     <TableCell>
@@ -145,7 +145,7 @@ export function StockTable({
         ) : (
           stockItems.map((item) => {
             const isPreorder = item.type === 'PREORDER';
-            const isLowStock = !isPreorder && item.stock <= item.lowStock;
+            const isLowStock = !isPreorder && item.stock <= item.lowStockAt;
             return (
               <div
                 key={item.id}
@@ -194,7 +194,7 @@ export function StockTable({
                     {isPreorder ? (
                       <p className="text-xs font-bold text-amber-500/60">—</p>
                     ) : (
-                      <p className="text-xs font-semibold text-gray-700">{item.lowStock}</p>
+                      <p className="text-xs font-semibold text-gray-700">{item.lowStockAt}</p>
                     )}
                   </div>
                 </div>

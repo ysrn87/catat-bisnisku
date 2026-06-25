@@ -35,7 +35,7 @@ export default async function StoreSelectPage() {
         select: { id: true, name: true, slug: true, plan: true },
       },
     },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { joinedAt: 'asc' },
   });
 
   // Kalau cuma punya 1 toko → langsung redirect

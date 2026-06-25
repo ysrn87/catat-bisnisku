@@ -16,10 +16,8 @@ interface Transaction {
   amount: number;
   category: string;
   description: string | null;
-  date: Date;
-  time: string | null;
+  occurredAt: Date;
   saleId: string | null;
-  createdBy: { name: string };
 }
 
 interface CashflowTableProps {
@@ -65,8 +63,7 @@ function DeleteButton({ id }: { id: string }) {
 }
 
 function formatTimeLabel(t: Transaction): string {
-  if (t.time) return t.time;
-  const d = new Date(t.date);
+  const d = new Date(t.occurredAt);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
@@ -101,14 +98,13 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
               <TableHead>Kategori</TableHead>
               <TableHead>Deskripsi</TableHead>
               <TableHead className="text-right">Jumlah</TableHead>
-              <TableHead>Pencatat</TableHead>
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
           <TableBody className="text-xs">
             {transactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                   Belum ada transaksi
                 </TableCell>
               </TableRow>
@@ -117,7 +113,7 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                 const isLocked = !!t.saleId;
                 return (
                 <TableRow key={t.id} className={isLocked ? 'bg-gray-50/50' : ''}>
-                  <TableCell className="whitespace-nowrap">{formatDate(t.date)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{formatDate(t.occurredAt)}</TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">{formatTimeLabel(t)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -140,12 +136,20 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                       {t.type === 'INCOME' ? '+' : '−'}{formatCurrency(t.amount)}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{t.createdBy.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <CashflowDialog
                         mode="edit"
-                        transaction={{ ...t, type: t.type as 'INCOME' | 'EXPENSE', description: t.description ?? '', date: new Date(t.date), time: t.time, saleId: t.saleId }}
+                        transaction={{
+                          id: t.id,
+                          type: t.type as 'INCOME' | 'EXPENSE',
+                          amount: t.amount,
+                          category: t.category,
+                          description: t.description ?? '',
+                          date: new Date(t.occurredAt),
+                          time: formatTimeLabel(t),
+                          saleId: t.saleId,
+                        }}
                       />
                       {!isLocked && <DeleteButton id={t.id} />}
                     </div>
@@ -179,7 +183,7 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                       <p className={`text-sm font-bold ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
                         {isIncome ? 'Pemasukan' : 'Pengeluaran'}
                       </p>
-                      <p className="text-xs text-gray-500">{formatDate(t.date)} · {formatTimeLabel(t)}</p>
+                      <p className="text-xs text-gray-500">{formatDate(t.occurredAt)} · {formatTimeLabel(t)}</p>
                     </div>
                   </div>
                   <div className={`text-base font-bold shrink-0 ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
@@ -199,12 +203,20 @@ export function CashflowTable({ transactions, currentPage, pageSize, totalItems 
                       <p className="text-xs text-gray-500">{t.description}</p>
                     </div>
                   )}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <p className="text-xs text-gray-400">Pencatat: {t.createdBy.name}</p>
+                  <div className="flex items-center justify-end pt-2 border-t border-gray-100">
                     <div className="flex gap-1">
                       <CashflowDialog
                         mode="edit"
-                        transaction={{ ...t, type: t.type as 'INCOME' | 'EXPENSE', description: t.description ?? '', date: new Date(t.date), time: t.time, saleId: t.saleId }}
+                        transaction={{
+                          id: t.id,
+                          type: t.type as 'INCOME' | 'EXPENSE',
+                          amount: t.amount,
+                          category: t.category,
+                          description: t.description ?? '',
+                          date: new Date(t.occurredAt),
+                          time: formatTimeLabel(t),
+                          saleId: t.saleId,
+                        }}
                       />
                       {!isLocked && <DeleteButton id={t.id} />}
                     </div>

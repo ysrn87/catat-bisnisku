@@ -25,8 +25,8 @@ interface VariantDialogProps {
     price: number;
     cost: number;
     stock: number;
-    lowStock: number;
-    points: number;
+    lowStockAt: number;
+    pointsPerUnit: number;
   };
   trigger?: React.ReactNode;
 }
@@ -257,9 +257,9 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
 
   const [price, setPrice] = useState(variant?.price?.toString() || '');
   const [cost, setCost] = useState(variant?.cost?.toString() || '');
-  const [points, setPoints] = useState(variant?.points?.toString() || '0');
+  const [points, setPoints] = useState(variant?.pointsPerUnit?.toString() || '0');
   const [stock, setStock] = useState('0');
-  const [lowStock, setLowStock] = useState(variant?.lowStock?.toString() || '10');
+  const [lowStock, setLowStock] = useState(variant?.lowStockAt?.toString() || '10');
 
   const formatNumber = (value: string): string => {
     const cleanValue = value.replace(/[^\d.]/g, '');
@@ -340,9 +340,9 @@ export function VariantDialog({ mode, productId, productSku, variantCount = 0, d
       setShowBarcodeScanner(false);
       setPrice(formatNumber(variant?.price?.toString() || ''));
       setCost(formatNumber(variant?.cost?.toString() || ''));
-      setPoints(formatNumber(variant?.points?.toString() || '0'));
+      setPoints(formatNumber(variant?.pointsPerUnit?.toString() || '0'));
       setStock('0');
-      setLowStock(formatNumber(variant?.lowStock?.toString() || '10'));
+      setLowStock(formatNumber(variant?.lowStockAt?.toString() || '10'));
     } else {
       setShowBarcodeScanner(false);
     }

@@ -407,8 +407,8 @@ type Variant = {
   sku: string;
   price: number;
   stock: number;
-  lowStock: number;
-  points: number;
+  lowStockAt: number;
+  pointsPerUnit: number;
   type: string;
 };
 
@@ -431,7 +431,7 @@ function VariantGrid({
       {variants.map((variant) => {
         const isPreorder   = variant.type === 'PREORDER';
         const isOutOfStock = !isPreorder && variant.stock === 0;
-        const isLowStock   = !isPreorder && variant.stock > 0 && variant.stock <= variant.lowStock;
+        const isLowStock   = !isPreorder && variant.stock > 0 && variant.stock <= variant.lowStockAt;
 
         const stockBadge = isPreorder
           ? { bg: 'bg-amber-50 text-amber-700 border-amber-100', dot: '', label: 'Pre Order', icon: true }
@@ -464,9 +464,9 @@ function VariantGrid({
               </span>
               <div className="mt-auto">
                 <p className="text-base font-extrabold text-[#028697] leading-none">{formatCurrency(variant.price)}</p>
-                {variant.points > 0 && (
+                {variant.pointsPerUnit > 0 && (
                   <p className="text-[10px] text-amber-600 flex items-center gap-0.5 mt-1">
-                    <Star className="w-2.5 h-2.5" />+{variant.points} poin
+                    <Star className="w-2.5 h-2.5" />+{variant.pointsPerUnit} poin
                   </p>
                 )}
               </div>

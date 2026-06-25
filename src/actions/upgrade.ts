@@ -25,23 +25,31 @@ export async function createSnapToken(storeSlug: string): Promise<
     }
 
     const store = await db.store.findUnique({
-      where: { slug: storeSlug },
-      select: { id: true, name: true, plan: true, ownerId: true },
+      where:  { slug: storeSlug },
+      // FIX: tidak ada subscriptionExpiresAt — select field yang ada
+      select: { id: true, name: true, plan: true, ownerId: true, planExpiresAt: true },
     });
 
     if (!store) return { success: false, error: 'Toko tidak ditemukan' };
-    if (store.plan === 'PRO') return { success: false, error: 'Toko sudah PRO' };
+    if (store.plan === 'PRO') {
+      // Cek apakah PRO masih aktif
+      if (store.planExpiresAt && store.planExpiresAt > new Date()) {
+        return { success: false, error: 'Toko sudah PRO dan masih aktif' };
+      }
+    }
     if (store.ownerId !== session.user.id) return { success: false, error: 'Unauthorized' };
 
     const user = await db.user.findUnique({
-      where: { id: session.user.id },
+      where:  { id: session.user.id },
       select: { name: true, email: true, phone: true },
     });
 
     if (!user) return { success: false, error: 'User tidak ditemukan' };
 
     const serverKey = process.env.MIDTRANS_SERVER_KEY;
-    if (!serverKey) return { success: false, error: 'Mohon maaf, saat ini konfigurasi payment belum diatur, silahkan hubungi kami untuk upgrade.' };
+    if (!serverKey) {
+      return { success: false, error: 'Mohon maaf, konfigurasi payment belum diatur. Hubungi kami untuk upgrade.' };
+    }
 
     const isProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
     const baseUrl = isProduction
@@ -49,12 +57,11 @@ export async function createSnapToken(storeSlug: string): Promise<
       : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
     // Format: PRO-{slug}-{timestamp}
-    // Webhook akan parse slug dari format ini
     const orderId = `PRO-${storeSlug}-${Date.now()}`;
 
     const payload = {
       transaction_details: {
-        order_id: orderId,
+        order_id:     orderId,
         gross_amount: 99000,
       },
       item_details: [
@@ -67,8 +74,8 @@ export async function createSnapToken(storeSlug: string): Promise<
       ],
       customer_details: {
         first_name: user.name,
-        email:      user.email || undefined,
-        phone:      user.phone || undefined,
+        email:      user.email   || undefined,
+        phone:      user.phone   || undefined,
       },
       callbacks: {
         finish: `${process.env.NEXTAUTH_URL}/${storeSlug}/upgrade/success`,
@@ -91,7 +98,6 @@ export async function createSnapToken(storeSlug: string): Promise<
     }
 
     const data = await response.json() as { token: string; redirect_url: string };
-
     return { success: true, token: data.token, orderId };
 
   } catch (error) {

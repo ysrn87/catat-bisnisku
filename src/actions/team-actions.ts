@@ -1,6 +1,13 @@
 'use server';
 
+import { auth } from '@/auth';
 import { db } from '@/lib/db';
+import {
+  type StoreRoleValue,
+  checkRoleConflict,
+  canAssignRole,
+  // FIX: syncGlobalRole DIHAPUS dari import — tidak ada di role-guard lagi
+} from '@/lib/role-guard';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, checkPlanLimit } from '@/lib/store-context';
 
@@ -8,14 +15,25 @@ type SwitchableRole = 'MANAGER' | 'CASHIER';
 
 export interface SwitchRoleResult {
   success: boolean;
-  error?: string;
+  error?:  string;
 }
 
-/**
- * Pindahkan peran seorang anggota tim antara Manager <-> Kasir di store yang sama,
- * tanpa hapus-lalu-buat-ulang akun (yang sebelumnya gagal karena nomor telepon
- * sudah terpakai oleh akun lama).
- */
+// ─── Helper ────────────────────────────────────────────────────────────────────
+
+async function getActor(storeId: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error('Unauthorized');
+
+  const membership = await db.storeUser.findUnique({
+    where:  { storeId_userId: { storeId, userId: session.user.id } },
+    select: { role: true },
+  });
+  if (!membership) throw new Error('Kamu tidak terdaftar di toko ini.');
+  return { actorId: session.user.id, actorRole: membership.role as StoreRoleValue };
+}
+
+// ─── switchTeamMemberRole ──────────────────────────────────────────────────────
+
 export async function switchTeamMemberRole(
   memberId: string,
   newRole: SwitchableRole
@@ -38,25 +56,155 @@ export async function switchTeamMemberRole(
     return { success: false, error: `Sudah menjadi ${newRole === 'MANAGER' ? 'Manager' : 'Kasir'}` };
   }
 
-  // Cek kuota plan untuk peran tujuan
   const limit = await checkPlanLimit(newRole === 'MANAGER' ? 'managers' : 'cashiers');
   if (!limit.allowed) {
     const label = newRole === 'MANAGER' ? 'manager' : 'kasir';
     return {
       success: false,
-      error: `Batas ${label} tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak ${label}.`,
+      error:   `Batas ${label} tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak ${label}.`,
     };
   }
 
-  await db.$transaction(async (tx) => {
-    await tx.storeUser.update({
-      where: { storeId_userId: { storeId, userId: memberId } },
-      data: { role: newRole },
-    });
-    // Sinkronkan Role global (dipakai beberapa flag UI ringan)
-    await tx.user.update({ where: { id: memberId }, data: { role: newRole } });
+  await db.storeUser.update({
+    where: { storeId_userId: { storeId, userId: memberId } },
+    data:  { role: newRole },
   });
+  // FIX: hapus syncGlobalRole(memberId, tx) — tidak diperlukan lagi
 
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
   return { success: true };
+}
+
+// ─── assignStaff (generic) ────────────────────────────────────────────────────
+
+async function assignStaff(
+  storeId: string,
+  targetUserId: string,
+  targetRole: 'MANAGER' | 'CASHIER'
+) {
+  const { actorRole } = await getActor(storeId);
+
+  if (!canAssignRole(actorRole, targetRole)) {
+    throw new Error(`Role kamu (${actorRole}) tidak dapat meng-assign ${targetRole}.`);
+  }
+
+  const conflict = await checkRoleConflict(targetUserId, storeId, targetRole);
+  if (conflict.hasConflict) throw new Error(conflict.reason);
+
+  const storeUser = await db.storeUser.create({
+    data: { userId: targetUserId, storeId, role: targetRole },
+  });
+  // FIX: hapus syncGlobalRole — tidak diperlukan lagi
+
+  return { storeUser, warning: conflict.isWarning ? conflict.reason : undefined };
+}
+
+// ─── createManagerAction ──────────────────────────────────────────────────────
+
+export async function createManagerAction(storeId: string, targetUserId: string) {
+  try {
+    const result = await assignStaff(storeId, targetUserId, 'MANAGER');
+    revalidatePath(`/dashboard/${storeId}/team`);
+    return { success: true, ...result };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ─── createCashierAction ──────────────────────────────────────────────────────
+
+export async function createCashierAction(storeId: string, targetUserId: string) {
+  try {
+    const result = await assignStaff(storeId, targetUserId, 'CASHIER');
+    revalidatePath(`/dashboard/${storeId}/team`);
+    return { success: true, ...result };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ─── updateStoreUserRoleAction ────────────────────────────────────────────────
+
+export async function updateStoreUserRoleAction(
+  storeId: string,
+  targetUserId: string,
+  newRole: StoreRoleValue
+) {
+  try {
+    const { actorId, actorRole } = await getActor(storeId);
+
+    const target = await db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId: targetUserId } },
+    });
+    if (!target) throw new Error('User tidak ditemukan di toko ini.');
+
+    if (target.role === 'OWNER' && actorRole !== 'OWNER') {
+      throw new Error('Hanya OWNER yang dapat mengubah role OWNER lain.');
+    }
+    if (!canAssignRole(actorRole, newRole) && actorId !== targetUserId) {
+      throw new Error(`Role kamu (${actorRole}) tidak dapat meng-assign ${newRole}.`);
+    }
+
+    const updated = await db.storeUser.update({
+      where: { storeId_userId: { storeId, userId: targetUserId } },
+      data:  { role: newRole },
+    });
+    // FIX: hapus syncGlobalRole — tidak diperlukan lagi
+
+    revalidatePath(`/dashboard/${storeId}/team`);
+    return { success: true, data: updated };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ─── removeStaff / deleteManagerAction / deleteCashierAction ─────────────────
+
+async function removeStaff(
+  storeId: string,
+  targetUserId: string,
+  expectedRole?: StoreRoleValue
+) {
+  const { actorId, actorRole } = await getActor(storeId);
+
+  const target = await db.storeUser.findUnique({
+    where: { storeId_userId: { storeId, userId: targetUserId } },
+  });
+  if (!target) throw new Error('User tidak ditemukan di toko ini.');
+
+  if (expectedRole && target.role !== expectedRole) {
+    throw new Error(`User ini bukan ${expectedRole} di toko ini.`);
+  }
+
+  if (actorId === targetUserId && target.role === 'OWNER') {
+    const ownerCount = await db.storeUser.count({ where: { storeId, role: 'OWNER' } });
+    if (ownerCount <= 1) throw new Error('Kamu satu-satunya OWNER. Transfer ownership dulu.');
+  }
+
+  if (!canAssignRole(actorRole, target.role as StoreRoleValue) && actorId !== targetUserId) {
+    throw new Error(`Role kamu (${actorRole}) tidak dapat menghapus ${target.role}.`);
+  }
+
+  await db.storeUser.delete({ where: { storeId_userId: { storeId, userId: targetUserId } } });
+  // FIX: hapus syncGlobalRole — tidak diperlukan lagi
+}
+
+export async function deleteManagerAction(storeId: string, targetUserId: string) {
+  try {
+    await removeStaff(storeId, targetUserId, 'MANAGER');
+    revalidatePath(`/dashboard/${storeId}/team`);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function deleteCashierAction(storeId: string, targetUserId: string) {
+  try {
+    await removeStaff(storeId, targetUserId, 'CASHIER');
+    revalidatePath(`/dashboard/${storeId}/team`);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
 }

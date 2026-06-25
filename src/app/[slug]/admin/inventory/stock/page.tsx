@@ -1,7 +1,6 @@
 import { db } from '@/lib/db';
 import { getStoreContext, PLAN_LIMITS } from '@/lib/store-context';
 import { PlanGate } from '@/components/plan/plan-gate';
-import { Crown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, AlertTriangle } from 'lucide-react';
 import { StockTable } from '@/components/stock/stock-table';
@@ -11,7 +10,8 @@ import { SearchFilterBar } from '@/components/filters/search-filter-bar';
 async function getStockData(storeId: string) {
   const [totalVariants, lowStockCount, stockValue] = await Promise.all([
     db.productVariant.count({ where: { storeId } }),
-    db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStock } } }),
+    // FIX: lowStock → lowStockAt
+    db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } } }),
     db.productVariant.aggregate({ where: { storeId }, _sum: { stock: true } }),
   ]);
   return { totalVariants, lowStockCount, totalStock: stockValue._sum.stock || 0 };
@@ -24,21 +24,22 @@ async function getAllStock(storeId: string, params: { page?: number; limit?: num
 
   if (search) {
     where.OR = [
-      { name: { contains: search, mode: 'insensitive' as const } },
-      { sku: { contains: search, mode: 'insensitive' as const } },
+      { name:    { contains: search, mode: 'insensitive' as const } },
+      { sku:     { contains: search, mode: 'insensitive' as const } },
       { product: { name: { contains: search, mode: 'insensitive' as const } } },
     ];
   }
 
-  if (stockLevel === 'low')    where.stock = { lte: db.productVariant.fields.lowStock };
-  if (stockLevel === 'normal') where.stock = { gt: db.productVariant.fields.lowStock };
+  // FIX: lowStock → lowStockAt
+  if (stockLevel === 'low')    where.stock = { lte: db.productVariant.fields.lowStockAt };
+  if (stockLevel === 'normal') where.stock = { gt:  db.productVariant.fields.lowStockAt };
   if (stockLevel === 'out')    where.stock = { equals: 0 };
 
   const orderBy: any = [];
-  if (sort === 'stock_desc') orderBy.push({ stock: 'desc' });
+  if (sort === 'stock_desc')     orderBy.push({ stock: 'desc' });
   else if (sort === 'name_asc')  orderBy.push({ product: { name: 'asc' } });
   else if (sort === 'name_desc') orderBy.push({ product: { name: 'desc' } });
-  else orderBy.push({ stock: 'asc' });
+  else                           orderBy.push({ stock: 'asc' });
 
   const [items, total] = await Promise.all([
     db.productVariant.findMany({ where, skip, take: limit, include: { product: true }, orderBy }),
@@ -58,9 +59,9 @@ async function getStockMovements(storeId: string, params: { page?: number; limit
 
   if (search) {
     where.OR = [
-      { variant: { name: { contains: search, mode: 'insensitive' as const } } },
+      { variant: { name:    { contains: search, mode: 'insensitive' as const } } },
       { variant: { product: { name: { contains: search, mode: 'insensitive' as const } } } },
-      { notes: { contains: search, mode: 'insensitive' as const } },
+      { notes:   { contains: search, mode: 'insensitive' as const } },
     ];
   }
 
@@ -98,36 +99,9 @@ export default async function StockPage({ params, searchParams }: {
   return (
     <div className="space-y-6 md:space-y-8">
       <div className="grid gap-3 md:gap-4 grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Total Produk</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold">{stats.totalVariants}</div>
-            <p className="text-[10px] md:text-xs text-muted-foreground">Varian produk</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Stok Kurang</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold text-red-600">{stats.lowStockCount}</div>
-            <p className="text-[10px] md:text-xs text-muted-foreground">Butuh pembaruan</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Total Stok</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-xl md:text-2xl font-bold">{stats.totalStock}</div>
-            <p className="text-[10px] md:text-xs text-muted-foreground">Total unit</p>
-          </CardContent>
-        </Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-xs md:text-sm font-medium">Total Produk</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-xl md:text-2xl font-bold">{stats.totalVariants}</div><p className="text-[10px] md:text-xs text-muted-foreground">Varian produk</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-xs md:text-sm font-medium">Stok Kurang</CardTitle><AlertTriangle className="h-4 w-4 text-red-600" /></CardHeader><CardContent><div className="text-xl md:text-2xl font-bold text-red-600">{stats.lowStockCount}</div><p className="text-[10px] md:text-xs text-muted-foreground">Butuh pembaruan</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-xs md:text-sm font-medium">Total Stok</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-xl md:text-2xl font-bold">{stats.totalStock}</div><p className="text-[10px] md:text-xs text-muted-foreground">Total unit</p></CardContent></Card>
       </div>
 
       <Card>
@@ -149,20 +123,20 @@ export default async function StockPage({ params, searchParams }: {
         </CardContent>
       </Card>
 
-      <PlanGate
-        plan={storePlan}
-        storeSlug={slug}
-        feature="Riwayat Stok Masuk-Keluar"
-        description="Upgrade ke PRO untuk melihat riwayat lengkap sirkulasi barang"
-      >
+      <PlanGate plan={storePlan} storeSlug={slug} feature="Riwayat Stok Masuk-Keluar" description="Upgrade ke PRO untuk melihat riwayat lengkap sirkulasi barang">
         <Card>
           <CardHeader><CardTitle className="text-lg md:text-xl">Riwayat Sirkulasi Barang</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <SearchFilterBar
               searchPlaceholder="Cari riwayat stok..."
               filters={[{ key: 'movementType', label: 'Tipe', defaultValue: 'all', options: [
-                { value: 'all', label: 'Semua' }, { value: 'IN', label: 'Masuk' },
-                { value: 'OUT', label: 'Keluar' }, { value: 'ADJUSTMENT', label: 'Penyesuaian' },
+                { value: 'all',        label: 'Semua' },
+                // FIX: enum MovementType baru: PURCHASE/SALE/ADJUSTMENT/RETURN/DAMAGED
+                { value: 'PURCHASE',   label: 'Pembelian' },
+                { value: 'SALE',       label: 'Penjualan' },
+                { value: 'ADJUSTMENT', label: 'Penyesuaian' },
+                { value: 'RETURN',     label: 'Retur' },
+                { value: 'DAMAGED',    label: 'Rusak/Hilang' },
               ]}]}
               sortOptions={[{ value: 'date_desc', label: 'Terbaru' }, { value: 'date_asc', label: 'Terlama' }]}
               defaultSort="date_desc"

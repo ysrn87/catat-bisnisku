@@ -28,7 +28,7 @@ interface NewSaleDialogProps {
     name: string;
     price: number;
     stock: number;
-    points: number;
+    pointsPerUnit: number;
     barcode: string | null;
     type: string;
     product: {
@@ -44,7 +44,6 @@ interface NewSaleDialogProps {
     id: string;
     name: string;
     phone: string;
-    address: string | null;
   }>;
   conversionRate?: number;
   trigger?: React.ReactNode;
@@ -140,7 +139,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
   const pointsEarned = (customerId && customerType === 'member' && pointsToRedeem === 0)
     ? items.reduce((sum, item) => {
         const variant = variants.find(v => v.id === item.variantId);
-        return sum + (variant?.points ?? 0) * item.quantity;
+        return sum + (variant?.pointsPerUnit ?? 0) * item.quantity;
       }, 0)
     : 0;
 
@@ -168,7 +167,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
     }
   };
 
-  const handleQuickAddSuccess = (customer: { id: string; name: string; phone: string; address: string | null }) => {
+  const handleQuickAddSuccess = (customer: { id: string; name: string; phone: string }) => {
     setLocalNonMemberCustomers(prev => [customer, ...prev]);
     setNonMemberCustomerId(customer.id);
     setCustomerType('non-member');
@@ -631,7 +630,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                     <div className="divide-y divide-gray-100 max-h-[300px] overflow-y-auto">
                       {items.map((item, index) => {
                         const variant = variants.find(v => v.id === item.variantId);
-                        const itemPoints = (variant?.points ?? 0) * item.quantity;
+                        const itemPoints = (variant?.pointsPerUnit ?? 0) * item.quantity;
                         return (
                           <div key={index} className="px-3 py-3 hover:bg-gray-50/60 transition-colors space-y-0.5">
                             <div className="flex items-center justify-between gap-2">

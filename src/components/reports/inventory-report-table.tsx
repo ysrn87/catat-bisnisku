@@ -12,7 +12,7 @@ interface InventoryReportTableProps {
     name: string;
     sku: string;
     stock: number;
-    lowStock: number;
+    lowStockAt: number;
     cost: number;
     price: number;
     product: {
@@ -73,7 +73,7 @@ export function InventoryReportTable({
               </TableRow>
             ) : (
               inventory.map((item) => {
-                const isLowStock = item.stock <= item.lowStock;
+                const isLowStock = item.stock <= item.lowStockAt;
                 const stockValue = Number(item.cost) * item.stock;
                 
                 return (

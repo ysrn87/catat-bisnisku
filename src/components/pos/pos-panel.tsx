@@ -18,7 +18,7 @@ interface ProductVariant {
   name: string;
   price: number;
   stock: number;
-  points: number;
+  pointsPerUnit: number;
   barcode: string | null;
   type: string;
   product: {
@@ -309,7 +309,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     customerType === 'member' && customerId && pointsToRedeem === 0 && paymentStatus === PaymentStatus.PAID
       ? cart.reduce((sum, item) => {
           const v = variants.find((x) => x.id === item.variantId);
-          return sum + (v?.points ?? 0) * item.quantity;
+          return sum + (v?.pointsPerUnit ?? 0) * item.quantity;
         }, 0)
       : 0;
 

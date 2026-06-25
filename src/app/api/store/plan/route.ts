@@ -6,15 +6,14 @@ import { db } from '@/lib/db';
  * Body: { slug: string, plan: 'FREE' | 'PRO', secret: string, days?: number }
  *
  * Endpoint internal untuk upgrade/downgrade plan secara manual.
- * Untuk upgrade PRO, set `days` (default 30) untuk durasi subscription.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as {
-      slug?: string;
-      plan?: string;
+      slug?:   string;
+      plan?:   string;
       secret?: string;
-      days?: number;
+      days?:   number;
     };
     const { slug, plan, secret, days = 30 } = body;
 
@@ -29,32 +28,32 @@ export async function POST(request: NextRequest) {
     const store = await db.store.findUnique({ where: { slug } });
     if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
 
-    // Hitung expiresAt untuk PRO
-    let subscriptionExpiresAt: Date | null = null;
+    // FIX: subscriptionExpiresAt → planExpiresAt
+    let planExpiresAt: Date | null = null;
     if (plan === 'PRO') {
       const base =
-        store.subscriptionExpiresAt && store.subscriptionExpiresAt > new Date()
-          ? store.subscriptionExpiresAt
+        store.planExpiresAt && store.planExpiresAt > new Date()
+          ? store.planExpiresAt
           : new Date();
-      subscriptionExpiresAt = new Date(base);
-      subscriptionExpiresAt.setDate(subscriptionExpiresAt.getDate() + days);
+      planExpiresAt = new Date(base);
+      planExpiresAt.setDate(planExpiresAt.getDate() + days);
     }
 
     const updated = await db.store.update({
       where: { slug },
       data: {
         plan: plan as 'FREE' | 'PRO',
-        subscriptionExpiresAt,
+        planExpiresAt, // FIX: subscriptionExpiresAt → planExpiresAt
         updatedAt: new Date(),
       },
-      select: { id: true, name: true, slug: true, plan: true, subscriptionExpiresAt: true },
+      select: { id: true, name: true, slug: true, plan: true, planExpiresAt: true },
     });
 
     return NextResponse.json({
       success: true,
-      store: updated,
+      store:   updated,
       message: plan === 'PRO'
-        ? `Store "${updated.name}" berhasil upgrade ke PRO sampai ${subscriptionExpiresAt?.toLocaleDateString('id-ID')}`
+        ? `Store "${updated.name}" berhasil upgrade ke PRO sampai ${planExpiresAt?.toLocaleDateString('id-ID')}`
         : `Store "${updated.name}" berhasil downgrade ke FREE`,
     });
 

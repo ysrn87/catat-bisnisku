@@ -1,24 +1,20 @@
 // System Settings Configuration
-// This file stores adjustable system-wide settings
 
 export interface SystemSettings {
-  pointsConversionRate: number; // How much discount per point (in Rupiah)
-  pointsExpiryEnabled: boolean;
-  pointsExpiryMonths: number;
-  minPointsForRedemption: number;
-  maxPointsPerTransaction: number;
+  pointsConversionRate:    number; // 1 point = X Rupiah diskon
+  minPointsForRedemption:  number; // Minimum poin untuk bisa redeem
+  maxPointsPerTransaction: number; // Maksimum poin yang bisa di-earn per transaksi
+  // FIX: hapus pointsExpiryEnabled dan pointsExpiryMonths
+  // Expiry dihapus dari skema baru — kalau dibutuhkan, implementasi
+  // di level StoreUser (tambah field pointsExpiresAt) di iterasi berikutnya
 }
 
-// Default settings
 export const DEFAULT_SETTINGS: SystemSettings = {
-  pointsConversionRate: 1000, // 1 point = Rp 1,000
-  pointsExpiryEnabled: true,
-  pointsExpiryMonths: 12, // Points expire after 12 months
-  minPointsForRedemption: 10, // Minimum 10 points to redeem
-  maxPointsPerTransaction: 1000, // Max 1000 points per transaction
+  pointsConversionRate:    1000, // 1 point = Rp 1.000
+  minPointsForRedemption:  10,   // Minimal 10 poin untuk redeem
+  maxPointsPerTransaction: 1000, // Maksimal 1000 poin per transaksi
 };
 
-// Helper function to format conversion rate
 export function formatConversionRate(rate: number): string {
-  return `1 point = Rp ${rate.toLocaleString('id-ID')}`;
+  return `1 poin = Rp ${rate.toLocaleString('id-ID')}`;
 }
