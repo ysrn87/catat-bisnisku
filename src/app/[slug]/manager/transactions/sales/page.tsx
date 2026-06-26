@@ -50,9 +50,11 @@ async function getSales(storeId: string, params: {
 
   return {
     sales: sales.map((sale) => {
-      const { subtotal, discount, tax, total, items, ...rest } = sale;
+      const { subtotal, discount, tax, total, items, payment, ...rest } = sale;
       return {
         ...rest,
+        paymentMethod: payment?.method ?? 'CASH',
+        paymentStatus: payment?.status ?? 'PAID',
         subtotal: Number(subtotal), discount: Number(discount),
         tax: Number(tax), ongkir: Number(sale.ongkir), total: Number(total),
         items: items.map((item) => {

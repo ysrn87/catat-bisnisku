@@ -1,7 +1,6 @@
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
-import { DashboardTabs } from '@/components/pos/dashboard-tabs';
 import { PosPanel } from '@/components/pos/pos-panel';
 import { getPointsConversionRate } from '@/actions/settings';
 
@@ -58,13 +57,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ slu
     db.store.findUnique({ where: { id: storeId }, select: { name: true } }),
   ]);
 
-  const SummaryContent = (
-    <div className="p-4 text-muted-foreground text-sm">
-      Pilih menu Ringkasan dari sidebar untuk melihat statistik toko.
-    </div>
-  );
-
-  const PosContent = (
+  return (
     <PosPanel
       variants={posVariants}
       members={members}
@@ -75,6 +68,4 @@ export default async function AdminDashboard({ params }: { params: Promise<{ slu
       cashierName={session?.user?.name ?? undefined}
     />
   );
-
-  return <DashboardTabs ringkasanContent={SummaryContent} posContent={PosContent} />;
 }

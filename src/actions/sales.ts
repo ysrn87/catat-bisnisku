@@ -245,14 +245,43 @@ export async function updateSaleAction(
     const total          = subtotal - discount - pointDiscount + tax + ongkir;
     if (total < 0) return { success: false, error: 'Total pembayaran tidak boleh negatif' };
 
+    // ── Pra-validasi di luar transaksi (read-only, tidak perlu lock) ──
+    // Tipe varian untuk items lama (untuk skip PREORDER saat restore stok)
+    const oldVariantIds = [...new Set(existingSale.items.map((i) => i.variantId))];
+    const oldVariants = await db.productVariant.findMany({
+      where:  { id: { in: oldVariantIds } },
+      select: { id: true, type: true },
+    });
+    const oldVariantTypeById = new Map(oldVariants.map((v) => [v.id, v.type]));
+
+    // Validasi stok untuk items baru. Stok lama belum dikembalikan di titik ini,
+    // jadi stok efektif yang tersedia = stock + qty lama (kalau varian yang sama dipakai lagi)
+    const oldQtyByVariant = new Map<string, number>();
+    for (const oldItem of existingSale.items) {
+      oldQtyByVariant.set(oldItem.variantId, (oldQtyByVariant.get(oldItem.variantId) ?? 0) + oldItem.quantity);
+    }
+    const newVariantIds = [...new Set(items.map((i) => i.variantId))];
+    const newVariants = await db.productVariant.findMany({
+      where:  { id: { in: newVariantIds }, storeId },
+      select: { id: true, stock: true, type: true, name: true },
+    });
+    const newVariantById = new Map(newVariants.map((v) => [v.id, v]));
+
+    for (const item of items) {
+      const variant = newVariantById.get(item.variantId);
+      if (!variant) return { success: false, error: 'Varian tidak ditemukan' };
+      if (variant.type !== 'PREORDER') {
+        const effectiveStock = variant.stock + (oldQtyByVariant.get(item.variantId) ?? 0);
+        if (effectiveStock < item.quantity) {
+          return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
+        }
+      }
+    }
+
     await db.$transaction(async (tx) => {
       // 1. Kembalikan stok dari items lama
       for (const oldItem of existingSale.items) {
-        const variant = await tx.productVariant.findUnique({
-          where:  { id: oldItem.variantId },
-          select: { type: true },
-        });
-        if (variant?.type === 'PREORDER') continue;
+        if (oldVariantTypeById.get(oldItem.variantId) === 'PREORDER') continue;
         await tx.productVariant.update({
           where: { id: oldItem.variantId },
           data:  { stock: { increment: oldItem.quantity } },
@@ -261,19 +290,13 @@ export async function updateSaleAction(
 
       // 2. Kurangi stok dari items baru
       for (const item of items) {
-        const variant = await tx.productVariant.findFirst({
-          where:  { id: item.variantId, storeId },
-          select: { stock: true, type: true, name: true },
-        });
-        if (!variant) throw new Error('Varian tidak ditemukan');
-        if (variant.type !== 'PREORDER' && variant.stock < item.quantity) {
-          throw new Error(`Stok tidak mencukupi untuk varian ini`);
-        }
+        const variant = newVariantById.get(item.variantId)!;
         if (variant.type !== 'PREORDER') {
-          await tx.productVariant.update({
-            where: { id: item.variantId },
+          const updated = await tx.productVariant.updateMany({
+            where: { id: item.variantId, stock: { gte: item.quantity } },
             data:  { stock: { decrement: item.quantity } },
           });
+          if (updated.count === 0) throw new Error(`Stok tidak mencukupi untuk ${variant.name}`);
         }
       }
 
@@ -317,7 +340,7 @@ export async function updateSaleAction(
           data:  { amount: total },
         });
       }
-    });
+    }, { maxWait: 10000, timeout: 15000 });
 
     revalidatePath(`/${storeSlug}/admin/transactions/sales`);
     revalidatePath(`/${storeSlug}/manager/transactions/sales`);
@@ -331,6 +354,11 @@ export async function updateSaleAction(
 
 // ─────────────────────────────────────────────────────────────
 // GET SALES
+// Catatan: payment dikembalikan nested (sale.payment.method / .status),
+// BUKAN flat sale.paymentMethod / sale.paymentStatus. Komponen seperti
+// SalesTable & SaleDetailsDialog mengharapkan field flat — kalau dipakai
+// untuk itu, flatten dulu (lihat getSales() di page.tsx admin/manager/cashier
+// transactions/sales untuk contoh polanya).
 // ─────────────────────────────────────────────────────────────
 export async function getSales(limit = 50) {
   const { storeId } = await requireStoreAccess();
@@ -346,6 +374,7 @@ export async function getSales(limit = 50) {
   });
 }
 
+// Catatan: sama seperti getSales() di atas — payment nested, bukan flat.
 export async function getSaleById(id: string) {
   const { storeId } = await requireStoreAccess();
   return db.sale.findFirst({

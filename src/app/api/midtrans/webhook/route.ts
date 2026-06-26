@@ -67,8 +67,9 @@ export async function POST(request: NextRequest) {
     const isPending = transaction_status === 'pending';
     const isFailed  = ['deny', 'cancel', 'expire'].includes(transaction_status);
 
-    // 4. Idempotency check — FIX: where: { midtransOrderId } bukan { orderId }
-    const existingPayment = await db.payment.findUnique({
+    // 4. Idempotency check — order_id di titik ini selalu untuk upgrade (lihat filter "PRO-" di atas),
+    // jadi cek di UpgradePayment, bukan Payment (yang khusus transaksi POS).
+    const existingPayment = await db.upgradePayment.findUnique({
       where: { midtransOrderId: order_id },
     });
     if (existingPayment) {
@@ -105,23 +106,20 @@ export async function POST(request: NextRequest) {
           data:  { plan: 'PRO', planExpiresAt: expiresAt, updatedAt: new Date() },
         });
 
-        // FIX: Payment schema baru — saleId UNIQUE, midtransOrderId, method, status, amount, paidAt
-        // Untuk transaksi upgrade PRO, tidak ada saleId (bukan transaksi POS)
-        // Kita buat Payment tanpa saleId dengan storeId langsung
-        await tx.payment.create({
+        // FIX: upgrade plan bukan transaksi POS — tidak ada Sale terkait,
+        // jadi dicatat di UpgradePayment (bukan Payment, yang wajib punya saleId).
+        // Sebelumnya kode ini memaksa saleId palsu ke Payment.create(), yang
+        // melanggar foreign key constraint dan membuat seluruh transaksi ini
+        // (termasuk update plan ke PRO di atas) di-rollback oleh Prisma.
+        await tx.upgradePayment.create({
           data: {
-            // saleId wajib di schema baru karena 1-to-1 dengan Sale
-            // Tapi upgrade PRO bukan Sale — simpan sebagai catatan terpisah via tabel lain,
-            // atau buat Sale dummy. Solusi terbaik: buat model UpgradePayment terpisah.
-            // Untuk sementara, catat di tabel payment dengan workaround:
-            // saleId di-generate sebagai string khusus untuk upgrade
-            saleId:         `upgrade-${store.id}-${Date.now()}`, // temporary workaround
-            storeId:        store.id,
-            method:         'MIDTRANS',
-            status:         'PAID',
-            amount:         parseFloat(gross_amount),
+            storeId:         store.id,
+            method:          'MIDTRANS',
+            status:          'PAID',
+            amount:          parseFloat(gross_amount),
             midtransOrderId: order_id,
-            paidAt:         new Date(),
+            planDays:        30,
+            paidAt:          new Date(),
           },
         });
       });
@@ -131,13 +129,12 @@ export async function POST(request: NextRequest) {
     } else if (isFailed) {
       const store = await db.store.findUnique({ where: { slug: storeSlug }, select: { id: true } });
       if (store) {
-        await db.payment.create({
+        await db.upgradePayment.create({
           data: {
-            saleId:         `upgrade-${store.id}-${Date.now()}`,
-            storeId:        store.id,
-            method:         'MIDTRANS',
-            status:         'FAILED',
-            amount:         parseFloat(gross_amount),
+            storeId:         store.id,
+            method:          'MIDTRANS',
+            status:          'FAILED',
+            amount:          parseFloat(gross_amount),
             midtransOrderId: order_id,
           },
         }).catch(() => {});

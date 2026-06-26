@@ -23,19 +23,24 @@ export async function createProductAction(formData: FormData) {
     }
 
     const name        = sanitizeName(formData.get('name') as string, 100);
+    const sku         = sanitizeSku(formData.get('sku') as string);
     const description = sanitizeText(formData.get('description') as string, 500);
-    // FIX: type dihapus dari Product — ada di ProductVariant
     const categoryId  = (formData.get('categoryId') as string) || null;
 
     if (!name) return { success: false, error: 'Nama wajib diisi' };
+    if (!sku)  return { success: false, error: 'Kode produk wajib diisi' };
+
+    const existingSku = await db.product.findUnique({ where: { storeId_sku: { storeId, sku } } });
+    if (existingSku) return { success: false, error: 'Kode produk sudah digunakan' };
 
     await db.product.create({
       data: {
         storeId,
         name,
+        sku,
         description: description || null,
         categoryId,
-        // FIX: hapus sku, type, createdById
+        // FIX: hapus type, createdById
       },
     });
 
@@ -58,21 +63,27 @@ export async function updateProductAction(id: string, formData: FormData) {
     }
 
     const name        = sanitizeName(formData.get('name') as string, 100);
+    const sku         = sanitizeSku(formData.get('sku') as string);
     const description = sanitizeText(formData.get('description') as string, 500);
     const categoryId  = (formData.get('categoryId') as string) || null;
 
     if (!name) return { success: false, error: 'Nama wajib diisi' };
+    if (!sku)  return { success: false, error: 'Kode produk wajib diisi' };
 
     const product = await db.product.findFirst({ where: { id, storeId } });
     if (!product) return { success: false, error: 'Produk tidak ditemukan' };
+
+    const existingSku = await db.product.findFirst({ where: { storeId, sku, NOT: { id } } });
+    if (existingSku) return { success: false, error: 'Kode produk sudah digunakan' };
 
     await db.product.update({
       where: { id },
       data: {
         name,
+        sku,
         description: description || null,
         categoryId,
-        // FIX: hapus sku, type, updatedById
+        // FIX: hapus type, updatedById
       },
     });
 

@@ -69,6 +69,7 @@ model Store {
   stockMovements StockMovement[]
   settings       StoreSetting[]
   payments       Payment[]
+  upgradePayments UpgradePayment[]
 
   @@map("stores")
 }
@@ -113,6 +114,7 @@ model Product {
   storeId     String
   categoryId  String?
   name        String
+  sku         String
   description String?
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
@@ -122,6 +124,7 @@ model Product {
   category Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   variants ProductVariant[]
 
+  @@unique([storeId, sku])
   @@map("products")
 }
 
@@ -262,6 +265,31 @@ model Payment {
 
   @@index([storeId])
   @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPGRADE PAYMENT
+//
+// Catatan pembayaran untuk upgrade plan FREE → PRO via Midtrans.
+// Terpisah dari Payment (yang 1-to-1 dengan Sale/transaksi POS) karena
+// upgrade plan bukan transaksi penjualan — tidak ada Sale yang terkait.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model UpgradePayment {
+  id              String        @id @default(cuid())
+  storeId         String
+  method          String        @default("MIDTRANS")
+  status          PaymentStatus @default(PAID)
+  amount          Decimal       @db.Decimal(10, 2)
+  midtransOrderId String        @unique
+  planDays        Int           @default(30)
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("upgrade_payments")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

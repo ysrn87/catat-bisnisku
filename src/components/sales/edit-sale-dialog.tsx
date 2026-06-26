@@ -527,7 +527,6 @@ export function EditSaleDialog({
                 <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as PaymentStatus)} disabled={loading}>
                   <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UNPAID">❌ Belum Bayar</SelectItem>
                     <SelectItem value="PENDING">⏳ Pending</SelectItem>
                     <SelectItem value="PAID">✅ Lunas</SelectItem>
                   </SelectContent>

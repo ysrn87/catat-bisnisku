@@ -964,7 +964,6 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                       <SelectContent>
                         <SelectItem value="PAID">✅ Lunas</SelectItem>
                         <SelectItem value="PENDING">⏳ Pending</SelectItem>
-                        <SelectItem value="UNPAID">❌ Belum Lunas</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

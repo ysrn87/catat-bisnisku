@@ -794,7 +794,6 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                   >
                     <option value="PAID">Lunas</option>
                     <option value="PENDING">Pending</option>
-                    <option value="UNPAID">Belum Lunas</option>
                   </select>
                 </div>
                 <div className="col-span-3">

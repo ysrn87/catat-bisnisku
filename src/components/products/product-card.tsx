@@ -36,6 +36,7 @@ interface ProductCardProps {
   product: {
     id: string;
     name: string;
+    sku: string;
     description: string | null;
     isActive: boolean;
     variants: Variant[];
@@ -129,6 +130,7 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
               product={{
                 id: product.id,
                 name: product.name,
+                sku: product.sku,
                 description: product.description,
                 categoryId: product.category?.id ?? null,
               }}
@@ -155,7 +157,7 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
               )}
               Varian
             </Button>
-            <VariantDialog mode="create" productId={product.id} productSku={undefined} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
+            <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
           </div>
         )}
 
@@ -192,7 +194,7 @@ export function ProductCard({ product, filterStatus, categories = [], isAdmin = 
                     ? 'Belum ada varian tersedia'
                     : `No ${filterStatus} variants found`}
                 </p>
-                <VariantDialog mode="create" productId={product.id} productSku={undefined} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
+                <VariantDialog mode="create" productId={product.id} productSku={product.sku} variantCount={product.variants.length} defaultType={hasPreorder ? 'PREORDER' : 'READY_STOCK'} />
               </div>
             ) : (
               <>
