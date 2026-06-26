@@ -135,7 +135,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
   );
 
   const PosContent = (
-    <PosPanel variants={posVariants} members={members} nonMembers={nonMembers} conversionRate={conversionRate} storeSlug={slug} storeName={store?.name ?? 'Toko'} cashierName={session?.user?.name ?? undefined} />
+    <PosPanel variants={posVariants} members={members} walkInCustomers={nonMembers} conversionRate={conversionRate} storeSlug={slug} storeName={store?.name ?? 'Toko'} cashierName={session?.user?.name ?? undefined} />
   );
 
   return <DashboardTabs ringkasanContent={RingkasanContent} posContent={PosContent} />;

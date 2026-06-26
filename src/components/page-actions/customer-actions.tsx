@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { AddCustomerMenu } from '@/components/customers/add-customer-menu';
+import { useParams } from 'next/navigation';
 import { NonMemberDialog } from '@/components/customers/non-member-dialog';
-import { CustomerDialog } from '@/components/customers/customer-dialog';
+import { LinkMemberDialog } from '@/components/customers/link-member-dialog';
+import { AddCustomerMenu } from '@/components/customers/add-customer-menu';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, UserPlus, Users } from 'lucide-react';
+import { Link2, Plus, UserPlus } from 'lucide-react';
 
 interface CustomerActionsProps {
   isAdmin: boolean;
@@ -35,35 +36,36 @@ const PlusIcon = () => (
 
 export function CustomerActions({ isAdmin }: CustomerActionsProps) {
   const [nonMemberOpen, setNonMemberOpen] = useState(false);
-  const [memberOpen, setMemberOpen]       = useState(false);
+  const [memberOpen, setMemberOpen] = useState(false);
+  const params = useParams();
+  const storeSlug = typeof params?.slug === 'string' ? params.slug : undefined;
 
   if (isAdmin) {
     return (
       <>
-        {/* Dialogs — satu instance masing-masing, dikontrol state */}
         <NonMemberDialog mode="create" open={nonMemberOpen} onOpenChange={setNonMemberOpen} trigger={null} />
-        <CustomerDialog  mode="create" open={memberOpen}    onOpenChange={setMemberOpen}    trigger={null} />
+        <LinkMemberDialog open={memberOpen} onOpenChange={setMemberOpen} storeSlug={storeSlug} />
 
-        {/* Desktop — pakai AddCustomerMenu yang sudah ada */}
+        {/* Desktop */}
         <div className="hidden sm:block">
           <AddCustomerMenu />
         </div>
 
-        {/* Mobile FAB — dropdown sederhana untuk pilih tipe */}
+        {/* Mobile FAB */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" aria-label="Tambah Pelanggan" className={FAB_BTN_CLASS}>
               <PlusIcon />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" className="w-48 mb-2">
+          <DropdownMenuContent align="end" side="top" className="w-52 mb-2">
             <DropdownMenuItem onClick={() => setMemberOpen(true)} className="gap-2 cursor-pointer">
-              <UserPlus className="w-4 h-4 text-[#028697]" />
-              Tambah Member
+              <Link2 className="w-4 h-4 text-blue-600" />
+              Tautkan Akun Member
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setNonMemberOpen(true)} className="gap-2 cursor-pointer">
-              <Users className="w-4 h-4 text-gray-500" />
-              Tambah Non-Member
+              <UserPlus className="w-4 h-4 text-[#028697]" />
+              Tambah Customer
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -71,7 +73,7 @@ export function CustomerActions({ isAdmin }: CustomerActionsProps) {
     );
   }
 
-  // Manager — hanya bisa tambah non-member
+  // Manager — hanya bisa tambah customer (non-member)
   return (
     <>
       <NonMemberDialog mode="create" open={nonMemberOpen} onOpenChange={setNonMemberOpen} trigger={null} />
@@ -81,11 +83,11 @@ export function CustomerActions({ isAdmin }: CustomerActionsProps) {
         onClick={() => setNonMemberOpen(true)}
       >
         <Plus className="w-4 h-4 mr-2" />
-        Tambah Non-Member
+        Tambah Customer
       </Button>
       <button
         type="button"
-        aria-label="Tambah Non-Member"
+        aria-label="Tambah Customer"
         className={FAB_BTN_CLASS}
         onClick={() => setNonMemberOpen(true)}
       >

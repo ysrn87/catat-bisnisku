@@ -37,7 +37,7 @@ interface Member {
   points: number;
 }
 
-interface NonMember {
+interface WalkInCustomer {
   id: string;
   name: string;
   phone: string;
@@ -75,7 +75,7 @@ interface ReceiptData {
 interface PosPanelProps {
   variants: ProductVariant[];
   members: Member[];
-  nonMembers: NonMember[];
+  walkInCustomers: WalkInCustomer[];
   conversionRate: number;
   storeSlug: string;
   storeName: string;
@@ -237,7 +237,7 @@ function ReceiptDialog({
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-export function PosPanel({ variants, members, nonMembers, conversionRate, storeSlug, storeName, cashierName }: PosPanelProps) {
+export function PosPanel({ variants, members, walkInCustomers, conversionRate, storeSlug, storeName, cashierName }: PosPanelProps) {
   const { toast } = useToast();
 
   // Cart state
@@ -248,9 +248,9 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
   const [activeCategory, setActiveCategory] = useState<string>('all');
 
   // Customer
-  const [customerType, setCustomerType] = useState<'customer' | 'member' | 'non-member'>('customer');
+  const [customerType, setCustomerType] = useState<'customer' | 'member' | 'walk-in'>('customer');
   const [customerId, setCustomerId] = useState('');
-  const [nonMemberId, setNonMemberId] = useState('');
+  const [walkInCustomerId, setWalkInCustomerId] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
@@ -298,7 +298,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
   }, [variants, search, activeCategory]);
 
   const selectedMember = members.find((m) => m.id === customerId);
-  const selectedNonMember = nonMembers.find((m) => m.id === nonMemberId);
+  const selectedWalkIn = walkInCustomers.find((m) => m.id === walkInCustomerId);
   const availablePoints = selectedMember?.points ?? 0;
   const pointDiscount = pointsToRedeem * conversionRate;
 
@@ -318,16 +318,16 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
   const customerName = useMemo(() => {
     if (customerType === 'customer') return 'Pelanggan Umum';
     if (customerType === 'member' && selectedMember) return selectedMember.name;
-    if (customerType === 'non-member' && selectedNonMember) return selectedNonMember.name;
+    if (customerType === 'walk-in' && selectedWalkIn) return selectedWalkIn.name;
     return 'Pelanggan Umum';
-  }, [customerType, selectedMember, selectedNonMember]);
+  }, [customerType, selectedMember, selectedWalkIn]);
 
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.toLowerCase();
     if (customerType === 'member') return members.filter((m) => m.name.toLowerCase().includes(q));
-    if (customerType === 'non-member') return nonMembers.filter((m) => m.name.toLowerCase().includes(q));
+    if (customerType === 'walk-in') return walkInCustomers.filter((m) => m.name.toLowerCase().includes(q));
     return [];
-  }, [customerType, customerSearch, members, nonMembers]);
+  }, [customerType, customerSearch, members, walkInCustomers]);
 
   // ─── Cart actions ──────────────────────────────────────────────────────────
 
@@ -392,7 +392,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     setNotes('');
     setCustomerType('customer');
     setCustomerId('');
-    setNonMemberId('');
+    setWalkInCustomerId('');
     setCustomerSearch('');
     setShowCustomerDropdown(false);
     setPaymentMethod('CASH');
@@ -414,10 +414,10 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
 
   // ─── Customer selection ────────────────────────────────────────────────────
 
-  const handleCustomerTypeChange = (type: 'customer' | 'member' | 'non-member') => {
+  const handleCustomerTypeChange = (type: 'customer' | 'member' | 'walk-in') => {
     setCustomerType(type);
     setCustomerId('');
-    setNonMemberId('');
+    setWalkInCustomerId('');
     setCustomerSearch('');
     setShowCustomerDropdown(false);
     setPointsToRedeem(0);
@@ -430,8 +430,8 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     setShowCustomerDropdown(false);
   };
 
-  const selectNonMember = (nm: NonMember) => {
-    setNonMemberId(nm.id);
+  const selectWalkIn = (nm: WalkInCustomer) => {
+    setWalkInCustomerId(nm.id);
     setCustomerSearch(nm.name);
     setShowCustomerDropdown(false);
   };
@@ -443,7 +443,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
     !loading &&
     (customerType === 'customer' ||
       (customerType === 'member' && !!customerId) ||
-      (customerType === 'non-member' && !!nonMemberId)) &&
+      (customerType === 'walk-in' && !!walkInCustomerId)) &&
     discount + pointDiscount <= subtotal &&
     total >= 0;
 
@@ -663,7 +663,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
               <User className="w-3 h-3" /> Pelanggan
             </Label>
             <div className="flex gap-1 mb-2">
-              {(['customer', 'member', 'non-member'] as const).map((t) => (
+              {(['customer', 'member', 'walk-in'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => handleCustomerTypeChange(t)}
@@ -690,11 +690,11 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                     onChange={(e) => {
                       setCustomerSearch(e.target.value);
                       setCustomerId('');
-                      setNonMemberId('');
+                      setWalkInCustomerId('');
                       setShowCustomerDropdown(true);
                     }}
                     onFocus={() => setShowCustomerDropdown(true)}
-                    placeholder={customerType === 'member' ? 'Cari member...' : 'Cari non-member...'}
+                    placeholder={customerType === 'member' ? 'Cari member...' : 'Cari customer...'}
                     className="w-full pl-7 pr-3 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-[#028697]"
                   />
                 </div>
@@ -703,7 +703,7 @@ export function PosPanel({ variants, members, nonMembers, conversionRate, storeS
                     {filteredCustomers.slice(0, 8).map((c) => (
                       <button
                         key={c.id}
-                        onClick={() => customerType === 'member' ? selectMember(c as Member) : selectNonMember(c as NonMember)}
+                        onClick={() => customerType === 'member' ? selectMember(c as Member) : selectWalkIn(c as WalkInCustomer)}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors"
                       >
                         <span className="font-medium">{c.name}</span>

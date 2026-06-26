@@ -190,6 +190,8 @@ export async function checkPhoneExistsAction(phone: string): Promise<{
   return { exists: true, isAlreadyMember: !!storeUser, name: user.name };
 }
 
+// Toko hanya bisa MENAUTKAN akun yang sudah ada — tidak bisa membuat akun baru
+// atau menyentuh password. User harus daftar sendiri via /register.
 export async function createCustomerAction(formData: FormData) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
@@ -198,93 +200,44 @@ export async function createCustomerAction(formData: FormData) {
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    const name         = sanitizeName(formData.get('name') as string, 100);
-    const rawPhone     = formData.get('phone')        as string;
-    const rawEmail     = formData.get('email')        as string;
-    const password     = formData.get('password')     as string;
-    const birthday     = formData.get('birthday')     as string;
-    const photoUrl     = formData.get('photoUrl')     as string;
-    const linkExisting = formData.get('linkExisting') === 'true';
-
-    const phone = normalizePhone(rawPhone);
-    const email = normalizeEmail(rawEmail);
+    const rawPhone = formData.get('phone') as string;
+    const phone    = normalizePhone(rawPhone);
 
     if (!phone) return { success: false, error: 'Nomor telepon wajib diisi' };
     if (phone.length < 9 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
 
-    const existingUser = await db.user.findFirst({ where: { phone } });
+    // Hanya proses jika user sudah punya akun (password tidak null)
+    const existingUser = await db.user.findFirst({
+      where:  { phone },
+      select: { id: true, name: true, password: true },
+    });
 
-    if (existingUser) {
-      const existingStoreUser = await db.storeUser.findUnique({
-        where: { storeId_userId: { storeId, userId: existingUser.id } },
-      });
-
-      if (existingStoreUser) {
-        return { success: false, error: `${existingUser.name} sudah terdaftar di toko ini` };
-      }
-
-      if (!linkExisting) {
-        return {
-          success: false,
-          requiresConfirmation: true,
-          existingName: existingUser.name,
-          error: `Nomor HP ini sudah terdaftar atas nama "${existingUser.name}". Apakah ingin mendaftarkan mereka ke toko ini?`,
-        };
-      }
-
-      await db.storeUser.create({
-        data: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
-      });
-      // FIX: hapus syncGlobalRole — tidak diperlukan lagi
-
-      revalidatePath(`/${storeSlug}/admin/transactions/customers`);
-      revalidatePath(`/${storeSlug}/manager/transactions/customers`);
-      return { success: true, linked: true, name: existingUser.name };
+    if (!existingUser) {
+      return { success: false, error: 'Akun dengan nomor ini belum terdaftar. Minta pelanggan daftar sendiri via link /register.' };
     }
 
-    if (!name) return { success: false, error: 'Nama wajib diisi' };
-    if (!password || password.length < 6) return { success: false, error: 'Password minimal 6 karakter' };
-
-    if (email) {
-      const existingEmail = await db.user.findFirst({ where: { email } });
-      if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
+    if (!existingUser.password) {
+      return { success: false, error: 'Akun ini belum memiliki password. Minta pelanggan selesaikan pendaftaran via /register terlebih dahulu.' };
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const existingStoreUser = await db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId: existingUser.id } },
+    });
 
-    await db.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          name, phone, email,
-          // FIX: hapus address (tidak ada di User lagi)
-          // FIX: hapus role (tidak ada di User lagi)
-          password: hashedPassword,
-          birthday: birthday ? new Date(birthday) : null,
-          photoUrl: photoUrl || null,
-        },
-      });
+    if (existingStoreUser) {
+      return { success: false, error: `${existingUser.name} sudah terdaftar di toko ini` };
+    }
 
-      const su = await tx.storeUser.create({
-        data: { storeId, userId: newUser.id, role: 'MEMBER', points: 0 },
-      });
-
-      // Catat di PointHistory sebagai entry pendaftaran
-      await tx.pointHistory.create({
-        data: {
-          storeUserId: su.id,
-          type:        'REGISTER',
-          delta:       0,
-          description: 'Pendaftaran member baru',
-        },
-      });
+    await db.storeUser.create({
+      data: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
-    return { success: true, linked: false };
+    return { success: true, linked: true, name: existingUser.name };
   } catch (error) {
-    console.error('Create customer error:', error);
-    return { success: false, error: 'Gagal membuat customer' };
+    console.error('Link member error:', error);
+    return { success: false, error: 'Gagal menautkan member' };
   }
 }
 

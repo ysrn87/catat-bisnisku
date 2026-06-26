@@ -56,8 +56,8 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [customerId, setCustomerId] = useState<string>('');
-  const [nonMemberCustomerId, setNonMemberCustomerId] = useState<string>('');
-  const [customerType, setCustomerType] = useState<'member' | 'non-member' | 'customer' | ''>('');
+  const [walkInCustomerId, setWalkInCustomerId] = useState<string>('');
+  const [customerType, setCustomerType] = useState<'member' | 'walk-in' | 'customer' | ''>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('CASH');
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.PAID);
   const [discount, setDiscount] = useState<number>(0);
@@ -66,7 +66,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
   const [pointsToRedeem, setPointsToRedeem] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
   const [showQuickAddForm, setShowQuickAddForm] = useState(false);
-  const [localNonMemberCustomers, setLocalNonMemberCustomers] = useState(walkInCustomers);
+  const [localWalkInCustomers, setLocalWalkInCustomers] = useState(walkInCustomers);
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
@@ -129,7 +129,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
   const { toast } = useToast();
 
   const selectedCustomer = customers.find(c => c.id === customerId);
-  const selectedNonMemberCustomer = localNonMemberCustomers.find(c => c.id === nonMemberCustomerId);
+  const selectedWalkInCustomer = localWalkInCustomers.find(c => c.id === walkInCustomerId);
   const availablePoints = selectedCustomer?.points || 0;
   const pointDiscount = pointsToRedeem * conversionRate;
 
@@ -145,7 +145,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
 
   const handleCustomerChange = (value: string) => {
     setCustomerId('');
-    setNonMemberCustomerId('');
+    setWalkInCustomerId('');
     setPointsToRedeem(0);
     setIsCustomerDropdownOpen(false);
     setCustomerSearch('');
@@ -154,23 +154,23 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
       setCustomerType('customer');
     } else {
       const isMember = customers.some(c => c.id === value);
-      const isNonMember = localNonMemberCustomers.some(c => c.id === value);
+      const isWalkIn = localWalkInCustomers.some(c => c.id === value);
 
       if (isMember) {
         setCustomerId(value);
         setCustomerType('member');
-      } else if (isNonMember) {
-        setNonMemberCustomerId(value);
+      } else if (isWalkIn) {
+        setWalkInCustomerId(value);
         setCustomerId(value); // customer is now a User
-        setCustomerType('non-member');
+        setCustomerType('walk-in');
       }
     }
   };
 
   const handleQuickAddSuccess = (customer: { id: string; name: string; phone: string }) => {
-    setLocalNonMemberCustomers(prev => [customer, ...prev]);
-    setNonMemberCustomerId(customer.id);
-    setCustomerType('non-member');
+    setLocalWalkInCustomers(prev => [customer, ...prev]);
+    setWalkInCustomerId(customer.id);
+    setCustomerType('walk-in');
     setShowQuickAddForm(false);
     setIsCustomerDropdownOpen(false);
     toast({ title: 'Berhasil!', description: 'Pelanggan ditambahkan dan dipilih.' });
@@ -257,7 +257,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
   };
 
   const handleSubmit = async () => {
-    if (!customerId && !nonMemberCustomerId && customerType !== 'customer') {
+    if (!customerId && !walkInCustomerId && customerType !== 'customer') {
       toast({ title: 'Error', description: 'Pilih pelanggan terlebih dahulu.', variant: 'destructive' });
       return;
     }
@@ -291,7 +291,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
     try {
       const result = await createSaleAction({
         items: items.map(item => ({ variantId: item.variantId, quantity: item.quantity, price: item.price })),
-        customerId: customerId || nonMemberCustomerId || null,
+        customerId: customerId || walkInCustomerId || null,
         paymentMethod,
         paymentStatus,
         discount,
@@ -305,7 +305,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
         toast({ title: 'Transaksi Berhasil! 🎉', description: `Total: ${formatCurrency(total)}` });
         setItems([]);
         setCustomerId('');
-        setNonMemberCustomerId('');
+        setWalkInCustomerId('');
         setCustomerType('');
         setDiscount(0);
         setTax(0);
@@ -339,18 +339,18 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
 
   const getCustomerDisplayName = () => {
     if (customerType === 'member' && selectedCustomer) return selectedCustomer.name;
-    if (customerType === 'non-member' && selectedNonMemberCustomer) return selectedNonMemberCustomer.name;
+    if (customerType === 'walk-in' && selectedWalkInCustomer) return selectedWalkInCustomer.name;
     if (customerType === 'customer') return 'Pelanggan Umum';
     return null;
   };
 
   const selectedVariant = variants.find(v => v.id === selectedVariantId);
-  const customerSelected = !!(customerId || nonMemberCustomerId || customerType === 'customer');
+  const customerSelected = !!(customerId || walkInCustomerId || customerType === 'customer');
 
   const filteredMembers = customers.filter(c =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase())
   );
-  const filteredNonMembers = localNonMemberCustomers.filter(c =>
+  const filteredWalkIns = localWalkInCustomers.filter(c =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase())
   );
   const filteredVariants = variants
@@ -451,7 +451,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                       <p className={`text-xs ${customerType === 'customer' ? 'text-gray-400' : 'text-[#028697]'}`}>
                         {customerType === 'member'
                           ? `Member · ${selectedCustomer?.points ?? 0} poin`
-                          : customerType === 'non-member'
+                          : customerType === 'walk-in'
                           ? 'Non-Member'
                           : 'Tanpa akun · tidak dapat poin'}
                       </p>
@@ -461,7 +461,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                       onClick={(e) => {
                         e.stopPropagation();
                         setCustomerId('');
-                        setNonMemberCustomerId('');
+                        setWalkInCustomerId('');
                         setCustomerType('');
                         setPointsToRedeem(0);
                       }}
@@ -560,16 +560,16 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                       </>
                     )}
 
-                    {filteredNonMembers.length > 0 && (
+                    {filteredWalkIns.length > 0 && (
                       <>
                         <div className="px-3 py-1.5 bg-gray-50 text-gray-400 text-[10px] font-bold uppercase tracking-widest sticky top-0 border-b">
-                          Non-Members ({filteredNonMembers.length})
+                          Customers ({filteredWalkIns.length})
                         </div>
-                        {filteredNonMembers.map((customer) => (
+                        {filteredWalkIns.map((customer) => (
                           <div
                             key={customer.id}
                             onClick={() => handleCustomerChange(customer.id)}
-                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 ${nonMemberCustomerId === customer.id ? 'bg-[#028697]/[0.06]' : ''}`}
+                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 ${walkInCustomerId === customer.id ? 'bg-[#028697]/[0.06]' : ''}`}
                           >
                             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0 text-gray-600 text-xs font-bold">
                               {customer.name.charAt(0).toUpperCase()}
@@ -578,7 +578,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                               <p className="text-sm font-medium text-gray-900 truncate">{customer.name}</p>
                               <p className="text-xs text-gray-400">{customer.phone}</p>
                             </div>
-                            {nonMemberCustomerId === customer.id && (
+                            {walkInCustomerId === customer.id && (
                               <div className="w-5 h-5 rounded-full bg-[#028697] flex items-center justify-center shrink-0">
                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -590,7 +590,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                       </>
                     )}
 
-                    {customerSearch && filteredMembers.length === 0 && filteredNonMembers.length === 0 && !isWalkInVisible && (
+                    {customerSearch && filteredMembers.length === 0 && filteredWalkIns.length === 0 && !isWalkInVisible && (
                       <div className="p-6 text-center text-sm text-gray-400">Pelanggan tidak ditemukan</div>
                     )}
                   </div>
@@ -1172,7 +1172,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
             disabled={
               loading ||
               items.length === 0 ||
-              (!customerId && !nonMemberCustomerId && customerType !== 'customer') ||
+              (!customerId && !walkInCustomerId && customerType !== 'customer') ||
               (discount + pointDiscount) > subtotal ||
               total < 0
             }

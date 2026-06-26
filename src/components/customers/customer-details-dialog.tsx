@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { formatCurrency } from '@/lib/utils';
-import { ShoppingCart, Package, TrendingUp, Star, Sparkles, Phone, MapPin, Mail, User } from 'lucide-react';
+import { ShoppingCart, Package, TrendingUp, Star, Sparkles, Phone, MapPin, Mail, User, UserCog, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { MemberCard } from '../member/member-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getCustomerPurchaseHistory } from '@/actions/customers';
-import { CustomerDialog } from './customer-dialog';
+import { EditMemberDialog } from './edit-member-dialog';
 import { CustomerDeleteButton } from './customer-delete-button';
 import { NonMemberDialog } from './non-member-dialog';
 import { UpgradeToMemberDialog } from './upgrade-to-member-dialog';
@@ -191,6 +192,8 @@ export function CustomerDetailsDialog({
 }: CustomerDetailsDialogProps) {
   const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const totalSpent  = customer.sales.reduce((s, sale) => s + Number(sale.total), 0);
   const avgPurchase = customer._count.sales > 0 ? totalSpent / customer._count.sales : 0;
@@ -255,7 +258,7 @@ export function CustomerDetailsDialog({
                     ? 'bg-violet-500/30 text-violet-300 border border-violet-400/30'
                     : 'bg-slate-600/60 text-slate-300 border border-slate-500/30'
                 }`}>
-                  {isMember ? '✦ Member' : 'Non-Member'}
+                  {isMember ? '✦ Member' : 'Customer'}
                 </span>
               </div>
 
@@ -288,18 +291,27 @@ export function CustomerDetailsDialog({
             <div className="relative mt-3 flex items-center gap-2">
               {isMember ? (
                 <>
-                  <CustomerDialog
-                    mode="edit"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Edit Member"
+                    className="group"
+                    onClick={() => setEditOpen(true)}
+                  >
+                    <Pencil className="w-4 h-4 text-white group-hover:text-slate-900 transition-colors" />
+                  </Button>
+                  <EditMemberDialog
                     customer={{
-                      id: customer.id,
-                      name: customer.name,
-                      phone: customer.phone,
-                      address: customer.address ?? undefined,
-                      email: (customer as MemberCustomer).email ?? undefined,
-                      birthday: (customer as MemberCustomer).birthday ?? undefined,
-                      photoUrl: (customer as MemberCustomer).photoUrl ?? undefined,
-                      points: (customer as MemberCustomer).points,
+                      id:       customer.id,
+                      name:     customer.name,
+                      phone:    customer.phone,
+                      email:    (customer as MemberCustomer).email ?? null,
+                      birthday: (customer as MemberCustomer).birthday ?? null,
+                      photoUrl: (customer as MemberCustomer).photoUrl ?? null,
+                      points:   (customer as MemberCustomer).points,
                     }}
+                    open={editOpen}
+                    onOpenChange={setEditOpen}
                   />
                   <CustomerDeleteButton customerId={customer.id} />
                 </>
@@ -312,11 +324,19 @@ export function CustomerDetailsDialog({
                       phone: customer.phone, address: customer.address as string,
                     }}
                   />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Upgrade ke Member"
+                    className="group"
+                    onClick={() => setUpgradeOpen(true)}
+                  >
+                    <UserCog className="w-4 h-4 text-white group-hover:text-slate-900 transition-colors" />
+                  </Button>
                   <UpgradeToMemberDialog
-                    customer={{
-                      id: customer.id, name: customer.name,
-                      phone: customer.phone, address: customer.address as string,
-                    }}
+                    customer={{ id: customer.id, name: customer.name, phone: customer.phone }}
+                    open={upgradeOpen}
+                    onOpenChange={setUpgradeOpen}
                   />
                   <DeleteConfirmDialog
                     title="Hapus Non-Member"

@@ -60,7 +60,7 @@ export default async function CashierPage({ params }: { params: Promise<{ slug: 
     <PosPanel
       variants={posVariants}
       members={members}
-      nonMembers={nonMembers}
+      walkInCustomers={nonMembers}
       conversionRate={conversionRate}
       storeSlug={slug}
       storeName={store?.name ?? 'Toko'}

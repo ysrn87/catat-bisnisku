@@ -30,7 +30,7 @@ interface MemberCustomer {
   type: 'member';
 }
 
-interface NonMemberCustomer {
+interface CustomerCustomer {
   id: string;
   name: string;
   phone: string;
@@ -46,7 +46,7 @@ interface NonMemberCustomer {
   type: 'non-member';
 }
 
-type Customer = MemberCustomer | NonMemberCustomer;
+type Customer = MemberCustomer | CustomerCustomer;
 
 interface CustomersTableProps {
   customers: Customer[];
@@ -141,7 +141,7 @@ export function CustomersTable({
                       {isMember ? (
                         <Badge variant="default" className="bg-blue-600">Member</Badge>
                       ) : (
-                        <Badge variant="secondary">Non-Member</Badge>
+                        <Badge variant="secondary">Customer</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
@@ -222,7 +222,7 @@ export function CustomersTable({
                     {isMember ? (
                       <Badge variant="default" className="bg-blue-600 text-[11px]">Member</Badge>
                     ) : (
-                      <Badge variant="secondary" className="text-[11px]">Non-Member</Badge>
+                      <Badge variant="secondary" className="text-[11px]">Customer</Badge>
                     )}
                   </div>
                 </div>

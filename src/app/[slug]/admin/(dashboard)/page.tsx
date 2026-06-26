@@ -61,7 +61,7 @@ export default async function AdminDashboard({ params }: { params: Promise<{ slu
     <PosPanel
       variants={posVariants}
       members={members}
-      nonMembers={nonMembers}
+      walkInCustomers={nonMembers}
       conversionRate={conversionRate}
       storeSlug={slug}
       storeName={store?.name ?? 'Toko'}

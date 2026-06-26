@@ -4,7 +4,6 @@ import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { sanitizeName, sanitizeText } from '@/lib/sanitize';
 import { requireStoreAccess } from '@/lib/store-context';
-import bcrypt from 'bcryptjs';
 
 const normalizePhone = (phone: string) =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
@@ -177,65 +176,35 @@ export async function getCustomerPurchaseHistory(userId: string) {
 }
 
 // ─── Upgrade CUSTOMER → MEMBER ─────────────────────────────────────────────────
+// Skenario baru: user harus sudah punya akun sendiri (password tidak null).
+// Upgrade hanya ubah role — tidak menyentuh password atau data profil.
 
-export async function upgradeToMemberAction(userId: string, formData: FormData) {
+export async function upgradeToMemberAction(userId: string) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
-      return { success: false, error: 'Unauthorized - Admin access required' };
+    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
+      return { success: false, error: 'Unauthorized - minimal role MANAGER' };
     }
 
     const storeUser = await db.storeUser.findUnique({
       where: { storeId_userId: { storeId, userId } },
     });
-    if (!storeUser)                        return { success: false, error: 'Customer tidak ditemukan di toko ini' };
-    if (storeUser.role !== 'CUSTOMER')     return { success: false, error: 'Customer sudah menjadi member' };
+    if (!storeUser)                    return { success: false, error: 'Customer tidak ditemukan di toko ini' };
+    if (storeUser.role !== 'CUSTOMER') return { success: false, error: 'User ini bukan CUSTOMER' };
 
-    const user = await db.user.findUnique({ where: { id: userId } });
-    if (!user) return { success: false, error: 'User tidak ditemukan' };
-
-    const password   = formData.get('password')  as string | null;
-    const email      = formData.get('email')     as string | null;
-    const birthday   = formData.get('birthday')  as string | null;
-    const photoUrl   = formData.get('photoUrl')  as string | null;
-    const name       = sanitizeName(formData.get('name') as string, 100);
-    const phone      = normalizePhone(formData.get('phone') as string);
-    const grantRetro = formData.get('grantRetroPoints') === 'true';
-
-    if (!name || !phone) return { success: false, error: 'Nama dan telepon wajib diisi' };
-
-    const needsPassword = !user.password;
-    if (needsPassword && (!password || password.length < 6)) {
-      return { success: false, error: 'Password wajib diisi (min. 6 karakter) agar member bisa login' };
-    }
-
-    if (phone !== user.phone) {
-      const phoneConflict = await db.user.findFirst({ where: { phone, NOT: { id: userId } } });
-      if (phoneConflict) return { success: false, error: 'Nomor telepon sudah digunakan akun lain' };
-    }
-
-    const normalizedEmail = email ? email.trim().toLowerCase() : null;
-    if (normalizedEmail) {
-      const emailConflict = await db.user.findFirst({ where: { email: normalizedEmail, NOT: { id: userId } } });
-      if (emailConflict) return { success: false, error: 'Email sudah terdaftar' };
+    // Pastikan user sudah punya password sendiri — tidak boleh toko yang set
+    const user = await db.user.findUnique({ where: { id: userId }, select: { password: true } });
+    if (!user?.password) {
+      return { success: false, error: 'Pelanggan belum punya akun. Minta mereka daftar sendiri via /register terlebih dahulu.' };
     }
 
     await db.$transaction(async (tx) => {
-      // FIX: hapus address dari userUpdate
-      const userUpdate: any = { name, phone, email: normalizedEmail };
-      if (birthday)                     userUpdate.birthday = new Date(birthday);
-      if (photoUrl)                     userUpdate.photoUrl = photoUrl;
-      if (needsPassword && password)    userUpdate.password = await bcrypt.hash(password, 10);
-
-      await tx.user.update({ where: { id: userId }, data: userUpdate });
-
       await tx.storeUser.update({
         where: { storeId_userId: { storeId, userId } },
         data:  { role: 'MEMBER' },
       });
 
-      // FIX: PointHistory pakai storeUserId + delta
       await tx.pointHistory.create({
         data: {
           storeUserId: storeUser.id,
@@ -244,29 +213,6 @@ export async function upgradeToMemberAction(userId: string, formData: FormData) 
           description: 'Upgrade dari Customer ke Member',
         },
       });
-
-      // Backfill poin retroaktif dari transaksi sebelumnya
-      if (grantRetro) {
-        const pastSales = await tx.sale.findMany({
-          where:  { storeId, customerId: userId },
-          select: { id: true, saleNumber: true, pointsEarned: true },
-        });
-        const retroPoints = pastSales.reduce((sum, s) => sum + s.pointsEarned, 0);
-        if (retroPoints > 0) {
-          await tx.storeUser.update({
-            where: { storeId_userId: { storeId, userId } },
-            data:  { points: { increment: retroPoints } },
-          });
-          await tx.pointHistory.create({
-            data: {
-              storeUserId: storeUser.id,
-              type:        'ADJUST',
-              delta:       retroPoints,
-              description: `Poin retroaktif dari ${pastSales.length} transaksi sebelum upgrade ke member`,
-            },
-          });
-        }
-      }
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
@@ -278,6 +224,7 @@ export async function upgradeToMemberAction(userId: string, formData: FormData) 
   }
 }
 
+// Alias untuk backward compat — keduanya delegate ke fungsi yang sama
 export const upgradeToMemberActionLegacy = upgradeToMemberAction;
 
 export async function getAllNonMemberCustomers() {

@@ -48,7 +48,6 @@ export async function registerMemberAction(formData: FormData) {
     const name     = formData.get('name')     as string;
     const rawPhone = formData.get('phone')    as string;
     const rawEmail = formData.get('email')    as string;
-    // FIX: hapus address — tidak ada di User lagi
     const password = formData.get('password') as string;
     const birthday = formData.get('birthday') as string;
     const storeId  = formData.get('storeId')  as string;
@@ -81,11 +80,14 @@ export async function registerMemberAction(formData: FormData) {
     const existingUser = await db.user.findFirst({ where: { phone } });
 
     if (existingUser) {
+      // Akun sudah ada dan sudah punya password → suruh login
       if (existingUser.password) {
         return { success: false, error: 'Nomor telepon sudah terdaftar. Silakan login.' };
       }
 
-      // Passwordless (CUSTOMER) → set password and upgrade to MEMBER
+      // CUSTOMER (password null) → hanya set password + upgrade role.
+      // Nama yang dipakai tetap nama yang sudah ada di DB (dicatat toko),
+      // bukan nama dari form — mencegah user menimpa nama record toko secara sembarangan.
       if (email) {
         const emailConflict = await db.user.findFirst({ where: { email, NOT: { id: existingUser.id } } });
         if (emailConflict) return { success: false, error: 'Email sudah terdaftar' };
@@ -97,11 +99,11 @@ export async function registerMemberAction(formData: FormData) {
         await tx.user.update({
           where: { id: existingUser.id },
           data: {
-            name, email,
-            // FIX: hapus address — tidak ada di User lagi
-            // FIX: hapus role — tidak ada di User lagi
+            // Nama dan birthday hanya diisi kalau belum ada (CUSTOMER mungkin belum lengkap)
+            name:     existingUser.name || name,
+            email:    email ?? existingUser.email,
+            birthday: birthday ? new Date(birthday) : existingUser.birthday,
             password: hashedPassword,
-            birthday: birthday ? new Date(birthday) : null,
           },
         });
 
@@ -115,7 +117,7 @@ export async function registerMemberAction(formData: FormData) {
       return { success: true };
     }
 
-    // Brand new user
+    // User baru — buat akun + langsung jadi MEMBER di toko
     if (email) {
       const existingEmail = await db.user.findFirst({ where: { email } });
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
@@ -127,7 +129,6 @@ export async function registerMemberAction(formData: FormData) {
       const newUser = await tx.user.create({
         data: {
           name, phone, email,
-          // FIX: hapus address dan role — tidak ada di User lagi
           password: hashedPassword,
           birthday: birthday ? new Date(birthday) : null,
         },

@@ -46,8 +46,14 @@ async function getProducts(storeId: string, params: { search?: string; status?: 
   });
 
   return products.map((product) => ({
-    ...product,
-    variants: product.variants.map((v) => ({
+    id:          product.id,
+    name:        product.name,
+    sku:         product.sku,
+    description: product.description,
+    isActive:    product.isActive,
+    categoryId:  product.categoryId,
+    category:    product.category,
+    variants:    product.variants.map((v) => ({
       ...v,
       price: Number(v.price),
       cost:  Number(v.cost),
