@@ -153,11 +153,13 @@ export async function getCustomerPurchaseHistory(userId: string) {
 
     return sales.map((sale) => ({
       ...sale,
-      subtotal: Number(sale.subtotal),
-      discount: Number(sale.discount),
-      tax:      Number(sale.tax),
-      ongkir:   Number(sale.ongkir),
-      total:    Number(sale.total),
+      subtotal:      Number(sale.subtotal),
+      discount:      Number(sale.discount),
+      tax:           Number(sale.tax),
+      ongkir:        Number(sale.ongkir),
+      total:         Number(sale.total),
+      paymentMethod: sale.payment?.method ?? 'CASH',
+      paymentStatus: sale.payment?.status ?? 'PAID',
       items: sale.items.map((item) => ({
         ...item,
         price:    Number(item.price),
