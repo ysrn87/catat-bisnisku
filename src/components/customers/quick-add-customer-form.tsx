@@ -59,7 +59,7 @@ export function QuickAddCustomerForm({ onSuccess, onCancel }: QuickAddCustomerFo
           title: 'Success!',
           description: 'Customer added successfully.',
         });
-        onSuccess(result.data);
+        onSuccess({ ...result.data, phone: result.data.phone ?? '' });
         // Reset form
         setName('');
         setPhone('');

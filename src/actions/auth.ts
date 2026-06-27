@@ -70,12 +70,18 @@ export async function registerMemberAction(formData: FormData) {
     if (phone.length < 9 || phone.length > 15) {
       return { success: false, error: 'Nomor telepon tidak valid' };
     }
-    if (!storeId) {
-      return { success: false, error: 'Store ID tidak ditemukan' };
-    }
-
     const { db } = await import('@/lib/db');
     const bcrypt  = await import('bcryptjs');
+
+    // FIX: storeId sekarang opsional — member bisa daftar mandiri tanpa toko,
+    // lalu join toko belakangan lewat /join-store. storeId hanya dipakai kalau
+    // pendaftaran datang dari link toko tertentu (?storeId=xxx).
+    if (storeId) {
+      const store = await db.store.findUnique({ where: { id: storeId }, select: { id: true } });
+      if (!store) {
+        return { success: false, error: 'Toko tidak ditemukan' };
+      }
+    }
 
     const existingUser = await db.user.findFirst({ where: { phone } });
 
@@ -107,17 +113,20 @@ export async function registerMemberAction(formData: FormData) {
           },
         });
 
-        await tx.storeUser.upsert({
-          where:  { storeId_userId: { storeId, userId: existingUser.id } },
-          create: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
-          update: { role: 'MEMBER' },
-        });
+        // FIX: StoreUser hanya dibuat kalau storeId ada (link toko tertentu)
+        if (storeId) {
+          await tx.storeUser.upsert({
+            where:  { storeId_userId: { storeId, userId: existingUser.id } },
+            create: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
+            update: { role: 'MEMBER' },
+          });
+        }
       });
 
       return { success: true };
     }
 
-    // User baru — buat akun + langsung jadi MEMBER di toko
+    // User baru — buat akun, dan join toko kalau storeId disediakan
     if (email) {
       const existingEmail = await db.user.findFirst({ where: { email } });
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
@@ -134,9 +143,12 @@ export async function registerMemberAction(formData: FormData) {
         },
       });
 
-      await tx.storeUser.create({
-        data: { storeId, userId: newUser.id, role: 'MEMBER', points: 0 },
-      });
+      // FIX: StoreUser hanya dibuat kalau storeId ada
+      if (storeId) {
+        await tx.storeUser.create({
+          data: { storeId, userId: newUser.id, role: 'MEMBER', points: 0 },
+        });
+      }
     });
 
     return { success: true };

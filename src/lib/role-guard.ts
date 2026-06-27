@@ -14,8 +14,7 @@ export type StoreRoleValue =
   | 'ADMINISTRATOR'
   | 'MANAGER'
   | 'CASHIER'
-  | 'MEMBER'
-  | 'CUSTOMER';
+  | 'MEMBER';
 
 export const ROLE_HIERARCHY: Record<StoreRoleValue, number> = {
   OWNER:         0,
@@ -23,7 +22,6 @@ export const ROLE_HIERARCHY: Record<StoreRoleValue, number> = {
   MANAGER:       2,
   CASHIER:       3,
   MEMBER:        4,
-  CUSTOMER:      5,
 };
 
 const PRIVILEGED_ROLES: StoreRoleValue[] = ['OWNER', 'ADMINISTRATOR'];

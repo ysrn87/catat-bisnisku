@@ -17,7 +17,7 @@ async function getSalesReport(storeId: string, page = 1, limit = 10) {
     db.sale.findMany({
       where: { storeId }, skip, take: limit, orderBy: { createdAt: 'desc' },
       include: {
-        customer: { select: { name: true, email: true } },
+        customer: { select: { name: true, phone: true } },
         payment:  { select: { method: true, status: true } }, // FIX: dari Payment
         items: { include: { variant: { select: { name: true, product: { select: { name: true } } } } } },
       },

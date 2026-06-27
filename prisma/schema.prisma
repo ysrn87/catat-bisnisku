@@ -9,13 +9,8 @@ datasource db {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // USER
-//
-// Perubahan dari skema lama:
-// - Role global DIHAPUS — tidak ada enum Role. Otorisasi 100% dari StoreUser.
-// - isSuperAdmin: Boolean — flag internal untuk akses super admin dashboard.
-//   Di-set manual di DB, tidak ada UI register untuk ini.
-// - address: tetap di User — dipakai lintas konteks (member, non-member,
-//   customer, manager, cashier profile) jadi disimpan di sini saja.
+// Perubahan: hapus relasi customerSales (Sale.customerId sekarang → Customer.id)
+//            tambah linkedCustomers (Customer records yang sudah punya akun ini)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
@@ -31,21 +26,16 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  ownedStores   Store[]        @relation("StoreOwner")
-  storeUsers    StoreUser[]
-  cashierSales  Sale[]         @relation("CashierSales")
-  customerSales Sale[]         @relation("CustomerSales")
+  ownedStores      Store[]     @relation("StoreOwner")
+  storeUsers       StoreUser[]
+  cashierSales     Sale[]      @relation("CashierSales")
+  linkedCustomers  Customer[]  // Customer lokal yang sudah di-link ke akun ini
 
   @@map("users")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE
-//
-// Perubahan:
-// - subscriptionExpiresAt → planExpiresAt (lebih deskriptif)
-// - ownerId tetap ada sebagai FK langsung ke User (satu owner, tidak bisa transfer)
-// - Payment dipindah ke relasi lewat Sale (bukan langsung dari Store)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Store {
@@ -61,6 +51,7 @@ model Store {
 
   owner          User            @relation("StoreOwner", fields: [ownerId], references: [id])
   storeUsers     StoreUser[]
+  customers      Customer[]      // walk-in customers lokal toko ini
   products       Product[]
   variants       ProductVariant[]
   categories     Category[]
@@ -75,12 +66,34 @@ model Store {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CUSTOMER  (baru)
+// Walk-in / non-member lokal per toko. Tidak punya akun login.
+// userId: optional link ke User jika pelanggan ini kemudian daftar & di-upgrade ke Member.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  phone     String?
+  address   String?
+  userId    String?  // optional — diisi setelah upgrade ke member
+
+  createdAt DateTime @default(now())
+
+  store Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id])
+  sales Sale[]
+
+  @@index([storeId])
+  @@index([userId])
+  @@map("customers")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STORE USER (pivot User ↔ Store)
-//
-// Perubahan:
-// - points dipindah ke sini (sudah ada) — ini tetap sumber kebenaran saldo poin
-// - role menggunakan StoreRole enum yang sudah bersih
-// - TIDAK ada relasi balik ke User.role global — role global sudah dihapus
+// Hanya untuk yang punya akun: OWNER, ADMINISTRATOR, MANAGER, CASHIER, MEMBER
+// Role CUSTOMER dihapus — customer lokal kini di tabel Customer
 // ─────────────────────────────────────────────────────────────────────────────
 
 model StoreUser {
@@ -94,6 +107,7 @@ model StoreUser {
   store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   pointHistories PointHistory[]
+  memberSales    Sale[]         @relation("MemberSales") // sales sebagai member
 
   @@unique([storeId, userId])
   @@map("store_users")
@@ -101,12 +115,6 @@ model StoreUser {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCT
-//
-// Perubahan:
-// - createdById / updatedById dihapus — audit trail ini jarang dipakai dan
-//   mempersulit delete user. Kalau perlu, tambah balik nanti.
-// - type (READY_STOCK/PREORDER) dipindah ke ProductVariant saja — lebih fleksibel
-//   karena satu produk bisa punya varian ready stock dan preorder sekaligus.
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Product {
@@ -130,12 +138,6 @@ model Product {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCT VARIANT
-//
-// Perubahan:
-// - type (ProductType) ada di sini, bukan di Product
-// - pointsPerUnit: Int — berapa poin yang di-earn per unit terjual (0 = tidak earn)
-//   Ini menggantikan field `points` yang ada di skema lama
-// - lowStockAt menggantikan lowStock (nama lebih deskriptif)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model ProductVariant {
@@ -167,7 +169,6 @@ model ProductVariant {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CATEGORY
-// Tidak ada perubahan signifikan.
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Category {
@@ -188,34 +189,32 @@ model Category {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SALE
-//
 // Perubahan:
-// - paymentMethod dihapus dari Sale — dipindah ke Payment (karena satu sale
-//   bisa punya metode pembayaran berbeda via Midtrans)
-// - paymentStatus dihapus — status ada di Payment
-// - pointsRedeemed dihapus — sudah tercatat di PointHistory dengan delta negatif
-// - ongkir tetap ada (relevan untuk delivery order)
-// - notes tetap ada
+// - customerId → Customer.id  (walk-in lokal, nullable)
+// - memberId   → StoreUser.id (member punya akun, nullable)
+// Hapus relasi lama ke User ("CustomerSales")
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Sale {
-  id             String    @id @default(cuid())
-  storeId        String
-  cashierId      String
-  customerId     String?
-  saleNumber     String
-  subtotal       Decimal   @db.Decimal(10, 2)
-  discount       Decimal   @default(0) @db.Decimal(10, 2)
-  tax            Decimal   @default(0) @db.Decimal(10, 2)
-  ongkir         Decimal   @default(0) @db.Decimal(10, 2)
-  total          Decimal   @db.Decimal(10, 2)
-  pointsEarned   Int       @default(0)
-  notes          String?
-  createdAt      DateTime  @default(now())
+  id           String    @id @default(cuid())
+  storeId      String
+  cashierId    String
+  customerId   String?   // → Customer.id  (walk-in lokal)
+  memberId     String?   // → StoreUser.id (member dengan akun)
+  saleNumber   String
+  subtotal     Decimal   @db.Decimal(10, 2)
+  discount     Decimal   @default(0) @db.Decimal(10, 2)
+  tax          Decimal   @default(0) @db.Decimal(10, 2)
+  ongkir       Decimal   @default(0) @db.Decimal(10, 2)
+  total        Decimal   @db.Decimal(10, 2)
+  pointsEarned Int       @default(0)
+  notes        String?
+  createdAt    DateTime  @default(now())
 
   store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   cashier        User           @relation("CashierSales", fields: [cashierId], references: [id])
-  customer       User?          @relation("CustomerSales", fields: [customerId], references: [id])
+  customer       Customer?      @relation(fields: [customerId], references: [id])
+  member         StoreUser?     @relation("MemberSales", fields: [memberId], references: [id])
   items          SaleItem[]
   payment        Payment?
   pointHistories PointHistory[]
@@ -240,20 +239,14 @@ model SaleItem {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PAYMENT (Midtrans)
-//
-// Perubahan:
-// - saleId FK UNIQUE (1 sale = 1 payment record)
-// - method: String — CASH, QRIS, TRANSFER, MIDTRANS, dll
-// - status: PaymentStatus enum
-// - midtransOrderId: String? UNIQUE — diisi hanya untuk transaksi Midtrans
+// PAYMENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Payment {
   id              String        @id @default(cuid())
   saleId          String        @unique
   storeId         String
-  method          String        // CASH | QRIS | TRANSFER | MIDTRANS | dll
+  method          String
   status          PaymentStatus @default(PAID)
   amount          Decimal       @db.Decimal(10, 2)
   midtransOrderId String?       @unique
@@ -269,10 +262,6 @@ model Payment {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UPGRADE PAYMENT
-//
-// Catatan pembayaran untuk upgrade plan FREE → PRO via Midtrans.
-// Terpisah dari Payment (yang 1-to-1 dengan Sale/transaksi POS) karena
-// upgrade plan bukan transaksi penjualan — tidak ada Sale yang terkait.
 // ─────────────────────────────────────────────────────────────────────────────
 
 model UpgradePayment {
@@ -294,26 +283,16 @@ model UpgradePayment {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POINT HISTORY
-//
-// Perubahan BESAR:
-// - userId + storeId? diganti dengan storeUserId → FK langsung ke StoreUser
-//   Ini lebih bersih: satu record point history selalu milik satu StoreUser
-//   (kombinasi user + toko), tidak perlu dua FK terpisah.
-// - points (bisa positif/negatif) diganti dengan delta (lebih deskriptif)
-//   +N = earn, -N = redeem/expire
-// - saleId: FK? → Sale — untuk audit trail otomatis dari transaksi
-// - type: PointTxType enum (EARN, REDEEM, ADJUST, EXPIRE, REGISTER, UPGRADE)
-// - expiresAt dihapus per-history — kalau perlu expiry, kelola di level StoreUser
 // ─────────────────────────────────────────────────────────────────────────────
 
 model PointHistory {
-  id          String       @id @default(cuid())
+  id          String      @id @default(cuid())
   storeUserId String
   saleId      String?
   type        PointTxType
-  delta       Int          // positif = earn, negatif = redeem/expire
+  delta       Int
   description String
-  createdAt   DateTime     @default(now())
+  createdAt   DateTime    @default(now())
 
   storeUser StoreUser @relation(fields: [storeUserId], references: [id], onDelete: Cascade)
   sale      Sale?     @relation(fields: [saleId], references: [id], onDelete: SetNull)
@@ -324,13 +303,6 @@ model PointHistory {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CASHFLOW
-//
-// Perubahan:
-// - createdById dihapus — sama seperti Product, audit trail ini mempersulit
-//   delete user. Ganti dengan saleId (auto) atau manual entry tanpa creator.
-// - saleId: FK? UNIQUE → Sale — kalau berasal dari transaksi, 1 sale = 1 cashflow
-// - date + time digabung jadi occurredAt: DateTime
-// - category tetap String (fleksibel, admin bisa bebas isi)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Cashflow {
@@ -353,11 +325,6 @@ model Cashflow {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STOCK MOVEMENT
-//
-// Perubahan:
-// - storeId dihapus — redundan karena variant sudah punya storeId
-// - type: MovementType enum (bukan String bebas)
-// - refSaleId: FK? → Sale — untuk audit trail pengurangan stok dari penjualan
 // ─────────────────────────────────────────────────────────────────────────────
 
 model StockMovement {
@@ -365,7 +332,7 @@ model StockMovement {
   variantId  String
   storeId    String
   type       MovementType
-  quantity   Int          // positif = masuk, negatif = keluar
+  quantity   Int
   notes      String?
   refSaleId  String?
   createdAt  DateTime     @default(now())
@@ -379,10 +346,6 @@ model StockMovement {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STORE SETTING
-//
-// Perubahan:
-// - Rename dari Settings → StoreSetting (lebih eksplisit)
-// - updatedAt ditambah createdAt
 // ─────────────────────────────────────────────────────────────────────────────
 
 model StoreSetting {
@@ -404,15 +367,13 @@ model StoreSetting {
 // ENUMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// StoreRole: role user DI DALAM toko (sumber kebenaran otorisasi)
-// Tidak ada enum Role global — sudah dihapus
 enum StoreRole {
-  OWNER         // pemilik toko, tidak bisa di-assign, tidak bisa ditransfer
-  ADMINISTRATOR // kelola semua aspek toko kecuali delete toko
-  MANAGER       // kelola produk, stok, laporan, tim bawahnya
-  CASHIER       // akses POS saja
-  MEMBER        // pelanggan terdaftar, punya poin
-  CUSTOMER      // pelanggan dengan akun tapi belum jadi member resmi, tidak punya poin
+  OWNER
+  ADMINISTRATOR
+  MANAGER
+  CASHIER
+  MEMBER
+  // CUSTOMER dihapus — digantikan model Customer
 }
 
 enum Plan {
@@ -429,7 +390,7 @@ enum PaymentStatus {
   PAID
   PENDING
   FAILED
-  REFUNDED  // tambahan: untuk kasus pembatalan Midtrans
+  REFUNDED
 }
 
 enum TransactionType {
@@ -438,19 +399,19 @@ enum TransactionType {
 }
 
 enum MovementType {
-  PURCHASE    // beli stok masuk
-  SALE        // keluar dari penjualan (otomatis)
-  ADJUSTMENT  // koreksi manual
-  RETURN      // retur dari customer
-  DAMAGED     // barang rusak/hilang
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  RETURN
+  DAMAGED
 }
 
 enum PointTxType {
-  EARN        // dapat poin dari transaksi
-  EARN_MANUAL // dapat poin dari input manual admin
-  REDEEM      // tukar poin
-  ADJUST      // koreksi manual
-  EXPIRE      // poin hangus
-  REGISTER    // poin selamat datang saat jadi member
-  UPGRADE     // catatan upgrade dari CUSTOMER ke MEMBER
+  EARN
+  EARN_MANUAL
+  REDEEM
+  ADJUST
+  EXPIRE
+  REGISTER
+  UPGRADE
 }

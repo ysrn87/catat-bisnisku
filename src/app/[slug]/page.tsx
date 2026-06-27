@@ -26,8 +26,7 @@ export default async function StoreRootPage({ params }: { params: Promise<{ slug
     case 'ADMINISTRATOR': redirect(`/${slug}/admin`);         break;
     case 'MANAGER':       redirect(`/${slug}/manager`);       break;
     case 'CASHIER':       redirect(`/${slug}/cashier`);       break;
-    case 'MEMBER':
-    case 'CUSTOMER':      redirect(`/${slug}/member`);        break;
+    case 'MEMBER':         redirect(`/${slug}/member`);        break;
     default:              redirect('/store-select');
   }
 }

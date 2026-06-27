@@ -149,22 +149,26 @@ export async function getCustomerDetails(customerId: string) {
   }
 
   const storeUser = await db.storeUser.findUnique({
-    where: { storeId_userId: { storeId, userId: customerId } },
-  });
-  if (!storeUser) throw new Error('Customer tidak ditemukan di store ini');
-
-  return db.user.findUnique({
-    where:   { id: customerId },
+    where:   { storeId_userId: { storeId, userId: customerId } },
     include: {
-      customerSales: { // FIX: sales → customerSales (relasi baru)
-        where:   { storeId },
+      user: {
+        select: { id: true, name: true, email: true, phone: true, birthday: true, photoUrl: true, createdAt: true },
+      },
+      // FIX: member sales sekarang diakses via StoreUser.memberSales (relasi "MemberSales"), bukan User.customerSales
+      memberSales: {
         orderBy: { createdAt: 'desc' },
         take:    10,
         include: { items: { include: { variant: { include: { product: true } } } } },
       },
-      // FIX: pointsHistory dihapus dari User — akses via storeUser.pointHistories
     },
   });
+  if (!storeUser) throw new Error('Customer tidak ditemukan di store ini');
+
+  return {
+    ...storeUser.user,
+    points: storeUser.points,
+    sales: storeUser.memberSales,
+  };
 }
 
 export async function checkPhoneExistsAction(phone: string): Promise<{
@@ -368,46 +372,4 @@ export async function getCustomerPointsHistory(customerId: string, page = 1, pag
   ]);
 
   return { history, total };
-}
-
-export async function upgradeCustomerToMemberAction(customerId: string) {
-  try {
-    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
-
-    if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
-      return { success: false, error: 'Minimal role MANAGER untuk upgrade customer ke member.' };
-    }
-
-    const existing = await db.storeUser.findUnique({
-      where: { storeId_userId: { storeId, userId: customerId } },
-    });
-    if (!existing) return { success: false, error: 'Customer tidak ditemukan di toko ini.' };
-    if (existing.role !== 'CUSTOMER') {
-      return { success: false, error: `User ini bukan CUSTOMER (role saat ini: ${existing.role}).` };
-    }
-
-    await db.$transaction(async (tx) => {
-      await tx.storeUser.update({
-        where: { storeId_userId: { storeId, userId: customerId } },
-        data:  { role: 'MEMBER', points: 0 },
-      });
-
-      // FIX: PointHistory pakai storeUserId + delta
-      await tx.pointHistory.create({
-        data: {
-          storeUserId: existing.id,
-          type:        'UPGRADE',
-          delta:       0,
-          description: 'Upgrade dari Customer ke Member — point mulai dari 0',
-        },
-      });
-    });
-
-    revalidatePath(`/${storeSlug}/admin/transactions/customers`);
-    revalidatePath(`/${storeSlug}/manager/transactions/customers`);
-    return { success: true };
-  } catch (error) {
-    console.error('Upgrade customer error:', error);
-    return { success: false, error: 'Gagal upgrade customer ke member.' };
-  }
 }

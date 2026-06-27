@@ -17,7 +17,8 @@ async function getSales(storeId: string, params: {
 
   if (search) {
     where.OR = [
-      { customer:   { name:       { contains: search, mode: 'insensitive' as const } } },
+      { customer: { name:  { contains: search, mode: 'insensitive' as const } } },
+      { member:   { user: { name: { contains: search, mode: 'insensitive' as const } } } },
       { saleNumber: { contains: search, mode: 'insensitive' as const } },
       { cashier:    { name:       { contains: search, mode: 'insensitive' as const } } },
     ];
@@ -39,7 +40,8 @@ async function getSales(storeId: string, params: {
     db.sale.findMany({
       where, skip, take: limit, orderBy,
       include: {
-        customer: { select: { name: true, email: true, phone: true, address: true } },
+        customer: { select: { name: true, phone: true } },
+        member:   { select: { user: { select: { name: true, phone: true } } } },
         cashier:  { select: { name: true } },
         payment:  { select: { method: true, status: true } }, // FIX: include Payment
         items:    { include: { variant: { include: { product: true } } } },
@@ -50,9 +52,10 @@ async function getSales(storeId: string, params: {
 
   return {
     sales: sales.map((sale) => {
-      const { subtotal, discount, tax, total, items, payment, ...rest } = sale;
+      const { subtotal, discount, tax, total, items, payment, customer, member, ...rest } = sale;
       return {
         ...rest,
+        customerName: customer?.name ?? member?.user?.name ?? null,
         paymentMethod: payment?.method ?? 'CASH',
         paymentStatus: payment?.status ?? 'PAID',
         subtotal: Number(subtotal), discount: Number(discount),
@@ -90,12 +93,12 @@ async function getMembers(storeId: string) {
 }
 
 async function getNonMembers(storeId: string) {
-  const storeUsers = await db.storeUser.findMany({
-    where: { storeId, role: 'CUSTOMER' },
-    include: { user: { select: { id: true, name: true, phone: true, address: true } } },
-    orderBy: { user: { name: 'asc' } },
+  const customers = await db.customer.findMany({
+    where: { storeId },
+    select: { id: true, name: true, phone: true, address: true },
+    orderBy: { name: 'asc' },
   });
-  return storeUsers.map((su) => ({ id: su.user.id, name: su.user.name, phone: su.user.phone, address: su.user.address ?? '' }));
+  return customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone ?? '', address: c.address ?? '' }));
 }
 
 export default async function SalesPage({ searchParams }: {

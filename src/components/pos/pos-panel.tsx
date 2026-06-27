@@ -453,7 +453,8 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     try {
       const result = await createSaleAction({
         items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.price })),
-        customerId: customerType === 'member' ? customerId || null : null,
+        customerId: customerType === 'walk-in' ? walkInCustomerId || null : null,
+        memberId:   customerType === 'member'  ? customerId        || null : null,
 
         paymentMethod,
         paymentStatus,

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { upgradeCustomerToMemberAction } from '@/actions/members';
+import { upgradeToMemberAction } from '@/actions/customers';
 import { UserCog, Loader2, Star, CheckCircle2 } from 'lucide-react';
 
 interface UpgradeToMemberDialogProps {
@@ -29,7 +29,7 @@ export function UpgradeToMemberDialog({ customer, open, onOpenChange }: UpgradeT
   const handleUpgrade = async () => {
     setLoading(true);
     try {
-      const result = await upgradeCustomerToMemberAction(customer.id);
+      const result = await upgradeToMemberAction(customer.id);
       if (result.success) {
         toast({
           title: 'Berhasil diupgrade!',

@@ -17,6 +17,8 @@ const PUBLIC_ROUTES = [
 // ─── Route yang butuh session tapi tidak butuh store context ──────────────────
 const AUTH_ONLY_ROUTES = [
   '/store-select',
+  '/member-select',
+  '/join-store',
 ];
 
 // ─── File statis ──────────────────────────────────────────────────────────────

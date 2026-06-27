@@ -17,7 +17,8 @@ type PaymentStatusValue = 'PAID' | 'PENDING' | 'FAILED' | 'REFUNDED';
 
 interface CreateSaleInput {
   items:           SaleItemInput[];
-  customerId:      string | null;
+  customerId:      string | null; // Customer.id (walk-in) atau null
+  memberId?:       string | null; // StoreUser.id (member) — opsional, untuk backward compat
   paymentMethod:   string;
   paymentStatus?:  PaymentStatusValue;
   discount?:       number;
@@ -27,20 +28,9 @@ interface CreateSaleInput {
   pointsRedeemed?: number;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Helper
-// ─────────────────────────────────────────────────────────────
-async function getStoreUserId(storeId: string, userId: string): Promise<string | null> {
-  const su = await db.storeUser.findUnique({
-    where:  { storeId_userId: { storeId, userId } },
-    select: { id: true },
-  });
-  return su?.id ?? null;
-}
-
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // CREATE SALE
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export async function createSaleAction(input: CreateSaleInput) {
   try {
     const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
@@ -50,8 +40,11 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     const {
-      items, customerId,
-      paymentMethod, paymentStatus = 'PAID',
+      items,
+      customerId,   // Customer.id (walk-in lokal) — nullable
+      memberId,     // StoreUser.id (member) — nullable
+      paymentMethod,
+      paymentStatus = 'PAID',
       discount = 0, tax = 0, ongkir = 0,
       notes, pointsRedeemed = 0,
     } = input;
@@ -60,22 +53,25 @@ export async function createSaleAction(input: CreateSaleInput) {
 
     const notesSanitized = sanitizeText(notes, 500);
 
-    let customerStoreUserId: string | null = null;
-    if (customerId) {
-      const storeUser = await db.storeUser.findUnique({
-        where:  { storeId_userId: { storeId, userId: customerId } },
-        select: { id: true, role: true, points: true },
+    // Resolve member StoreUser untuk poin
+    let memberStoreUser: { id: string; points: number } | null = null;
+    if (memberId) {
+      const su = await db.storeUser.findUnique({
+        where:  { id: memberId },
+        select: { id: true, role: true, points: true, storeId: true },
       });
-      customerStoreUserId = storeUser?.id ?? null;
+      if (!su || su.storeId !== storeId || su.role !== 'MEMBER') {
+        return { success: false, error: 'Member tidak valid di toko ini' };
+      }
+      memberStoreUser = { id: su.id, points: su.points };
 
       if (pointsRedeemed > 0) {
-        if (!storeUser || storeUser.role !== 'MEMBER') {
-          return { success: false, error: 'Penukaran poin hanya untuk member' };
-        }
-        if (pointsRedeemed > storeUser.points) {
-          return { success: false, error: `Poin tidak cukup. Tersedia: ${storeUser.points}` };
+        if (pointsRedeemed > su.points) {
+          return { success: false, error: `Poin tidak cukup. Tersedia: ${su.points}` };
         }
       }
+    } else if (pointsRedeemed > 0) {
+      return { success: false, error: 'Penukaran poin hanya untuk member' };
     }
 
     let pointsEarned = 0;
@@ -94,7 +90,7 @@ export async function createSaleAction(input: CreateSaleInput) {
 
       variantTypeById.set(variant.id, variant.type);
 
-      if (customerId && pointsRedeemed === 0 && paymentStatus === 'PAID') {
+      if (memberId && pointsRedeemed === 0 && paymentStatus === 'PAID') {
         pointsEarned += variant.pointsPerUnit * item.quantity;
       }
     }
@@ -115,10 +111,11 @@ export async function createSaleAction(input: CreateSaleInput) {
           storeId,
           saleNumber:   generateSaleNumber(),
           cashierId:    userId,
-          customerId,
+          customerId:   customerId || null,
+          memberId:     memberId   || null,
           subtotal, discount, tax, ongkir, total,
           notes:        notesSanitized,
-          pointsEarned: customerId && pointsRedeemed === 0 && paymentStatus === 'PAID' ? pointsEarned : 0,
+          pointsEarned: memberId && pointsRedeemed === 0 && paymentStatus === 'PAID' ? pointsEarned : 0,
           items: {
             create: items.map((i) => ({
               variantId: i.variantId,
@@ -154,22 +151,22 @@ export async function createSaleAction(input: CreateSaleInput) {
         });
       }
 
-      if (customerId && customerStoreUserId) {
+      if (memberId && memberStoreUser) {
         if (pointsRedeemed > 0) {
           await tx.storeUser.update({
-            where: { storeId_userId: { storeId, userId: customerId } },
+            where: { id: memberStoreUser.id },
             data:  { points: { decrement: pointsRedeemed } },
           });
           await tx.pointHistory.create({
-            data: { storeUserId: customerStoreUserId, saleId: newSale.id, type: 'REDEEM', delta: -pointsRedeemed, description: `Penukaran poin ${newSale.saleNumber}` },
+            data: { storeUserId: memberStoreUser.id, saleId: newSale.id, type: 'REDEEM', delta: -pointsRedeemed, description: `Penukaran poin ${newSale.saleNumber}` },
           });
         } else if (pointsEarned > 0 && paymentStatus === 'PAID') {
           await tx.storeUser.update({
-            where: { storeId_userId: { storeId, userId: customerId } },
+            where: { id: memberStoreUser.id },
             data:  { points: { increment: pointsEarned } },
           });
           await tx.pointHistory.create({
-            data: { storeUserId: customerStoreUserId, saleId: newSale.id, type: 'EARN', delta: pointsEarned, description: `Poin pembelian ${newSale.saleNumber}` },
+            data: { storeUserId: memberStoreUser.id, saleId: newSale.id, type: 'EARN', delta: pointsEarned, description: `Poin pembelian ${newSale.saleNumber}` },
           });
         }
       }
@@ -193,15 +190,15 @@ export async function createSaleAction(input: CreateSaleInput) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // UPDATE SALE
-// Dipanggil dari edit-sale-dialog — update items, payment, discount, notes
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export async function updateSaleAction(
   saleId: string,
   input: {
     items:           SaleItemInput[];
     customerId?:     string | null;
+    memberId?:       string | null;
     paymentMethod?:  string;
     paymentStatus?:  PaymentStatusValue;
     discount?:       number;
@@ -227,6 +224,7 @@ export async function updateSaleAction(
     const {
       items,
       customerId     = existingSale.customerId,
+      memberId       = existingSale.memberId,
       paymentMethod  = existingSale.payment?.method ?? 'CASH',
       paymentStatus  = (existingSale.payment?.status as PaymentStatusValue) ?? 'PAID',
       discount       = Number(existingSale.discount),
@@ -238,15 +236,12 @@ export async function updateSaleAction(
 
     if (!items?.length) return { success: false, error: 'Tidak ada item dalam penjualan' };
 
-    // Hitung total baru
-    const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const subtotal       = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const conversionRate = await getPointsConversionRate();
     const pointDiscount  = pointsRedeemed * conversionRate;
     const total          = subtotal - discount - pointDiscount + tax + ongkir;
     if (total < 0) return { success: false, error: 'Total pembayaran tidak boleh negatif' };
 
-    // ── Pra-validasi di luar transaksi (read-only, tidak perlu lock) ──
-    // Tipe varian untuk items lama (untuk skip PREORDER saat restore stok)
     const oldVariantIds = [...new Set(existingSale.items.map((i) => i.variantId))];
     const oldVariants = await db.productVariant.findMany({
       where:  { id: { in: oldVariantIds } },
@@ -254,8 +249,6 @@ export async function updateSaleAction(
     });
     const oldVariantTypeById = new Map(oldVariants.map((v) => [v.id, v.type]));
 
-    // Validasi stok untuk items baru. Stok lama belum dikembalikan di titik ini,
-    // jadi stok efektif yang tersedia = stock + qty lama (kalau varian yang sama dipakai lagi)
     const oldQtyByVariant = new Map<string, number>();
     for (const oldItem of existingSale.items) {
       oldQtyByVariant.set(oldItem.variantId, (oldQtyByVariant.get(oldItem.variantId) ?? 0) + oldItem.quantity);
@@ -279,7 +272,6 @@ export async function updateSaleAction(
     }
 
     await db.$transaction(async (tx) => {
-      // 1. Kembalikan stok dari items lama
       for (const oldItem of existingSale.items) {
         if (oldVariantTypeById.get(oldItem.variantId) === 'PREORDER') continue;
         await tx.productVariant.update({
@@ -288,7 +280,6 @@ export async function updateSaleAction(
         });
       }
 
-      // 2. Kurangi stok dari items baru
       for (const item of items) {
         const variant = newVariantById.get(item.variantId)!;
         if (variant.type !== 'PREORDER') {
@@ -300,11 +291,11 @@ export async function updateSaleAction(
         }
       }
 
-      // 3. Update Sale
       await tx.sale.update({
         where: { id: saleId },
         data: {
           customerId,
+          memberId,
           subtotal, discount, tax, ongkir, total,
           notes: notes !== undefined ? sanitizeText(notes, 500) : existingSale.notes,
           items: {
@@ -319,7 +310,6 @@ export async function updateSaleAction(
         },
       });
 
-      // 4. Update Payment
       if (existingSale.payment) {
         await tx.payment.update({
           where: { saleId },
@@ -332,13 +322,9 @@ export async function updateSaleAction(
         });
       }
 
-      // 5. Update Cashflow
       const existingCashflow = await tx.cashflow.findUnique({ where: { saleId } });
       if (existingCashflow) {
-        await tx.cashflow.update({
-          where: { saleId },
-          data:  { amount: total },
-        });
+        await tx.cashflow.update({ where: { saleId }, data: { amount: total } });
       }
     }, { maxWait: 10000, timeout: 15000 });
 
@@ -352,14 +338,9 @@ export async function updateSaleAction(
   }
 }
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // GET SALES
-// Catatan: payment dikembalikan nested (sale.payment.method / .status),
-// BUKAN flat sale.paymentMethod / sale.paymentStatus. Komponen seperti
-// SalesTable & SaleDetailsDialog mengharapkan field flat — kalau dipakai
-// untuk itu, flatten dulu (lihat getSales() di page.tsx admin/manager/cashier
-// transactions/sales untuk contoh polanya).
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export async function getSales(limit = 50) {
   const { storeId } = await requireStoreAccess();
   return db.sale.findMany({
@@ -367,20 +348,21 @@ export async function getSales(limit = 50) {
     take:    limit,
     orderBy: { createdAt: 'desc' },
     include: {
-      customer: { select: { name: true, email: true } },
+      customer: { select: { name: true } },
+      member:   { select: { user: { select: { name: true, email: true } } } },
       payment:  { select: { method: true, status: true } },
       items:    { include: { variant: { include: { product: true } } } },
     },
   });
 }
 
-// Catatan: sama seperti getSales() di atas — payment nested, bukan flat.
 export async function getSaleById(id: string) {
   const { storeId } = await requireStoreAccess();
   return db.sale.findFirst({
     where:   { id, storeId },
     include: {
       customer: true,
+      member:   { include: { user: true } },
       cashier:  { select: { name: true, email: true } },
       payment:  true,
       items:    { include: { variant: { include: { product: true } } } },
@@ -388,9 +370,9 @@ export async function getSaleById(id: string) {
   });
 }
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // DELETE SALE
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export async function deleteSaleAction(id: string) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
@@ -415,9 +397,10 @@ export async function deleteSaleAction(id: string) {
         });
       }
 
-      if (sale.customerId && sale.pointsEarned > 0) {
+      // Batalkan poin untuk member
+      if (sale.memberId && sale.pointsEarned > 0) {
         const storeUser = await tx.storeUser.findUnique({
-          where:  { storeId_userId: { storeId, userId: sale.customerId } },
+          where:  { id: sale.memberId },
           select: { id: true, points: true },
         });
         if (storeUser) {

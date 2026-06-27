@@ -8,7 +8,7 @@ import { requireStoreAccess } from '@/lib/store-context';
 const normalizePhone = (phone: string) =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
 
-// ─── Customer (CUSTOMER role) ──────────────────────────────────────────────────
+// ─── CRUD Customer lokal (walk-in) ────────────────────────────────────────────
 
 export async function createWalkInCustomerAction(formData: FormData) {
   try {
@@ -18,39 +18,34 @@ export async function createWalkInCustomerAction(formData: FormData) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const name  = sanitizeName(formData.get('name') as string, 100);
-    const phone = normalizePhone(formData.get('phone') as string);
+    const name    = sanitizeName(formData.get('name') as string, 100);
+    const phone   = normalizePhone(formData.get('phone') as string);
+    const address = sanitizeText(formData.get('address') as string, 255);
 
-    if (!name || !phone) return { success: false, error: 'Nama dan nomor telepon wajib diisi' };
-    if (phone.length < 9 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
-
-    let user = await db.user.findFirst({ where: { phone } });
-
-    if (user) {
-      const existingStoreUser = await db.storeUser.findUnique({
-        where: { storeId_userId: { storeId, userId: user.id } },
-      });
-
-      if (existingStoreUser) {
-        if (existingStoreUser.role === 'CUSTOMER') {
-          await db.user.update({ where: { id: user.id }, data: { name } });
-        }
-        return { success: false, error: `${user.name} sudah terdaftar di toko ini` };
-      }
-
-      await db.storeUser.create({ data: { storeId, userId: user.id, role: 'CUSTOMER', points: 0 } });
-    } else {
-      // FIX: hapus address dan role dari User.create
-      user = await db.user.create({
-        data: { name, phone, password: null },
-      });
-      await db.storeUser.create({ data: { storeId, userId: user.id, role: 'CUSTOMER', points: 0 } });
+    if (!name) return { success: false, error: 'Nama wajib diisi' };
+    if (phone && (phone.length < 9 || phone.length > 15)) {
+      return { success: false, error: 'Nomor telepon tidak valid' };
     }
+
+    // Cegah duplikat phone dalam satu toko
+    if (phone) {
+      const existing = await db.customer.findFirst({
+        where: { storeId, phone },
+        select: { id: true, name: true },
+      });
+      if (existing) {
+        return { success: false, error: `${existing.name} sudah terdaftar di toko ini` };
+      }
+    }
+
+    const customer = await db.customer.create({
+      data: { storeId, name, phone: phone || null, address: address || null },
+    });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
     revalidatePath(`/${storeSlug}/cashier/transactions/customers`);
-    return { success: true, data: { id: user.id, name: user.name, phone: user.phone } };
+    return { success: true, data: { id: customer.id, name: customer.name, phone: customer.phone } };
   } catch (error) {
     console.error('Create customer error:', error);
     return { success: false, error: 'Gagal membuat customer' };
@@ -59,7 +54,7 @@ export async function createWalkInCustomerAction(formData: FormData) {
 
 export const createNonMemberCustomerAction = createWalkInCustomerAction;
 
-export async function updateWalkInCustomerAction(userId: string, formData: FormData) {
+export async function updateWalkInCustomerAction(customerId: string, formData: FormData) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
@@ -67,24 +62,35 @@ export async function updateWalkInCustomerAction(userId: string, formData: FormD
       return { success: false, error: 'Unauthorized' };
     }
 
-    const name  = sanitizeName((formData.get('name') as string)?.trim(), 100);
-    const phone = normalizePhone(formData.get('phone') as string);
+    const name    = sanitizeName((formData.get('name') as string)?.trim(), 100);
+    const phone   = normalizePhone(formData.get('phone') as string);
+    const address = sanitizeText(formData.get('address') as string, 255);
 
-    if (!name || !phone) return { success: false, error: 'Nama dan nomor telepon wajib diisi' };
-    if (phone.length < 9 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
+    if (!name) return { success: false, error: 'Nama wajib diisi' };
+    if (phone && (phone.length < 9 || phone.length > 15)) {
+      return { success: false, error: 'Nomor telepon tidak valid' };
+    }
 
-    const storeUser = await db.storeUser.findUnique({
-      where: { storeId_userId: { storeId, userId } },
+    const customer = await db.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, storeId: true },
     });
-    if (!storeUser || storeUser.role !== 'CUSTOMER') {
+    if (!customer || customer.storeId !== storeId) {
       return { success: false, error: 'Customer tidak ditemukan di toko ini' };
     }
 
-    const phoneConflict = await db.user.findFirst({ where: { phone, NOT: { id: userId } } });
-    if (phoneConflict) return { success: false, error: 'Nomor telepon sudah digunakan akun lain' };
+    // Cegah duplikat phone
+    if (phone) {
+      const conflict = await db.customer.findFirst({
+        where: { storeId, phone, NOT: { id: customerId } },
+      });
+      if (conflict) return { success: false, error: 'Nomor telepon sudah digunakan customer lain' };
+    }
 
-    // FIX: hapus address dari update
-    await db.user.update({ where: { id: userId }, data: { name, phone } });
+    await db.customer.update({
+      where: { id: customerId },
+      data:  { name, phone: phone || null, address: address || null },
+    });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
@@ -98,28 +104,28 @@ export async function updateWalkInCustomerAction(userId: string, formData: FormD
 
 export const updateNonMemberCustomerAction = updateWalkInCustomerAction;
 
-export async function deleteWalkInCustomerAction(userId: string) {
+export async function deleteWalkInCustomerAction(customerId: string) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+    if (!['OWNER', 'ADMINISTRATOR'].includes(storeRole)) {
       return { success: false, error: 'Unauthorized' };
     }
 
-    const storeUser = await db.storeUser.findUnique({
-      where: { storeId_userId: { storeId, userId } },
+    const customer = await db.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, storeId: true },
     });
-    if (!storeUser || storeUser.role !== 'CUSTOMER') {
+    if (!customer || customer.storeId !== storeId) {
       return { success: false, error: 'Customer tidak ditemukan di toko ini' };
     }
 
-    const salesCount = await db.sale.count({ where: { customerId: userId, storeId } });
+    const salesCount = await db.sale.count({ where: { customerId, storeId } });
     if (salesCount > 0) {
       return { success: false, error: 'Tidak bisa hapus customer yang punya riwayat penjualan' };
     }
 
-    // FIX: hapus syncGlobalRole — cascade ke PointHistory sudah dihandle schema
-    await db.storeUser.delete({ where: { storeId_userId: { storeId, userId } } });
+    await db.customer.delete({ where: { id: customerId } });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
@@ -133,7 +139,9 @@ export async function deleteWalkInCustomerAction(userId: string) {
 
 export const deleteNonMemberCustomerAction = deleteWalkInCustomerAction;
 
-export async function getCustomerPurchaseHistory(userId: string) {
+// ─── Purchase history (untuk tab Riwayat di CustomerDetailsDialog) ───────────
+
+export async function getCustomerPurchaseHistory(customerId: string) {
   try {
     const { storeId, storeRole } = await requireStoreAccess();
 
@@ -141,17 +149,33 @@ export async function getCustomerPurchaseHistory(userId: string) {
       throw new Error('Unauthorized');
     }
 
-    const sales = await db.sale.findMany({
-      where:   { storeId, customerId: userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        items:   { include: { variant: { include: { product: true } } } },
-        cashier: { select: { name: true } },
-        payment: { select: { method: true, status: true } }, // FIX: dari Payment
-      },
-    });
+    // customerId bisa berupa Customer.id (walk-in) ATAU StoreUser.id (member)
+    // Coba keduanya
+    const [customerSales, memberSales] = await Promise.all([
+      db.sale.findMany({
+        where:   { storeId, customerId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items:   { include: { variant: { include: { product: true } } } },
+          cashier: { select: { name: true } },
+          payment: { select: { method: true, status: true } },
+        },
+      }),
+      db.sale.findMany({
+        where:   { storeId, memberId: customerId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items:   { include: { variant: { include: { product: true } } } },
+          cashier: { select: { name: true } },
+          payment: { select: { method: true, status: true } },
+        },
+      }),
+    ]);
 
-    return sales.map((sale) => ({
+    const allSales = [...customerSales, ...memberSales]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return allSales.map((sale) => ({
       ...sale,
       subtotal:      Number(sale.subtotal),
       discount:      Number(sale.discount),
@@ -177,57 +201,98 @@ export async function getCustomerPurchaseHistory(userId: string) {
   }
 }
 
-// ─── Upgrade CUSTOMER → MEMBER ─────────────────────────────────────────────────
-// Skenario baru: user harus sudah punya akun sendiri (password tidak null).
-// Upgrade hanya ubah role — tidak menyentuh password atau data profil.
+// ─── Upgrade Customer → Member ────────────────────────────────────────────────
+// Flow:
+// 1. Cari User by phone yang sama dengan Customer
+// 2. User harus sudah punya password (daftar sendiri)
+// 3. Buat StoreUser role MEMBER
+// 4. Link Customer.userId = User.id
+// 5. (Opsional) Relink sale lama: customer sales tetap ada, member sales dari sini ke depan
 
-export async function upgradeToMemberAction(userId: string) {
+export async function upgradeToMemberAction(customerId: string) {
   try {
     const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
     if (!['OWNER', 'ADMINISTRATOR', 'MANAGER'].includes(storeRole)) {
-      return { success: false, error: 'Unauthorized - minimal role MANAGER' };
+      return { success: false, error: 'Minimal role MANAGER untuk upgrade ke member' };
     }
 
-    const storeUser = await db.storeUser.findUnique({
-      where: { storeId_userId: { storeId, userId } },
+    const customer = await db.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, storeId: true, name: true, phone: true, userId: true },
     });
-    if (!storeUser)                    return { success: false, error: 'Customer tidak ditemukan di toko ini' };
-    if (storeUser.role !== 'CUSTOMER') return { success: false, error: 'User ini bukan CUSTOMER' };
 
-    // Pastikan user sudah punya password sendiri — tidak boleh toko yang set
-    const user = await db.user.findUnique({ where: { id: userId }, select: { password: true } });
-    if (!user?.password) {
-      return { success: false, error: 'Pelanggan belum punya akun. Minta mereka daftar sendiri via /register terlebih dahulu.' };
+    if (!customer || customer.storeId !== storeId) {
+      return { success: false, error: 'Customer tidak ditemukan di toko ini' };
+    }
+
+    if (!customer.phone) {
+      return { success: false, error: 'Customer belum punya nomor telepon. Update data customer terlebih dahulu.' };
+    }
+
+    // Cari User by phone
+    const user = await db.user.findFirst({
+      where:  { phone: customer.phone },
+      select: { id: true, password: true, name: true },
+    });
+
+    if (!user) {
+      return { success: false, error: `Belum ada akun dengan nomor ${customer.phone}. Minta pelanggan daftar di /register terlebih dahulu.` };
+    }
+
+    if (!user.password) {
+      return { success: false, error: 'Akun ditemukan tapi belum selesai mendaftar. Minta pelanggan lengkapi pendaftaran.' };
+    }
+
+    // Cek apakah sudah jadi StoreUser di toko ini
+    const existingStoreUser = await db.storeUser.findUnique({
+      where: { storeId_userId: { storeId, userId: user.id } },
+    });
+
+    if (existingStoreUser) {
+      if (existingStoreUser.role === 'MEMBER') {
+        return { success: false, error: `${user.name} sudah menjadi member di toko ini` };
+      }
+      // Kalau sudah ada sebagai role lain (CASHIER, MANAGER, dll) — jangan ubah
+      return { success: false, error: `${user.name} sudah terdaftar di toko ini sebagai ${existingStoreUser.role}` };
     }
 
     await db.$transaction(async (tx) => {
-      await tx.storeUser.update({
-        where: { storeId_userId: { storeId, userId } },
-        data:  { role: 'MEMBER' },
+      // Buat StoreUser role MEMBER
+      const storeUser = await tx.storeUser.create({
+        data: { storeId, userId: user.id, role: 'MEMBER', points: 0 },
       });
 
+      // Catat di PointHistory
       await tx.pointHistory.create({
         data: {
           storeUserId: storeUser.id,
           type:        'UPGRADE',
           delta:       0,
-          description: 'Upgrade dari Customer ke Member',
+          description: `Upgrade dari Customer ke Member`,
         },
+      });
+
+      // Link Customer.userId ke User
+      await tx.customer.update({
+        where: { id: customerId },
+        data:  { userId: user.id },
       });
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);
-    return { success: true };
+    return { success: true, memberName: user.name };
   } catch (error) {
     console.error('Upgrade to member error:', error);
     return { success: false, error: 'Gagal upgrade customer ke member' };
   }
 }
 
-// Alias untuk backward compat — keduanya delegate ke fungsi yang sama
+// Alias backward compat
 export const upgradeToMemberActionLegacy = upgradeToMemberAction;
+
+// ─── Ambil semua Customer (walk-in) untuk POS / dropdown ────────────────────
 
 export async function getAllNonMemberCustomers() {
   try {
@@ -237,23 +302,13 @@ export async function getAllNonMemberCustomers() {
       throw new Error('Unauthorized');
     }
 
-    const storeUsers = await db.storeUser.findMany({
-      where:   { storeId, role: 'CUSTOMER' },
-      include: {
-        user: {
-          // FIX: hapus address dari select
-          select: { id: true, name: true, phone: true, createdAt: true },
-        },
-      },
-      orderBy: { joinedAt: 'desc' }, // FIX: createdAt → joinedAt (field baru di StoreUser)
+    const customers = await db.customer.findMany({
+      where:   { storeId },
+      orderBy: { name: 'asc' },
+      select:  { id: true, name: true, phone: true, address: true, createdAt: true },
     });
 
-    return storeUsers.map((su) => ({
-      id:        su.user.id,
-      name:      su.user.name,
-      phone:     su.user.phone,
-      createdAt: su.user.createdAt,
-    }));
+    return customers;
   } catch (error) {
     console.error('Get customers error:', error);
     throw error;

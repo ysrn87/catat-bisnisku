@@ -14,7 +14,7 @@ interface SalesReportTableProps {
     createdAt: Date;
     customer: {
       name: string;
-      email: string | null;
+      phone: string | null;
     } | null;
     items: Array<{
       quantity: number;
@@ -88,7 +88,7 @@ export function SalesReportTable({
                     {sale.customer ? (
                       <div>
                         <p className="font-medium">{sale.customer.name}</p>
-                        <p className="text-muted-foreground">{sale.customer.email}</p>
+                        <p className="text-muted-foreground">{sale.customer.phone}</p>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">Guest</span>

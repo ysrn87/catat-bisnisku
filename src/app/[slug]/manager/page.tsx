@@ -59,12 +59,12 @@ async function getMembers(storeId: string) {
 }
 
 async function getNonMembers(storeId: string) {
-  const storeUsers = await db.storeUser.findMany({
-    where: { storeId, role: 'CUSTOMER' },
-    include: { user: { select: { id: true, name: true, phone: true, address: true } } },
-    orderBy: { user: { name: 'asc' } },
+  const customers = await db.customer.findMany({
+    where: { storeId },
+    select: { id: true, name: true, phone: true, address: true },
+    orderBy: { name: 'asc' },
   });
-  return storeUsers.map((su) => ({ id: su.user.id, name: su.user.name, phone: su.user.phone, address: su.user.address ?? null }));
+  return customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone ?? '', address: c.address ?? null }));
 }
 
 export default async function ManagerDashboard({ params }: { params: Promise<{ slug: string }> }) {
