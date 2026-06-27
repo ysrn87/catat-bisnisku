@@ -19,6 +19,7 @@ async function getSales(storeId: string, cashierId: string, params: {
   if (search) {
     where.OR = [
       { customer:   { name: { contains: search, mode: 'insensitive' as const } } },
+      { member:     { user: { name: { contains: search, mode: 'insensitive' as const } } } },
       { saleNumber: { contains: search, mode: 'insensitive' as const } },
     ];
   }
@@ -40,6 +41,7 @@ async function getSales(storeId: string, cashierId: string, params: {
       where, skip, take: limit, orderBy,
       include: {
         customer: { select: { name: true, phone: true, address: true } },
+        member:   { select: { points: true, user: { select: { name: true, email: true, phone: true, address: true } } } },
         cashier:  { select: { name: true } },
         payment:  { select: { method: true, status: true } }, // FIX
         items:    { include: { variant: { include: { product: true } } } },
@@ -50,9 +52,13 @@ async function getSales(storeId: string, cashierId: string, params: {
 
   return {
     sales: sales.map((sale) => {
-      const { subtotal, discount, tax, total, items, payment, ...rest } = sale;
+      const { subtotal, discount, tax, total, items, payment, customer, member, ...rest } = sale;
       return {
         ...rest,
+        // FIX: customerName dipakai tabel (ringkas), customer/nonMemberCustomer dipakai dialog detail (lengkap)
+        customerName: member?.user?.name ?? customer?.name ?? null,
+        customer: member ? { name: member.user.name, email: member.user.email, phone: member.user.phone, address: member.user.address, points: member.points } : null,
+        nonMemberCustomer: customer ?? null,
         paymentMethod: payment?.method ?? 'CASH',
         paymentStatus: payment?.status ?? 'PAID',
         subtotal: Number(subtotal), discount: Number(discount),

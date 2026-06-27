@@ -21,6 +21,7 @@ interface EditSaleDialogProps {
     id: string;
     saleNumber?: string;
     customerId: string | null;
+    memberId?: string | null;
     paymentMethod: string;
     paymentStatus?: string;
     discount: number;
@@ -29,6 +30,7 @@ interface EditSaleDialogProps {
     notes: string | null;
     pointsRedeemed?: number;
     customer?: { name: string } | null;
+    nonMemberCustomer?: { name: string } | null;
     items: Array<{
       id: string;
       quantity: number;
@@ -106,7 +108,7 @@ export function EditSaleDialog({
   const canManageProducts = userRole === 'OWNER' || userRole === 'ADMINISTRATOR' || userRole === 'MANAGER';
   const pointsRedeemed = sale.pointsRedeemed || 0;
   const pointDiscount = pointsRedeemed * conversionRate;
-  const customerName = sale.customer?.name ?? 'Pelanggan Umum';
+  const customerName = sale.customer?.name ?? sale.nonMemberCustomer?.name ?? 'Pelanggan Umum';
 
   useEffect(() => {
     setItems(
@@ -268,7 +270,7 @@ export function EditSaleDialog({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-gray-900 truncate">{customerName}</p>
-                <p className="text-xs text-gray-400">{sale.customerId ? 'Member' : 'Non-Member'}</p>
+                <p className="text-xs text-gray-400">{sale.customer ? 'Member' : 'Non-Member'}</p>
               </div>
               <span className="text-[10px] text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full font-medium shrink-0">
                 Tidak dapat diubah
@@ -388,6 +390,16 @@ export function EditSaleDialog({
           </section>
 
           {/* 3. TAMBAH PRODUK (admin/manager only) */}
+          {!canManageProducts && (
+            <p className="text-[11px] text-gray-400 italic px-1">
+              Hanya Owner/Admin/Manager yang dapat menambah produk ke transaksi yang sudah dibuat.
+            </p>
+          )}
+          {canManageProducts && variants.length === 0 && (
+            <p className="text-[11px] text-gray-400 italic px-1">
+              Tidak ada produk dengan stok tersedia untuk ditambahkan.
+            </p>
+          )}
           {canManageProducts && variants.length > 0 && (
             <section className="space-y-2">
               <div className="flex items-center gap-1.5">
