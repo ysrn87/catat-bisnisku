@@ -20,7 +20,6 @@ export type RegisterStoreResult =
 
 export async function registerStoreAction(formData: FormData): Promise<RegisterStoreResult> {
   try {
-    // Rate limit: max 3 percobaan per jam per IP — termasuk jalur verifikasi password user existing
     const ip          = getIP(await headers());
     const rateLimited = await checkRegisterStoreLimit(ip);
     if (!rateLimited.success) {
@@ -33,16 +32,13 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
     const ownerPhone    = (formData.get('ownerPhone')    as string)?.trim();
     const ownerEmail    = (formData.get('ownerEmail')    as string)?.trim().toLowerCase() || null;
     const ownerPassword = (formData.get('ownerPassword') as string);
-    // Flag: user existing yang sudah konfirmasi dengan password
     const isExistingUser = formData.get('isExistingUser') === 'true';
 
-    // ─── Validasi wajib ───────────────────────────────────────────────────────
     if (!storeName)     return { success: false, error: 'Nama toko wajib diisi' };
     if (!storeSlug)     return { success: false, error: 'Slug toko wajib diisi' };
     if (!ownerPhone)    return { success: false, error: 'Nomor telepon wajib diisi' };
     if (!ownerPassword) return { success: false, error: 'Password wajib diisi' };
 
-    // Validasi slug
     const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     if (!slugRegex.test(storeSlug)) {
       return { success: false, error: 'Slug hanya boleh huruf kecil, angka, dan tanda hubung (-)' };
@@ -51,13 +47,11 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
       return { success: false, error: 'Slug harus antara 3–50 karakter' };
     }
 
-    // Validasi phone
     const phoneDigits = ownerPhone.replace(/\D/g, '');
     if (phoneDigits.length < 9 || phoneDigits.length > 15) {
       return { success: false, error: 'Nomor telepon tidak valid' };
     }
 
-    // Validasi email
     if (ownerEmail) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(ownerEmail)) {
@@ -65,20 +59,14 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
       }
     }
 
-    // ─── Cek slug ─────────────────────────────────────────────────────────────
     const existingSlug = await db.store.findUnique({ where: { slug: storeSlug } });
     if (existingSlug) {
       return { success: false, error: `Slug "${storeSlug}" sudah digunakan. Pilih slug lain.` };
     }
 
-    // ─── Cek apakah user sudah ada ────────────────────────────────────────────
     const existingUser = await db.user.findFirst({ where: { phone: ownerPhone } });
 
     if (existingUser) {
-      // ── User sudah ada → verifikasi password, lalu buat store baru ──────────
-
-      // CUSTOMER (walk-in) accounts have no password — they can't register a store
-      // until they set one via the /register page first.
       if (!existingUser.password) {
         return {
           success: false,
@@ -96,7 +84,6 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
         };
       }
 
-      // Password benar → buat store baru untuk user existing ini
       const store = await db.$transaction(async (tx) => {
         const newStore = await tx.store.create({
           data: {
@@ -108,7 +95,8 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
           },
         });
 
-        await tx.storeUser.create({
+        // UPDATED: insert ke StoreStaff sebagai OWNER, bukan StoreUser
+        await tx.storeStaff.create({
           data: { storeId: newStore.id, userId: existingUser.id, role: 'OWNER' },
         });
 
@@ -125,8 +113,6 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
             create: { storeId: newStore.id, key: s.key, value: s.value, description: s.description, updatedAt: new Date() },
           });
         }
-
-        // FIX: hapus syncGlobalRole — tidak diperlukan lagi (otorisasi 100% dari StoreUser.role)
 
         return newStore;
       });
@@ -166,7 +152,8 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
         },
       });
 
-      await tx.storeUser.create({
+      // UPDATED: insert ke StoreStaff sebagai OWNER, bukan StoreUser
+      await tx.storeStaff.create({
         data: { storeId: newStore.id, userId: owner.id, role: 'OWNER' },
       });
 
@@ -183,8 +170,6 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
           create: { storeId: newStore.id, key: s.key, value: s.value, description: s.description, updatedAt: new Date() },
         });
       }
-
-      // FIX: hapus syncGlobalRole — tidak diperlukan lagi (otorisasi 100% dari StoreUser.role)
 
       return newStore;
     });

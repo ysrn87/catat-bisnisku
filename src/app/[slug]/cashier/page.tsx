@@ -29,7 +29,7 @@ async function getPosData(storeId: string) {
 
 async function getMembers(storeId: string) {
   const storeUsers = await db.storeUser.findMany({
-    where: { storeId, role: 'MEMBER' },
+    where: { storeId },
     include: { user: { select: { id: true, name: true } } },
   });
   // FIX: id harus StoreUser.id (dipakai sebagai memberId), bukan User.id

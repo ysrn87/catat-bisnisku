@@ -42,7 +42,7 @@ async function getSales(storeId: string, params: {
       include: {
         customer: { select: { name: true, phone: true, address: true } },
         member:   { select: { points: true, user: { select: { name: true, email: true, phone: true, address: true } } } },
-        cashier:  { select: { name: true } },
+        cashier:  { include: { user: { select: { name: true } } } },
         payment:  { select: { method: true, status: true } }, // FIX: include Payment
         items:    { include: { variant: { include: { product: true } } } },
       },
@@ -57,6 +57,7 @@ async function getSales(storeId: string, params: {
         ...rest,
         // FIX: customerName dipakai tabel (ringkas), customer/nonMemberCustomer dipakai dialog detail (lengkap)
         customerName: member?.user?.name ?? customer?.name ?? null,
+        cashierName: sale.cashier?.user?.name ?? null,
         customer: member ? { name: member.user.name, email: member.user.email, phone: member.user.phone, address: member.user.address, points: member.points } : null,
         nonMemberCustomer: customer ?? null,
         paymentMethod: payment?.method ?? 'CASH',
@@ -89,7 +90,7 @@ async function getVariants(storeId: string) {
 
 async function getMembers(storeId: string) {
   const storeUsers = await db.storeUser.findMany({
-    where: { storeId, role: 'MEMBER' },
+    where: { storeId },
     include: { user: { select: { id: true, name: true } } },
   });
   // FIX: id harus StoreUser.id (dipakai sebagai memberId), bukan User.id
@@ -127,10 +128,7 @@ export default async function SalesPage({ searchParams }: {
   ]);
 
   // FIX: userRole dari StoreUser, bukan session.user.role
-  const storeUser = await db.storeUser.findUnique({
-    where: { storeId_userId: { storeId, userId: session!.user.id } },
-    select: { role: true },
-  });
+  const storeUser = await db.storeStaff.findUnique({ where: { storeId_userId: { storeId, userId: session!.user.id } }, select: { role: true } });
   const userRole = storeUser?.role ?? 'MANAGER';
 
   return (

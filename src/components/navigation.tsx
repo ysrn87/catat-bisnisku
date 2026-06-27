@@ -24,7 +24,7 @@ interface NavItem {
 }
 
 interface NavigationProps {
-  role: 'ADMINISTRATOR' | 'MANAGER' | 'CASHIER' | 'MEMBER';
+  role: 'OWNER' | 'ADMINISTRATOR' | 'MANAGER' | 'CASHIER' | 'MEMBER';
   userName?: string;
   storeSlug: string;
   storeName?: string;
@@ -40,6 +40,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
 
   const base = `/${storeSlug}`;
   const homeHref =
+    role === 'OWNER'         ? `${base}/admin` :
     role === 'ADMINISTRATOR' ? `${base}/admin` :
     role === 'MANAGER'       ? `${base}/manager` :
     role === 'CASHIER'       ? `${base}/cashier` :

@@ -15,25 +15,28 @@ import {
 } from 'lucide-react';
 
 const STAFF_ROLES = ['OWNER', 'ADMINISTRATOR', 'MANAGER', 'CASHIER'];
-const MEMBER_ROLES = ['MEMBER'];
 
 const roleIcon: Record<string, React.ReactNode> = {
-  OWNER: <Crown className="w-4 h-4 text-amber-500" />,
+  OWNER:         <Crown className="w-4 h-4 text-amber-500" />,
   ADMINISTRATOR: <ShieldCheck className="w-4 h-4 text-blue-500" />,
-  MANAGER: <Users className="w-4 h-4 text-green-500" />,
-  CASHIER: <Wallet className="w-4 h-4 text-[#028697]" />,
+  MANAGER:       <Users className="w-4 h-4 text-green-500" />,
+  CASHIER:       <Wallet className="w-4 h-4 text-[#028697]" />,
 };
 
 const roleLabel: Record<string, string> = {
-  OWNER: 'Pemilik',
+  OWNER:         'Pemilik',
   ADMINISTRATOR: 'Administrator',
-  MANAGER: 'Manager',
-  CASHIER: 'Kasir',
+  MANAGER:       'Manager',
+  CASHIER:       'Kasir',
 };
 
-type StoreUserWithStore = {
+type StaffRecord = {
   role: string;
   store: { id: string; name: string; slug: string; plan: string };
+};
+
+type MemberRecord = {
+  store: { id: string; name: string; slug: string };
 };
 
 export default async function StoreSelectPage({
@@ -46,49 +49,34 @@ export default async function StoreSelectPage({
 
   const { view } = await searchParams;
 
-  const storeUsers = await db.storeUser.findMany({
-    where: { userId: session.user.id },
-    include: {
-      store: { select: { id: true, name: true, slug: true, plan: true } },
-    },
-    orderBy: { joinedAt: 'asc' },
-  });
+  // UPDATED: staff dari StoreStaff, member dari StoreUser (terpisah)
+  const [staffRecords, memberRecords] = await Promise.all([
+    db.storeStaff.findMany({
+      where:   { userId: session.user.id },
+      include: { store: { select: { id: true, name: true, slug: true, plan: true } } },
+      orderBy: { joinedAt: 'asc' },
+    }),
+    db.storeUser.findMany({
+      where:   { userId: session.user.id },
+      include: { store: { select: { id: true, name: true, slug: true } } },
+      orderBy: { joinedAt: 'asc' },
+    }),
+  ]);
 
-  const staffStores = storeUsers.filter((su: { role: string }) =>
-    STAFF_ROLES.includes(su.role),
-  );
-  const memberStores = storeUsers.filter((su: { role: string }) =>
-    MEMBER_ROLES.includes(su.role),
-  );
+  const staffStores  = staffRecords;
+  const memberStores = memberRecords;
 
-  // Tidak punya toko sama sekali (baru daftar, belum pernah jadi staff/member di mana pun)
-  if (staffStores.length === 0 && memberStores.length === 0) {
-    redirect('/join-store');
-  }
+  if (staffStores.length === 0 && memberStores.length === 0) redirect('/join-store');
+  if (staffStores.length === 0 && memberStores.length === 1) redirect(`/${memberStores[0].store.slug}/member`);
+  if (staffStores.length === 1 && memberStores.length === 0) redirect(`/${staffStores[0].store.slug}`);
+  if (staffStores.length === 0 && memberStores.length > 1)  redirect('/member-select');
 
-  // Hanya member/customer di satu toko, tidak pernah jadi staff sama sekali
-  if (staffStores.length === 0 && memberStores.length === 1) {
-    redirect(`/${memberStores[0].store.slug}/member`);
-  }
-
-  // Hanya staff di satu toko, tidak pernah jadi member/customer sama sekali
-  if (staffStores.length === 1 && memberStores.length === 0) {
-    redirect(`/${staffStores[0].store.slug}`);
-  }
-
-  // Member/customer di banyak toko, tidak pernah jadi staff sama sekali → ringkasan member
-  if (staffStores.length === 0 && memberStores.length > 1) {
-    redirect('/member-select');
-  }
-
-  // Datang dari kartu "Pengelola" di category picker, atau tidak ada toko member sama sekali
   const showStaffList = view === 'staff' || memberStores.length === 0;
 
   if (showStaffList) {
     return <StaffList stores={staffStores} userName={session.user.name} />;
   }
 
-  // Punya kedua kategori (staff di beberapa/satu toko, dan member/customer di toko lain)
   return (
     <CategoryPicker
       staffCount={staffStores.length}
@@ -99,21 +87,14 @@ export default async function StoreSelectPage({
   );
 }
 
-function StaffList({
-  stores,
-  userName,
-}: {
-  stores: StoreUserWithStore[];
-  userName?: string | null;
-}) {
+function StaffList({ stores, userName }: { stores: StaffRecord[]; userName?: string | null }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Pilih Toko</h1>
           <p className="text-gray-500 mt-1">
-            Halo, <span className="font-medium">{userName}</span>. Kamu mengelola
-            beberapa toko.
+            Halo, <span className="font-medium">{userName}</span>. Kamu mengelola beberapa toko.
           </p>
         </div>
 
@@ -175,8 +156,7 @@ function CategoryPicker({
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Masuk sebagai</h1>
           <p className="text-gray-500 mt-1">
-            Halo, <span className="font-medium">{userName}</span>. Pilih bagaimana
-            kamu mau masuk.
+            Halo, <span className="font-medium">{userName}</span>. Pilih bagaimana kamu mau masuk.
           </p>
         </div>
 

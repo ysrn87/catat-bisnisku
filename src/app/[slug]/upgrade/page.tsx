@@ -46,7 +46,7 @@ export default async function UpgradePage({
 
   const [productCount, managerCount, todayTxCount] = await Promise.all([
     db.product.count({ where: { storeId: store.id } }),
-    db.storeUser.count({ where: { storeId: store.id, role: 'MANAGER' } }),
+    db.storeStaff.count({ where: { storeId: store.id, role: 'MANAGER' } }),
     db.sale.count({ where: { storeId: store.id, createdAt: { gte: startOfDay } } }),
   ]);
 

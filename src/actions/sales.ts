@@ -53,14 +53,22 @@ export async function createSaleAction(input: CreateSaleInput) {
 
     const notesSanitized = sanitizeText(notes, 500);
 
+    // UPDATED: cashierId → StoreStaff.id (bukan User.id langsung)
+    const staffRecord = await db.storeStaff.findUnique({
+      where:  { storeId_userId: { storeId, userId } },
+      select: { id: true },
+    });
+    if (!staffRecord) return { success: false, error: 'Staff record tidak ditemukan' };
+    const cashierId = staffRecord.id;
+
     // Resolve member StoreUser untuk poin
     let memberStoreUser: { id: string; points: number } | null = null;
     if (memberId) {
       const su = await db.storeUser.findUnique({
         where:  { id: memberId },
-        select: { id: true, role: true, points: true, storeId: true },
+        select: { id: true, points: true, storeId: true },
       });
-      if (!su || su.storeId !== storeId || su.role !== 'MEMBER') {
+      if (!su || su.storeId !== storeId) {
         return { success: false, error: 'Member tidak valid di toko ini' };
       }
       memberStoreUser = { id: su.id, points: su.points };
@@ -110,7 +118,7 @@ export async function createSaleAction(input: CreateSaleInput) {
         data: {
           storeId,
           saleNumber:   generateSaleNumber(),
-          cashierId:    userId,
+          cashierId:    cashierId,
           customerId:   customerId || null,
           memberId:     memberId   || null,
           subtotal, discount, tax, ongkir, total,
@@ -363,7 +371,7 @@ export async function getSaleById(id: string) {
     include: {
       customer: true,
       member:   { include: { user: true } },
-      cashier:  { select: { name: true, email: true } },
+      cashier:  { include: { user: { select: { name: true, email: true } } } },
       payment:  true,
       items:    { include: { variant: { include: { product: true } } } },
     },

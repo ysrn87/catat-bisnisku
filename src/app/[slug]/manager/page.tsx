@@ -12,7 +12,7 @@ async function getManagerStats(storeId: string) {
   const [totalProducts, totalSales, totalCustomers, lowStockItems, salesAgg] = await Promise.all([
     db.productVariant.count({ where: { storeId } }),
     db.sale.count({ where: { storeId } }),
-    db.storeUser.count({ where: { storeId, role: 'MEMBER' } }),
+    db.storeUser.count({ where: { storeId } }),
     // FIX: lowStock → lowStockAt
     db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } } }),
     db.sale.aggregate({ where: { storeId }, _sum: { total: true } }),
@@ -54,7 +54,7 @@ async function getPosVariants(storeId: string) {
 }
 
 async function getMembers(storeId: string) {
-  const storeUsers = await db.storeUser.findMany({ where: { storeId, role: 'MEMBER' }, include: { user: { select: { id: true, name: true } } } });
+  const storeUsers = await db.storeUser.findMany({ where: { storeId }, include: { user: { select: { id: true, name: true } } } });
   // FIX: id harus StoreUser.id (dipakai sebagai memberId), bukan User.id
   return storeUsers.map((su) => ({ id: su.id, name: su.user.name, points: su.points }));
 }

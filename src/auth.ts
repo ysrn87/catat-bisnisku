@@ -33,7 +33,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!user) return null;
 
-        // CUSTOMER accounts have no password — they cannot log in directly
+        // Walk-in customer accounts have no password — cannot log in directly
         if (!user.password) return null;
 
         const isPasswordValid = await bcrypt.compare(
@@ -43,11 +43,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!isPasswordValid) return null;
 
+        // UPDATED: tidak ada storeRole di session level —
+        // role per toko diambil dari StoreStaff saat requireStoreAccess() dipanggil
         return {
-          id:          user.id,
-          email:       user.email || user.phone,
-          name:        user.name,
-          isSuperAdmin: user.isSuperAdmin, // ← ganti dari role
+          id:           user.id,
+          email:        user.email || user.phone,
+          name:         user.name,
+          isSuperAdmin: user.isSuperAdmin,
         };
       },
     }),

@@ -157,7 +157,7 @@ export async function getCustomerPurchaseHistory(customerId: string) {
         orderBy: { createdAt: 'desc' },
         include: {
           items:   { include: { variant: { include: { product: true } } } },
-          cashier: { select: { name: true } },
+          cashier: { include: { user: { select: { name: true } } } },
           payment: { select: { method: true, status: true } },
         },
       }),
@@ -166,7 +166,7 @@ export async function getCustomerPurchaseHistory(customerId: string) {
         orderBy: { createdAt: 'desc' },
         include: {
           items:   { include: { variant: { include: { product: true } } } },
-          cashier: { select: { name: true } },
+          cashier: { include: { user: { select: { name: true } } } },
           payment: { select: { method: true, status: true } },
         },
       }),
@@ -250,17 +250,14 @@ export async function upgradeToMemberAction(customerId: string) {
     });
 
     if (existingStoreUser) {
-      if (existingStoreUser.role === 'MEMBER') {
-        return { success: false, error: `${user.name} sudah menjadi member di toko ini` };
-      }
-      // Kalau sudah ada sebagai role lain (CASHIER, MANAGER, dll) — jangan ubah
-      return { success: false, error: `${user.name} sudah terdaftar di toko ini sebagai ${existingStoreUser.role}` };
+      // StoreUser sekarang murni untuk member — kalau sudah ada berarti sudah member
+      return { success: false, error: `${user.name} sudah menjadi member di toko ini` };
     }
 
     await db.$transaction(async (tx) => {
-      // Buat StoreUser role MEMBER
+      // Buat StoreUser (member)
       const storeUser = await tx.storeUser.create({
-        data: { storeId, userId: user.id, role: 'MEMBER', points: 0 },
+        data: { storeId, userId: user.id, points: 0 },
       });
 
       // Catat di PointHistory

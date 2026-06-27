@@ -9,7 +9,7 @@ async function getDashboardStats(storeId: string) {
     await Promise.all([
       db.productVariant.count({ where: { storeId } }),
       db.sale.count({ where: { storeId } }),
-      db.storeUser.count({ where: { storeId, role: 'MEMBER' } }),
+      db.storeUser.count({ where: { storeId } }),
       // FIX: lowStock → lowStockAt
       db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } } }),
       db.sale.aggregate({ where: { storeId }, _sum: { total: true } }),

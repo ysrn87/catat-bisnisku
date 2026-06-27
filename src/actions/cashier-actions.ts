@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, checkPlanLimit, MAX_STORES_PER_USER } from '@/lib/store-context';
 import bcrypt from 'bcryptjs';
 
-// FIX: hapus address dari CashierData — tidak ada di User lagi
 export interface CashierData {
   id:        string;
   name:      string;
@@ -21,30 +20,29 @@ export async function getCashiers(): Promise<CashierData[]> {
     throw new Error('Unauthorized');
   }
 
-  const storeUsers = await db.storeUser.findMany({
+  // UPDATED: query ke StoreStaff, bukan StoreUser
+  const staffRecords = await db.storeStaff.findMany({
     where:   { storeId, role: 'CASHIER' },
     include: {
       user: {
-        // FIX: hapus address dari select
         select: { id: true, name: true, email: true, phone: true, createdAt: true },
       },
     },
     orderBy: { user: { name: 'asc' } },
   });
 
-  return storeUsers.map((su) => su.user);
+  return staffRecords.map((s) => s.user);
 }
 
 export interface CreateCashierResult {
-  success:              boolean;
-  error?:               string;
+  success:               boolean;
+  error?:                string;
   requiresConfirmation?: boolean;
-  existingName?:        string;
-  linked?:              boolean;
+  existingName?:         string;
+  linked?:               boolean;
 }
 
 export async function createCashier(
-  // FIX: hapus address dari parameter
   data: { name: string; phone: string; password: string; email?: string },
   linkExisting = false
 ): Promise<CreateCashierResult> {
@@ -60,23 +58,24 @@ export async function createCashier(
   const existingUser = await db.user.findFirst({ where: { phone: data.phone } });
 
   if (existingUser) {
-    const existingStoreUser = await db.storeUser.findUnique({
+    // UPDATED: cek di StoreStaff
+    const existingStaff = await db.storeStaff.findUnique({
       where: { storeId_userId: { storeId, userId: existingUser.id } },
     });
-    if (existingStoreUser) {
-      return { success: false, error: `Nomor sudah terdaftar di toko ini atas nama ${existingUser.name}` };
+    if (existingStaff) {
+      return { success: false, error: `Nomor sudah terdaftar di toko ini sebagai ${existingStaff.role} atas nama ${existingUser.name}` };
     }
 
     if (!linkExisting) {
       return {
-        success:              false,
-        requiresConfirmation: true,
-        existingName:         existingUser.name,
-        error:                `Nomor HP ini sudah terdaftar atas nama "${existingUser.name}".`,
+        success:               false,
+        requiresConfirmation:  true,
+        existingName:          existingUser.name,
+        error:                 `Nomor HP ini sudah terdaftar atas nama "${existingUser.name}".`,
       };
     }
 
-    const storeCount = await db.storeUser.count({ where: { userId: existingUser.id } });
+    const storeCount = await db.storeStaff.count({ where: { userId: existingUser.id } });
     if (storeCount >= MAX_STORES_PER_USER) {
       return { success: false, error: `${existingUser.name} sudah tergabung di ${MAX_STORES_PER_USER} toko (batas maksimal).` };
     }
@@ -86,8 +85,8 @@ export async function createCashier(
       return { success: false, error: `Batas kasir tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO.` };
     }
 
-    // FIX: hapus syncGlobalRole dan tx.user.update({ role }) — tidak diperlukan lagi
-    await db.storeUser.create({ data: { storeId, userId: existingUser.id, role: 'CASHIER' } });
+    // UPDATED: create di StoreStaff
+    await db.storeStaff.create({ data: { storeId, userId: existingUser.id, role: 'CASHIER' } });
 
     revalidatePath(`/${storeSlug}/admin/settings/profile`);
     return { success: true, linked: true, existingName: existingUser.name };
@@ -115,11 +114,11 @@ export async function createCashier(
         phone:    data.phone,
         password: hashedPassword,
         email:    data.email || null,
-        // FIX: hapus role dan address — tidak ada di User lagi
       },
     });
 
-    await tx.storeUser.create({ data: { storeId, userId: newUser.id, role: 'CASHIER' } });
+    // UPDATED: create di StoreStaff
+    await tx.storeStaff.create({ data: { storeId, userId: newUser.id, role: 'CASHIER' } });
   });
 
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
@@ -128,7 +127,6 @@ export async function createCashier(
 
 export async function updateCashier(
   cashierId: string,
-  // FIX: hapus address dari parameter
   data: { name: string; phone: string; email?: string; newPassword?: string }
 ) {
   const { storeId, storeSlug, storeRole } = await requireStoreAccess();
@@ -137,10 +135,11 @@ export async function updateCashier(
     throw new Error('Unauthorized');
   }
 
-  const storeUser = await db.storeUser.findUnique({
+  // UPDATED: cek di StoreStaff
+  const staffRecord = await db.storeStaff.findUnique({
     where: { storeId_userId: { storeId, userId: cashierId } },
   });
-  if (!storeUser || storeUser.role !== 'CASHIER') throw new Error('Kasir tidak ditemukan di store ini');
+  if (!staffRecord || staffRecord.role !== 'CASHIER') throw new Error('Kasir tidak ditemukan di store ini');
 
   if (!data.name.trim())  throw new Error('Nama wajib diisi');
   if (!data.phone.trim()) throw new Error('Nomor telepon wajib diisi');
@@ -153,7 +152,6 @@ export async function updateCashier(
     if (existingEmail) throw new Error('Email sudah digunakan');
   }
 
-  // FIX: hapus address dari updateData
   const updateData: Record<string, unknown> = {
     name:  data.name,
     phone: data.phone,
@@ -176,13 +174,13 @@ export async function deleteCashier(cashierId: string) {
     throw new Error('Unauthorized');
   }
 
-  const storeUser = await db.storeUser.findUnique({
+  // UPDATED: delete dari StoreStaff
+  const staffRecord = await db.storeStaff.findUnique({
     where: { storeId_userId: { storeId, userId: cashierId } },
   });
-  if (!storeUser || storeUser.role !== 'CASHIER') throw new Error('Kasir tidak ditemukan di store ini');
+  if (!staffRecord || staffRecord.role !== 'CASHIER') throw new Error('Kasir tidak ditemukan di store ini');
 
-  await db.storeUser.delete({ where: { storeId_userId: { storeId, userId: cashierId } } });
-  // FIX: hapus syncGlobalRole — tidak diperlukan lagi
+  await db.storeStaff.delete({ where: { storeId_userId: { storeId, userId: cashierId } } });
 
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
 }

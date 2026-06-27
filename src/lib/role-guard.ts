@@ -1,71 +1,70 @@
 /**
- * role-guard.ts (final)
+ * role-guard.ts
  * ============================================================
- * syncGlobalRole() DIHAPUS — User tidak punya field role lagi.
- * Otorisasi 100% dari StoreUser.role.
- * isSuperAdmin di-set manual di DB, tidak perlu di-sync.
+ * Setelah refactor StoreStaff:
+ * - StaffRole: OWNER | ADMINISTRATOR | MANAGER | CASHIER
+ * - StoreUser sekarang murni member — tidak ada di sini
+ * - checkRoleConflict & canAssignRole hanya berlaku untuk StoreStaff
  * ============================================================
  */
 
 import { db } from '@/lib/db';
 
-export type StoreRoleValue =
+export type StaffRoleValue =
   | 'OWNER'
   | 'ADMINISTRATOR'
   | 'MANAGER'
-  | 'CASHIER'
-  | 'MEMBER';
+  | 'CASHIER';
 
-export const ROLE_HIERARCHY: Record<StoreRoleValue, number> = {
+export const STAFF_ROLE_HIERARCHY: Record<StaffRoleValue, number> = {
   OWNER:         0,
   ADMINISTRATOR: 1,
   MANAGER:       2,
   CASHIER:       3,
-  MEMBER:        4,
 };
 
-const PRIVILEGED_ROLES: StoreRoleValue[] = ['OWNER', 'ADMINISTRATOR'];
+const PRIVILEGED_ROLES: StaffRoleValue[] = ['OWNER', 'ADMINISTRATOR'];
 
 export interface RoleConflictResult {
   hasConflict: boolean;
   isWarning?:  boolean;
   reason?:     string;
-  existingRoles?: { storeName: string; role: StoreRoleValue }[];
+  existingRoles?: { storeName: string; role: StaffRoleValue }[];
 }
 
-export async function checkRoleConflict(
+export async function checkStaffConflict(
   userId: string,
   targetStoreId: string,
-  targetRole: StoreRoleValue
+  targetRole: StaffRoleValue
 ): Promise<RoleConflictResult> {
-  const existingMemberships = await db.storeUser.findMany({
+  const existingStaff = await db.storeStaff.findMany({
     where:   { userId },
     include: { store: { select: { id: true, name: true } } },
   });
 
-  const sameStore = existingMemberships.find((m) => m.storeId === targetStoreId);
+  const sameStore = existingStaff.find((s) => s.storeId === targetStoreId);
   if (sameStore) {
     return {
       hasConflict: true,
       reason: `User sudah terdaftar di toko ini sebagai ${sameStore.role}. Gunakan fitur ubah role.`,
-      existingRoles: existingMemberships.map((m) => ({
-        storeName: m.store.name,
-        role: m.role as StoreRoleValue,
+      existingRoles: existingStaff.map((s) => ({
+        storeName: s.store.name,
+        role: s.role as StaffRoleValue,
       })),
     };
   }
 
-  const privilegedElsewhere = existingMemberships.filter((m) =>
-    PRIVILEGED_ROLES.includes(m.role as StoreRoleValue)
+  const privilegedElsewhere = existingStaff.filter((s) =>
+    PRIVILEGED_ROLES.includes(s.role as StaffRoleValue)
   );
   if (privilegedElsewhere.length > 0 && !PRIVILEGED_ROLES.includes(targetRole)) {
     return {
       hasConflict: false,
       isWarning:   true,
       reason: `User ini adalah ${privilegedElsewhere[0].role} di toko "${privilegedElsewhere[0].store.name}". Tetap tambahkan sebagai ${targetRole}?`,
-      existingRoles: existingMemberships.map((m) => ({
-        storeName: m.store.name,
-        role: m.role as StoreRoleValue,
+      existingRoles: existingStaff.map((s) => ({
+        storeName: s.store.name,
+        role: s.role as StaffRoleValue,
       })),
     };
   }
@@ -73,9 +72,17 @@ export async function checkRoleConflict(
   return { hasConflict: false };
 }
 
-export function canAssignRole(
-  actorRole: StoreRoleValue,
-  targetRole: StoreRoleValue
+export function canAssignStaffRole(
+  actorRole: StaffRoleValue,
+  targetRole: StaffRoleValue
 ): boolean {
-  return ROLE_HIERARCHY[actorRole] < ROLE_HIERARCHY[targetRole];
+  return STAFF_ROLE_HIERARCHY[actorRole] < STAFF_ROLE_HIERARCHY[targetRole];
 }
+
+// ─── Backward-compat alias (hapus bertahap saat semua caller sudah diupdate) ──
+/** @deprecated gunakan checkStaffConflict */
+export const checkRoleConflict = checkStaffConflict;
+/** @deprecated gunakan canAssignStaffRole */
+export const canAssignRole = canAssignStaffRole;
+/** @deprecated gunakan StaffRoleValue */
+export type StoreRoleValue = StaffRoleValue;

@@ -13,7 +13,7 @@ async function getCustomersData(storeId: string, params: {
   const skip = (page - 1) * limit;
 
   // ── Members (StoreUser with role MEMBER) ──────────────────────────────────
-  const memberWhere: any = { storeId, role: 'MEMBER' };
+  const memberWhere: any = { storeId };
   if (search) {
     memberWhere.user = {
       OR: [
@@ -121,10 +121,7 @@ export default async function CustomersPage({
     type:   p.type,
   });
 
-  const storeUser = await db.storeUser.findUnique({
-    where:  { storeId_userId: { storeId, userId: session!.user.id } },
-    select: { role: true },
-  });
+  const storeUser = await db.storeStaff.findUnique({ where: { storeId_userId: { storeId, userId: session!.user.id } }, select: { role: true } });
   const isAdmin = storeUser?.role === 'OWNER' || storeUser?.role === 'ADMINISTRATOR';
 
   return (

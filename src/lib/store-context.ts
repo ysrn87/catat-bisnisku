@@ -11,14 +11,9 @@ export interface StoreContext {
   storePlan: StorePlan;
 }
 
-/**
- * Resolve store dari slug, dengan lazy expiry check.
- * Kalau plan PRO sudah expired → otomatis downgrade ke FREE di DB.
- */
 const resolveStore = cache(async (slug: string): Promise<StoreContext> => {
   const store = await db.store.findUnique({
     where:  { slug },
-    // FIX: subscriptionExpiresAt → planExpiresAt (sesuai skema baru)
     select: { id: true, slug: true, plan: true, planExpiresAt: true },
   });
 
@@ -34,46 +29,33 @@ const resolveStore = cache(async (slug: string): Promise<StoreContext> => {
     store.planExpiresAt < new Date()
   ) {
     effectivePlan = 'FREE';
-
     db.store.update({
       where: { id: store.id },
-      data: {
-        plan:         'FREE',
-        planExpiresAt: null, // FIX: subscriptionExpiresAt → planExpiresAt
-        updatedAt:    new Date(),
-      },
+      data:  { plan: 'FREE', planExpiresAt: null, updatedAt: new Date() },
     }).catch((err) => {
       console.error('[getStoreContext] Gagal auto-downgrade store:', err);
     });
   }
 
-  return {
-    storeId:   store.id,
-    storeSlug: store.slug,
-    storePlan: effectivePlan,
-  };
+  return { storeId: store.id, storeSlug: store.slug, storePlan: effectivePlan };
 });
 
 export async function getStoreContext(): Promise<StoreContext> {
   const headersList = await headers();
   const slug = headersList.get('x-store-slug');
-
   if (!slug) {
-    throw new Error(
-      '[getStoreContext] x-store-slug tidak ditemukan di headers. ' +
-      'Pastikan request melewati middleware dan path menggunakan format /[slug]/...'
-    );
+    throw new Error('[getStoreContext] x-store-slug tidak ditemukan di headers.');
   }
-
   return resolveStore(slug);
 }
 
 export async function requireStoreAccess(): Promise<{
-  storeId:   string;
-  storeSlug: string;
-  storePlan: StorePlan;
-  userId:    string;
-  storeRole: string;
+  storeId:    string;
+  storeSlug:  string;
+  storePlan:  StorePlan;
+  userId:     string;
+  storeRole:  string;  // StaffRoleValue dari StoreStaff
+  isMember:   boolean; // apakah juga punya StoreUser (member)
 }> {
   const [{ storeId, storeSlug, storePlan }, session] = await Promise.all([
     getStoreContext(),
@@ -84,18 +66,32 @@ export async function requireStoreAccess(): Promise<{
     throw new Error('[requireStoreAccess] User tidak terautentikasi.');
   }
 
-  const storeUser = await db.storeUser.findUnique({
-    where: { storeId_userId: { storeId, userId: session.user.id } },
+  // Cek di StoreStaff (tim operasional)
+  const staffRecord = await db.storeStaff.findUnique({
+    where:  { storeId_userId: { storeId, userId: session.user.id } },
     select: { role: true },
   });
 
-  if (!storeUser) {
+  // Cek di StoreUser (member) — opsional
+  const memberRecord = await db.storeUser.findUnique({
+    where:  { storeId_userId: { storeId, userId: session.user.id } },
+    select: { id: true },
+  });
+
+  if (!staffRecord) {
     throw new Error(
-      `[requireStoreAccess] User ${session.user.id} tidak memiliki akses ke store ${storeId}.`
+      `[requireStoreAccess] User ${session.user.id} tidak memiliki akses staff ke store ${storeId}.`
     );
   }
 
-  return { storeId, storeSlug, storePlan, userId: session.user.id, storeRole: storeUser.role };
+  return {
+    storeId,
+    storeSlug,
+    storePlan,
+    userId:    session.user.id,
+    storeRole: staffRecord.role,
+    isMember:  !!memberRecord,
+  };
 }
 
 export async function checkPlanLimit(
@@ -119,11 +115,13 @@ export async function checkPlanLimit(
       break;
     case 'managers':
       limit   = limits.managers;
-      current = await db.storeUser.count({ where: { storeId, role: 'MANAGER' } });
+      // UPDATED: query ke StoreStaff, bukan StoreUser
+      current = await db.storeStaff.count({ where: { storeId, role: 'MANAGER' } });
       break;
     case 'cashiers':
       limit   = limits.cashiers;
-      current = await db.storeUser.count({ where: { storeId, role: 'CASHIER' } });
+      // UPDATED: query ke StoreStaff, bukan StoreUser
+      current = await db.storeStaff.count({ where: { storeId, role: 'CASHIER' } });
       break;
     case 'dailyTransactions': {
       limit = limits.dailyTransactions;
@@ -142,10 +140,10 @@ export const MAX_STORES_PER_USER = 3;
 
 export const PLAN_LIMITS = {
   FREE: {
-    products:           15,
-    variantsPerProduct:  3,
-    managers:            1,
-    cashiers:            1,
+    products:            15,
+    variantsPerProduct:   3,
+    managers:             1,
+    cashiers:             1,
     dailyTransactions:  100,
     stockHistory:       false,
     exportReports:      false,
@@ -153,9 +151,9 @@ export const PLAN_LIMITS = {
   },
   PRO: {
     products:           1000,
-    variantsPerProduct:  10,
-    managers:             5,
-    cashiers:             5,
+    variantsPerProduct:   10,
+    managers:              5,
+    cashiers:              5,
     dailyTransactions:  Infinity,
     stockHistory:       true,
     exportReports:      true,

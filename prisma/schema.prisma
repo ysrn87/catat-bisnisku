@@ -9,8 +9,6 @@ datasource db {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // USER
-// Perubahan: hapus relasi customerSales (Sale.customerId sekarang → Customer.id)
-//            tambah linkedCustomers (Customer records yang sudah punya akun ini)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model User {
@@ -26,10 +24,10 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  ownedStores      Store[]     @relation("StoreOwner")
-  storeUsers       StoreUser[]
-  cashierSales     Sale[]      @relation("CashierSales")
-  linkedCustomers  Customer[]  // Customer lokal yang sudah di-link ke akun ini
+  ownedStores     Store[]      @relation("StoreOwner")
+  staffRecords    StoreStaff[] // relasi ke tabel staff (OWNER/ADMIN/MANAGER/CASHIER)
+  storeUsers      StoreUser[]  // relasi ke tabel member
+  linkedCustomers Customer[]   // Customer lokal yang sudah di-link ke akun ini
 
   @@map("users")
 }
@@ -50,7 +48,8 @@ model Store {
   updatedAt     DateTime  @updatedAt
 
   owner          User            @relation("StoreOwner", fields: [ownerId], references: [id])
-  storeUsers     StoreUser[]
+  staffMembers   StoreStaff[]    // tim operasional toko
+  storeUsers     StoreUser[]     // member loyalty toko
   customers      Customer[]      // walk-in customers lokal toko ini
   products       Product[]
   variants       ProductVariant[]
@@ -66,9 +65,50 @@ model Store {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CUSTOMER  (baru)
-// Walk-in / non-member lokal per toko. Tidak punya akun login.
-// userId: optional link ke User jika pelanggan ini kemudian daftar & di-upgrade ke Member.
+// STORE STAFF  (baru — menggantikan StoreUser untuk role operasional)
+// Tim in-house: OWNER, ADMINISTRATOR, MANAGER, CASHIER
+// Seorang user bisa sekaligus jadi StoreStaff DAN StoreUser (member) di toko
+// yang sama — karena dua tabel terpisah dengan unique constraint masing-masing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StoreStaff {
+  id       String    @id @default(cuid())
+  storeId  String
+  userId   String
+  role     StaffRole @default(CASHIER)
+  joinedAt DateTime  @default(now())
+
+  store        Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cashierSales Sale[] @relation("CashierSales") // sales yang di-proses staff ini
+
+  @@unique([storeId, userId])
+  @@map("store_staff")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STORE USER  (sekarang MURNI untuk member loyalty)
+// Hanya role MEMBER — yang punya akun & mengumpulkan poin.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model StoreUser {
+  id       String   @id @default(cuid())
+  storeId  String
+  userId   String
+  points   Int      @default(0)
+  joinedAt DateTime @default(now())
+
+  store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pointHistories PointHistory[]
+  memberSales    Sale[]         @relation("MemberSales")
+
+  @@unique([storeId, userId])
+  @@map("store_users")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOMER  (walk-in / non-member lokal per toko)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Customer {
@@ -88,29 +128,6 @@ model Customer {
   @@index([storeId])
   @@index([userId])
   @@map("customers")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STORE USER (pivot User ↔ Store)
-// Hanya untuk yang punya akun: OWNER, ADMINISTRATOR, MANAGER, CASHIER, MEMBER
-// Role CUSTOMER dihapus — customer lokal kini di tabel Customer
-// ─────────────────────────────────────────────────────────────────────────────
-
-model StoreUser {
-  id        String    @id @default(cuid())
-  storeId   String
-  userId    String
-  role      StoreRole @default(MEMBER)
-  points    Int       @default(0)
-  joinedAt  DateTime  @default(now())
-
-  store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pointHistories PointHistory[]
-  memberSales    Sale[]         @relation("MemberSales") // sales sebagai member
-
-  @@unique([storeId, userId])
-  @@map("store_users")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,21 +158,21 @@ model Product {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model ProductVariant {
-  id           String      @id @default(cuid())
-  storeId      String
-  productId    String
-  name         String
-  sku          String
-  barcode      String?
-  price        Decimal     @db.Decimal(10, 2)
-  cost         Decimal     @db.Decimal(10, 2)
-  type         ProductType @default(READY_STOCK)
-  stock        Int         @default(0)
-  lowStockAt   Int         @default(10)
-  pointsPerUnit Int        @default(0)
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  storeId       String
+  productId     String
+  name          String
+  sku           String
+  barcode       String?
+  price         Decimal     @db.Decimal(10, 2)
+  cost          Decimal     @db.Decimal(10, 2)
+  type          ProductType @default(READY_STOCK)
+  stock         Int         @default(0)
+  lowStockAt    Int         @default(10)
+  pointsPerUnit Int         @default(0)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -189,16 +206,15 @@ model Category {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SALE
-// Perubahan:
-// - customerId → Customer.id  (walk-in lokal, nullable)
-// - memberId   → StoreUser.id (member punya akun, nullable)
-// Hapus relasi lama ke User ("CustomerSales")
+// cashierId → StoreStaff.id  (staff yang memproses transaksi)
+// memberId  → StoreUser.id   (member loyalty, nullable)
+// customerId → Customer.id   (walk-in lokal, nullable)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Sale {
   id           String    @id @default(cuid())
   storeId      String
-  cashierId    String
+  cashierId    String    // → StoreStaff.id
   customerId   String?   // → Customer.id  (walk-in lokal)
   memberId     String?   // → StoreUser.id (member dengan akun)
   saleNumber   String
@@ -212,7 +228,7 @@ model Sale {
   createdAt    DateTime  @default(now())
 
   store          Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  cashier        User           @relation("CashierSales", fields: [cashierId], references: [id])
+  cashier        StoreStaff     @relation("CashierSales", fields: [cashierId], references: [id])
   customer       Customer?      @relation(fields: [customerId], references: [id])
   member         StoreUser?     @relation("MemberSales", fields: [memberId], references: [id])
   items          SaleItem[]
@@ -225,12 +241,12 @@ model Sale {
 }
 
 model SaleItem {
-  id        String         @id @default(cuid())
+  id        String  @id @default(cuid())
   saleId    String
   variantId String
   quantity  Int
-  price     Decimal        @db.Decimal(10, 2)
-  subtotal  Decimal        @db.Decimal(10, 2)
+  price     Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
 
   sale    Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [variantId], references: [id])
@@ -328,14 +344,14 @@ model Cashflow {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model StockMovement {
-  id         String       @id @default(cuid())
-  variantId  String
-  storeId    String
-  type       MovementType
-  quantity   Int
-  notes      String?
-  refSaleId  String?
-  createdAt  DateTime     @default(now())
+  id        String       @id @default(cuid())
+  variantId String
+  storeId   String
+  type      MovementType
+  quantity  Int
+  notes     String?
+  refSaleId String?
+  createdAt DateTime     @default(now())
 
   variant ProductVariant @relation(fields: [variantId], references: [id])
   store   Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -367,13 +383,19 @@ model StoreSetting {
 // ENUMS
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum StoreRole {
+// Untuk StoreStaff — tim operasional in-house
+enum StaffRole {
   OWNER
   ADMINISTRATOR
   MANAGER
   CASHIER
-  MEMBER
-  // CUSTOMER dihapus — digantikan model Customer
+}
+
+// Untuk StoreUser — hanya member loyalty
+// (enum ini bisa dihapus jika StoreUser tidak butuh role field)
+// Dipertahankan untuk fleksibilitas jika nanti ada tier member (SILVER, GOLD, dll)
+enum MemberTier {
+  REGULAR
 }
 
 enum Plan {

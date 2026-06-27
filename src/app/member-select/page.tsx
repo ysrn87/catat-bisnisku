@@ -5,36 +5,22 @@ import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { ArrowRight, Sparkles, Store as StoreIcon, Briefcase } from 'lucide-react';
 
-const STAFF_ROLES = ['OWNER', 'ADMINISTRATOR', 'MANAGER', 'CASHIER'];
-
 export default async function MemberSelectPage() {
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
 
-  const storeUsers = await db.storeUser.findMany({
-    where: { userId: session.user.id },
-    include: {
-      store: { select: { id: true, name: true, slug: true } },
-    },
-    orderBy: { joinedAt: 'asc' },
-  });
+  // UPDATED: member dari StoreUser, staff dari StoreStaff (terpisah)
+  const [memberRecords, staffCount] = await Promise.all([
+    db.storeUser.findMany({
+      where:   { userId: session.user.id },
+      include: { store: { select: { id: true, name: true, slug: true } } },
+      orderBy: { joinedAt: 'asc' },
+    }),
+    db.storeStaff.count({ where: { userId: session.user.id } }),
+  ]);
 
-  const memberStores = storeUsers.filter(
-    (su: { role: string }) => su.role === 'MEMBER',
-  );
-  const hasStaffStores = storeUsers.some((su: { role: string }) =>
-    STAFF_ROLES.includes(su.role),
-  );
-
-  // Tidak ada toko member/customer sama sekali (mungkin akses langsung via URL)
-  if (memberStores.length === 0) {
-    redirect('/store-select');
-  }
-
-  // Hanya satu toko, langsung masuk ke detailnya, tidak perlu halaman ringkasan
-  if (memberStores.length === 1) {
-    redirect(`/${memberStores[0].store.slug}/member`);
-  }
+  if (memberRecords.length === 0) redirect('/store-select');
+  if (memberRecords.length === 1) redirect(`/${memberRecords[0].store.slug}/member`);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -42,22 +28,12 @@ export default async function MemberSelectPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Toko Kamu</h1>
           <p className="text-gray-500 mt-1">
-            Halo, <span className="font-medium">{session.user.name}</span>. Berikut
-            poin kamu di setiap toko.
+            Halo, <span className="font-medium">{session.user.name}</span>. Berikut poin kamu di setiap toko.
           </p>
         </div>
 
         <div className="space-y-3">
-          {memberStores.map(
-            ({
-              store,
-              role,
-              points,
-            }: {
-              store: { id: string; name: string; slug: string };
-              role: string;
-              points: number;
-            }) => (
+          {memberRecords.map(({ store, points }) => (
             <Link key={store.id} href={`/${store.slug}/member`}>
               <Card className="hover:border-amber-400 hover:shadow-md transition-all duration-200 cursor-pointer group">
                 <CardContent className="flex items-center justify-between p-4">
@@ -67,25 +43,12 @@ export default async function MemberSelectPage() {
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">{store.name}</p>
-                      {role === 'MEMBER' ? (
-                        <p className="text-xs text-gray-500">Member</p>
-                      ) : (
-                        <p className="text-xs text-gray-500">
-                          Pelanggan &middot; belum jadi member
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-500">Member</p>
                     </div>
                   </div>
-
-                  <div className="text-right">
-                    {role === 'MEMBER' ? (
-                      <div className="flex items-center gap-1 text-amber-600 font-bold">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>{points.toLocaleString('id-ID')}</span>
-                      </div>
-                    ) : (
-                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
-                    )}
+                  <div className="flex items-center gap-1 text-amber-600 font-bold">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{points.toLocaleString('id-ID')}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -93,7 +56,7 @@ export default async function MemberSelectPage() {
           ))}
         </div>
 
-        {hasStaffStores && (
+        {staffCount > 0 && (
           <div className="text-center">
             <Link
               href="/store-select?view=staff"

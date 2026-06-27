@@ -70,12 +70,10 @@ export async function registerMemberAction(formData: FormData) {
     if (phone.length < 9 || phone.length > 15) {
       return { success: false, error: 'Nomor telepon tidak valid' };
     }
+
     const { db } = await import('@/lib/db');
     const bcrypt  = await import('bcryptjs');
 
-    // FIX: storeId sekarang opsional — member bisa daftar mandiri tanpa toko,
-    // lalu join toko belakangan lewat /join-store. storeId hanya dipakai kalau
-    // pendaftaran datang dari link toko tertentu (?storeId=xxx).
     if (storeId) {
       const store = await db.store.findUnique({ where: { id: storeId }, select: { id: true } });
       if (!store) {
@@ -86,14 +84,10 @@ export async function registerMemberAction(formData: FormData) {
     const existingUser = await db.user.findFirst({ where: { phone } });
 
     if (existingUser) {
-      // Akun sudah ada dan sudah punya password → suruh login
       if (existingUser.password) {
         return { success: false, error: 'Nomor telepon sudah terdaftar. Silakan login.' };
       }
 
-      // CUSTOMER (password null) → hanya set password + upgrade role.
-      // Nama yang dipakai tetap nama yang sudah ada di DB (dicatat toko),
-      // bukan nama dari form — mencegah user menimpa nama record toko secara sembarangan.
       if (email) {
         const emailConflict = await db.user.findFirst({ where: { email, NOT: { id: existingUser.id } } });
         if (emailConflict) return { success: false, error: 'Email sudah terdaftar' };
@@ -105,7 +99,6 @@ export async function registerMemberAction(formData: FormData) {
         await tx.user.update({
           where: { id: existingUser.id },
           data: {
-            // Nama dan birthday hanya diisi kalau belum ada (CUSTOMER mungkin belum lengkap)
             name:     existingUser.name || name,
             email:    email ?? existingUser.email,
             birthday: birthday ? new Date(birthday) : existingUser.birthday,
@@ -113,12 +106,12 @@ export async function registerMemberAction(formData: FormData) {
           },
         });
 
-        // FIX: StoreUser hanya dibuat kalau storeId ada (link toko tertentu)
+        // UPDATED: StoreUser tidak punya kolom role lagi
         if (storeId) {
           await tx.storeUser.upsert({
             where:  { storeId_userId: { storeId, userId: existingUser.id } },
-            create: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
-            update: { role: 'MEMBER' },
+            create: { storeId, userId: existingUser.id, points: 0 },
+            update: {},
           });
         }
       });
@@ -126,7 +119,7 @@ export async function registerMemberAction(formData: FormData) {
       return { success: true };
     }
 
-    // User baru — buat akun, dan join toko kalau storeId disediakan
+    // User baru
     if (email) {
       const existingEmail = await db.user.findFirst({ where: { email } });
       if (existingEmail) return { success: false, error: 'Email sudah terdaftar' };
@@ -143,10 +136,10 @@ export async function registerMemberAction(formData: FormData) {
         },
       });
 
-      // FIX: StoreUser hanya dibuat kalau storeId ada
+      // UPDATED: StoreUser tidak punya kolom role lagi
       if (storeId) {
         await tx.storeUser.create({
-          data: { storeId, userId: newUser.id, role: 'MEMBER', points: 0 },
+          data: { storeId, userId: newUser.id, points: 0 },
         });
       }
     });

@@ -78,10 +78,7 @@ export default async function ProductsPage({ searchParams }: {
   ]);
 
   // FIX: isAdmin dari StoreUser, bukan session.user.role
-  const storeUser = await db.storeUser.findUnique({
-    where:  { storeId_userId: { storeId, userId: session!.user.id } },
-    select: { role: true },
-  });
+  const storeUser = await db.storeStaff.findUnique({ where: { storeId_userId: { storeId, userId: session!.user.id } }, select: { role: true } });
   const isAdmin = storeUser?.role === 'OWNER' || storeUser?.role === 'ADMINISTRATOR';
 
   return (

@@ -3,10 +3,9 @@
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import {
-  type StoreRoleValue,
-  checkRoleConflict,
-  canAssignRole,
-  // FIX: syncGlobalRole DIHAPUS dari import — tidak ada di role-guard lagi
+  type StaffRoleValue,
+  checkStaffConflict,
+  canAssignStaffRole,
 } from '@/lib/role-guard';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, checkPlanLimit } from '@/lib/store-context';
@@ -24,18 +23,18 @@ async function getActor(storeId: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error('Unauthorized');
 
-  const membership = await db.storeUser.findUnique({
+  const staff = await db.storeStaff.findUnique({
     where:  { storeId_userId: { storeId, userId: session.user.id } },
     select: { role: true },
   });
-  if (!membership) throw new Error('Kamu tidak terdaftar di toko ini.');
-  return { actorId: session.user.id, actorRole: membership.role as StoreRoleValue };
+  if (!staff) throw new Error('Kamu tidak terdaftar sebagai staff di toko ini.');
+  return { actorId: session.user.id, actorRole: staff.role as StaffRoleValue };
 }
 
 // ─── switchTeamMemberRole ──────────────────────────────────────────────────────
 
 export async function switchTeamMemberRole(
-  memberId: string,
+  targetUserId: string,
   newRole: SwitchableRole
 ): Promise<SwitchRoleResult> {
   const { storeId, storeSlug, storeRole } = await requireStoreAccess();
@@ -44,15 +43,15 @@ export async function switchTeamMemberRole(
     return { success: false, error: 'Unauthorized' };
   }
 
-  const storeUser = await db.storeUser.findUnique({
-    where: { storeId_userId: { storeId, userId: memberId } },
+  const staff = await db.storeStaff.findUnique({
+    where: { storeId_userId: { storeId, userId: targetUserId } },
   });
-  if (!storeUser) return { success: false, error: 'Anggota tim tidak ditemukan di store ini' };
+  if (!staff) return { success: false, error: 'Anggota tim tidak ditemukan di store ini' };
 
-  if (storeUser.role !== 'MANAGER' && storeUser.role !== 'CASHIER') {
+  if (staff.role !== 'MANAGER' && staff.role !== 'CASHIER') {
     return { success: false, error: 'Hanya Manager dan Kasir yang bisa dipindah peran' };
   }
-  if (storeUser.role === newRole) {
+  if (staff.role === newRole) {
     return { success: false, error: `Sudah menjadi ${newRole === 'MANAGER' ? 'Manager' : 'Kasir'}` };
   }
 
@@ -61,15 +60,14 @@ export async function switchTeamMemberRole(
     const label = newRole === 'MANAGER' ? 'manager' : 'kasir';
     return {
       success: false,
-      error:   `Batas ${label} tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk lebih banyak ${label}.`,
+      error:   `Batas ${label} tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO.`,
     };
   }
 
-  await db.storeUser.update({
-    where: { storeId_userId: { storeId, userId: memberId } },
+  await db.storeStaff.update({
+    where: { storeId_userId: { storeId, userId: targetUserId } },
     data:  { role: newRole },
   });
-  // FIX: hapus syncGlobalRole(memberId, tx) — tidak diperlukan lagi
 
   revalidatePath(`/${storeSlug}/admin/settings/profile`);
   return { success: true };
@@ -84,19 +82,18 @@ async function assignStaff(
 ) {
   const { actorRole } = await getActor(storeId);
 
-  if (!canAssignRole(actorRole, targetRole)) {
+  if (!canAssignStaffRole(actorRole, targetRole)) {
     throw new Error(`Role kamu (${actorRole}) tidak dapat meng-assign ${targetRole}.`);
   }
 
-  const conflict = await checkRoleConflict(targetUserId, storeId, targetRole);
+  const conflict = await checkStaffConflict(targetUserId, storeId, targetRole);
   if (conflict.hasConflict) throw new Error(conflict.reason);
 
-  const storeUser = await db.storeUser.create({
+  const storeStaff = await db.storeStaff.create({
     data: { userId: targetUserId, storeId, role: targetRole },
   });
-  // FIX: hapus syncGlobalRole — tidak diperlukan lagi
 
-  return { storeUser, warning: conflict.isWarning ? conflict.reason : undefined };
+  return { storeStaff, warning: conflict.isWarning ? conflict.reason : undefined };
 }
 
 // ─── createManagerAction ──────────────────────────────────────────────────────
@@ -128,28 +125,27 @@ export async function createCashierAction(storeId: string, targetUserId: string)
 export async function updateStoreUserRoleAction(
   storeId: string,
   targetUserId: string,
-  newRole: StoreRoleValue
+  newRole: StaffRoleValue
 ) {
   try {
     const { actorId, actorRole } = await getActor(storeId);
 
-    const target = await db.storeUser.findUnique({
+    const target = await db.storeStaff.findUnique({
       where: { storeId_userId: { storeId, userId: targetUserId } },
     });
-    if (!target) throw new Error('User tidak ditemukan di toko ini.');
+    if (!target) throw new Error('User tidak ditemukan sebagai staff di toko ini.');
 
     if (target.role === 'OWNER' && actorRole !== 'OWNER') {
       throw new Error('Hanya OWNER yang dapat mengubah role OWNER lain.');
     }
-    if (!canAssignRole(actorRole, newRole) && actorId !== targetUserId) {
+    if (!canAssignStaffRole(actorRole, newRole) && actorId !== targetUserId) {
       throw new Error(`Role kamu (${actorRole}) tidak dapat meng-assign ${newRole}.`);
     }
 
-    const updated = await db.storeUser.update({
+    const updated = await db.storeStaff.update({
       where: { storeId_userId: { storeId, userId: targetUserId } },
       data:  { role: newRole },
     });
-    // FIX: hapus syncGlobalRole — tidak diperlukan lagi
 
     revalidatePath(`/dashboard/${storeId}/team`);
     return { success: true, data: updated };
@@ -163,30 +159,29 @@ export async function updateStoreUserRoleAction(
 async function removeStaff(
   storeId: string,
   targetUserId: string,
-  expectedRole?: StoreRoleValue
+  expectedRole?: StaffRoleValue
 ) {
   const { actorId, actorRole } = await getActor(storeId);
 
-  const target = await db.storeUser.findUnique({
+  const target = await db.storeStaff.findUnique({
     where: { storeId_userId: { storeId, userId: targetUserId } },
   });
-  if (!target) throw new Error('User tidak ditemukan di toko ini.');
+  if (!target) throw new Error('User tidak ditemukan sebagai staff di toko ini.');
 
   if (expectedRole && target.role !== expectedRole) {
     throw new Error(`User ini bukan ${expectedRole} di toko ini.`);
   }
 
   if (actorId === targetUserId && target.role === 'OWNER') {
-    const ownerCount = await db.storeUser.count({ where: { storeId, role: 'OWNER' } });
+    const ownerCount = await db.storeStaff.count({ where: { storeId, role: 'OWNER' } });
     if (ownerCount <= 1) throw new Error('Kamu satu-satunya OWNER. Transfer ownership dulu.');
   }
 
-  if (!canAssignRole(actorRole, target.role as StoreRoleValue) && actorId !== targetUserId) {
+  if (!canAssignStaffRole(actorRole, target.role as StaffRoleValue) && actorId !== targetUserId) {
     throw new Error(`Role kamu (${actorRole}) tidak dapat menghapus ${target.role}.`);
   }
 
-  await db.storeUser.delete({ where: { storeId_userId: { storeId, userId: targetUserId } } });
-  // FIX: hapus syncGlobalRole — tidak diperlukan lagi
+  await db.storeStaff.delete({ where: { storeId_userId: { storeId, userId: targetUserId } } });
 }
 
 export async function deleteManagerAction(storeId: string, targetUserId: string) {

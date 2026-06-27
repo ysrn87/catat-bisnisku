@@ -129,7 +129,7 @@ export async function getAllCustomers() {
   }
 
   const storeUsers = await db.storeUser.findMany({
-    where:   { storeId, role: 'MEMBER' },
+    where:   { storeId },
     include: {
       user: {
         select: { id: true, name: true, email: true, phone: true, birthday: true, photoUrl: true, createdAt: true },
@@ -233,7 +233,7 @@ export async function createCustomerAction(formData: FormData) {
     }
 
     await db.storeUser.create({
-      data: { storeId, userId: existingUser.id, role: 'MEMBER', points: 0 },
+      data: { storeId, userId: existingUser.id, points: 0 },
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);

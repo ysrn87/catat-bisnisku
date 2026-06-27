@@ -4,10 +4,6 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 
-/**
- * Cari toko berdasarkan slug (atau bagian dari nama) untuk member yang
- * sudah punya akun tapi belum join toko manapun.
- */
 export async function searchStoreAction(query: string) {
   const q = query.trim();
   if (!q) return { success: true, data: [] };
@@ -28,8 +24,10 @@ export async function searchStoreAction(query: string) {
 }
 
 /**
- * Member yang sudah login (punya akun User, tapi belum/belum semua jadi
- * StoreUser di toko ini) join sebagai MEMBER di toko yang dipilih.
+ * User yang sudah login join sebagai MEMBER di toko yang dipilih.
+ * UPDATED: StoreUser sekarang tidak punya kolom role — murni untuk member.
+ * Cek juga apakah user sudah jadi staff di toko ini (StoreStaff) —
+ * kalau iya, tetap boleh join sebagai member (dua tabel terpisah).
  */
 export async function joinStoreAction(storeSlugOrId: string) {
   try {
@@ -46,16 +44,18 @@ export async function joinStoreAction(storeSlugOrId: string) {
       return { success: false, error: 'Toko tidak ditemukan' };
     }
 
-    const existing = await db.storeUser.findUnique({
+    // Cek apakah sudah jadi member di toko ini
+    const existingMember = await db.storeUser.findUnique({
       where: { storeId_userId: { storeId: store.id, userId: session.user.id } },
     });
-    if (existing) {
+    if (existingMember) {
       return { success: true, data: { slug: store.slug }, alreadyMember: true };
     }
 
+    // UPDATED: StoreUser tanpa kolom role
     await db.$transaction(async (tx) => {
       const storeUser = await tx.storeUser.create({
-        data: { storeId: store.id, userId: session.user.id, role: 'MEMBER', points: 0 },
+        data: { storeId: store.id, userId: session.user.id, points: 0 },
       });
 
       await tx.pointHistory.create({
