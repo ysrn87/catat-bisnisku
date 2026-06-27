@@ -161,7 +161,6 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
         setCustomerType('member');
       } else if (isWalkIn) {
         setWalkInCustomerId(value);
-        setCustomerId(value); // customer is now a User
         setCustomerType('walk-in');
       }
     }
@@ -291,14 +290,15 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
     try {
       const result = await createSaleAction({
         items: items.map(item => ({ variantId: item.variantId, quantity: item.quantity, price: item.price })),
-        customerId: customerId || walkInCustomerId || null,
+        customerId: customerType === 'walk-in' ? walkInCustomerId || null : null,
+        memberId:   customerType === 'member'  ? customerId       || null : null,
         paymentMethod,
         paymentStatus,
         discount,
         tax,
         ongkir,
         notes,
-        pointsRedeemed: customerId ? pointsToRedeem : 0,
+        pointsRedeemed: customerType === 'member' ? pointsToRedeem : 0,
       });
 
       if (result.success) {

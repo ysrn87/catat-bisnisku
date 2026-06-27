@@ -89,7 +89,8 @@ async function getMembers(storeId: string) {
     where: { storeId, role: 'MEMBER' },
     include: { user: { select: { id: true, name: true } } },
   });
-  return storeUsers.map((su) => ({ ...su.user, points: su.points }));
+  // FIX: id harus StoreUser.id (dipakai sebagai memberId), bukan User.id
+  return storeUsers.map((su) => ({ id: su.id, name: su.user.name, points: su.points }));
 }
 
 async function getNonMembers(storeId: string) {
