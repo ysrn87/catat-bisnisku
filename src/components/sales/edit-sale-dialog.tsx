@@ -39,6 +39,7 @@ interface EditSaleDialogProps {
         id: string;
         name: string;
         stock: number;
+        type?: string;
         product: { name: string };
       };
     }>;
@@ -49,6 +50,7 @@ interface EditSaleDialogProps {
     price: number;
     stock: number;
     pointsPerUnit: number;
+    type?: string;
     product: { name: string };
   }>;
   conversionRate?: number;
@@ -65,6 +67,7 @@ interface SaleItem {
   quantity: number;
   price: number;
   currentStock: number;
+  type?: string;
   priceDisplay?: string;
 }
 
@@ -119,6 +122,7 @@ export function EditSaleDialog({
         quantity: item.quantity,
         price: item.price,
         currentStock: item.variant.stock + item.quantity,
+        type: item.variant.type,
         priceDisplay: item.price.toLocaleString('en-US'),
       })),
     );
@@ -130,7 +134,7 @@ export function EditSaleDialog({
   const updateQuantity = (index: number, newQty: number) => {
     if (newQty < 1) return;
     const newItems = [...items];
-    if (newQty <= newItems[index].currentStock) {
+    if (newItems[index].type === 'PREORDER' || newQty <= newItems[index].currentStock) {
       newItems[index].quantity = newQty;
       setItems(newItems);
     }
@@ -149,7 +153,7 @@ export function EditSaleDialog({
   };
 
   const filteredVariants = variants
-    .filter((v) => v.stock > 0)
+    .filter((v) => v.type === 'PREORDER' || v.stock > 0)
     .filter(
       (v) =>
         !productSearch ||
@@ -166,7 +170,7 @@ export function EditSaleDialog({
     }
     const variant = variants.find((v) => v.id === selectedVariantId);
     if (!variant) return;
-    if (quantity > variant.stock) {
+    if (variant.type !== 'PREORDER' && quantity > variant.stock) {
       toast({ title: 'Error', description: `Stok tersedia hanya ${variant.stock} unit.`, variant: 'destructive' });
       return;
     }
@@ -185,6 +189,7 @@ export function EditSaleDialog({
           quantity,
           price: variant.price,
           currentStock: variant.stock,
+          type: variant.type,
           priceDisplay: variant.price.toLocaleString('en-US'),
         },
       ]);
@@ -366,7 +371,7 @@ export function EditSaleDialog({
                           <button
                             type="button"
                             onClick={() => updateQuantity(index, item.quantity + 1)}
-                            disabled={loading || item.quantity >= item.currentStock}
+                            disabled={loading || (item.type !== 'PREORDER' && item.quantity >= item.currentStock)}
                             className="w-6 h-6 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition-colors"
                           >
                             <Plus className="w-3 h-3" />
@@ -379,7 +384,7 @@ export function EditSaleDialog({
 
                       {/* Row 5 — Stock info */}
                       <p className="text-[10px] text-gray-300 pt-0.5">
-                        Stok: {item.currentStock} pcs
+                        {item.type === 'PREORDER' ? 'Pre Order' : `Stok: ${item.currentStock} pcs`}
                       </p>
 
                     </div>
@@ -415,6 +420,9 @@ export function EditSaleDialog({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900 break-words leading-snug">
                         {selectedVariant.product.name}
+                        {selectedVariant.type === 'PREORDER' && (
+                          <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Pre-Order</span>
+                        )}
                       </p>
                       {selectedVariant.name !== selectedVariant.product.name && (
                         <p className="text-xs text-amber-600 font-medium leading-tight">
@@ -422,7 +430,7 @@ export function EditSaleDialog({
                         </p>
                       )}
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {formatCurrency(selectedVariant.price)} · Stok: {selectedVariant.stock}
+                        {formatCurrency(selectedVariant.price)} · {selectedVariant.type === 'PREORDER' ? 'Pre Order' : `Stok: ${selectedVariant.stock}`}
                       </p>
                     </div>
                     <button
@@ -458,6 +466,9 @@ export function EditSaleDialog({
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 break-words leading-snug">
                               {variant.product.name}
+                              {variant.type === 'PREORDER' && (
+                                <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Pre-Order</span>
+                              )}
                             </p>
                             {variant.name !== variant.product.name && (
                               <p className="text-xs text-amber-600 font-medium leading-tight">
@@ -465,7 +476,7 @@ export function EditSaleDialog({
                               </p>
                             )}
                             <p className="text-xs text-gray-400 mt-0.5">
-                              {formatCurrency(variant.price)} · Stok: {variant.stock}
+                              {formatCurrency(variant.price)} · {variant.type === 'PREORDER' ? 'Pre Order' : `Stok: ${variant.stock}`}
                             </p>
                           </div>
                           {selectedVariantId === variant.id && (
