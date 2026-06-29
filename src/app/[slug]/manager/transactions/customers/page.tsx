@@ -49,7 +49,7 @@ async function getCustomersData(storeId: string, params: {
       include: {
         user: {
           select: {
-            id: true, name: true, email: true, phone: true, address: true,
+            id: true, name: true, email: true, phone: true,
             birthday: true, photoUrl: true, createdAt: true,
           },
         },

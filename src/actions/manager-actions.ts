@@ -8,8 +8,8 @@ import bcrypt from 'bcryptjs';
 export interface ManagerData {
   id:        string;
   name:      string;
-  email:     string | null;
-  phone:     string;
+  email:     string;
+  phone:     string | null;
   createdAt: Date;
 }
 
@@ -31,7 +31,13 @@ export async function getManagers(): Promise<ManagerData[]> {
     orderBy: { user: { name: 'asc' } },
   });
 
-  return staffRecords.map((s) => s.user);
+  return staffRecords.map((s) => ({
+    id:        s.user.id,
+    name:      s.user.name,
+    email:     s.user.email,
+    phone:     s.user.phone,
+    createdAt: s.user.createdAt,
+  }));
 }
 
 export interface CreateManagerResult {
@@ -113,7 +119,7 @@ export async function createManager(
         name:     data.name,
         phone:    data.phone,
         password: hashedPassword,
-        email:    data.email || null,
+        email:    data.email ?? '',
       },
     });
 

@@ -25,12 +25,19 @@ function LoginForm() {
     const slug       = searchParams.get('slug');
 
     if (registered === 'true') {
-      if (slug) {
+      const verify = searchParams.get('verify');
+      if (verify === 'true') {
+        setSuccessMessage('Akun berhasil dibuat! Cek email kamu untuk verifikasi sebelum login.');
+      } else if (slug) {
         setNewStoreSlug(slug);
-        setSuccessMessage(`Toko berhasil dibuat! Login untuk masuk ke dasbor toko kamu.`);
+        setSuccessMessage('Toko berhasil dibuat! Login untuk masuk ke dasbor toko kamu.');
       } else {
         setSuccessMessage('Akun berhasil dibuat! Silakan login.');
       }
+    }
+    const verified = searchParams.get('verified');
+    if (verified === '1') {
+      setSuccessMessage('Email berhasil diverifikasi! Silakan login.');
     }
   }, [searchParams]);
 
@@ -47,7 +54,7 @@ function LoginForm() {
       router.push('/store-select');
       router.refresh();
     } else {
-      setError(result.error || 'Login gagal. Periksa kembali email/telepon dan password.');
+      setError(result.error || 'Email atau password salah.');
       setLoading(false);
     }
   }
@@ -93,11 +100,11 @@ function LoginForm() {
             <div className="space-y-2">
               <Label htmlFor="identifier" className="text-xs font-light flex items-center gap-2">
                 <Mail className="w-4 h-4 text-gray-500" />
-                Email atau No. WhatsApp
+                Email
               </Label>
               <Input
-                id="identifier" name="identifier" type="text" required
-                placeholder="you@example.com atau 08123456789"
+                id="identifier" name="identifier" type="email" required
+                placeholder="you@example.com"
                 disabled={loading}
                 className="h-11 text-sm focus-visible:ring-[#a8f0f8]"
               />

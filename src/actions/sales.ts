@@ -422,7 +422,7 @@ export async function deleteSaleAction(id: string) {
         }
       }
 
-      await tx.sale.delete({ where: { id } });
+      await tx.sale.delete({ where: { id, storeId } });
     });
 
     revalidatePath(`/${storeSlug}/admin/transactions/sales`);

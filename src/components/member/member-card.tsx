@@ -12,7 +12,7 @@ interface MemberCardProps {
   user: {
     id: string;
     name: string;
-    phone: string;
+    phone?: string | null;
     email?: string | null;
     birthday?: Date | null;
     address?: string | null;

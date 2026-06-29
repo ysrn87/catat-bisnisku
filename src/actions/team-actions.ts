@@ -1,205 +1,350 @@
 'use server';
 
-import { auth } from '@/auth';
 import { db } from '@/lib/db';
-import {
-  type StaffRoleValue,
-  checkStaffConflict,
-  canAssignStaffRole,
-} from '@/lib/role-guard';
+import crypto from 'crypto';
+import { type StaffRoleValue, canAssignStaffRole } from '@/lib/role-guard';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, checkPlanLimit } from '@/lib/store-context';
+import {
+  sendEmail,
+  getAppUrl,
+  staffInvitationExistingUserTemplate,
+  staffInvitationNewUserTemplate,
+} from '@/lib/email';
 
-type SwitchableRole = 'MANAGER' | 'CASHIER';
+const INVITATION_EXPIRES_DAYS = 7;
+const ROLE_LABEL: Record<string, string> = {
+  MANAGER:       'Manager',
+  CASHIER:       'Kasir',
+  ADMINISTRATOR: 'Administrator',
+};
 
-export interface SwitchRoleResult {
-  success: boolean;
-  error?:  string;
+// ─────────────────────────────────────────────────────────────────────────────
+// inviteStaffAction
+// Menggantikan createManagerAction + createCashierAction.
+// Tidak langsung buat StoreStaff — kirim undangan via email dulu.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function inviteStaffAction(
+  email: string,
+  role: 'MANAGER' | 'CASHIER'
+): Promise<{ success: boolean; error?: string; warning?: string }> {
+  try {
+    const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
+
+    // Hanya OWNER dan ADMINISTRATOR yang bisa undang
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Kamu tidak memiliki izin untuk mengundang anggota tim.' };
+    }
+
+    if (!canAssignStaffRole(storeRole as StaffRoleValue, role)) {
+      return { success: false, error: `Role kamu (${storeRole}) tidak dapat mengundang ${role}.` };
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return { success: false, error: 'Format email tidak valid.' };
+    }
+
+    // Cek batas plan
+    const limit = await checkPlanLimit(role === 'MANAGER' ? 'managers' : 'cashiers');
+    if (!limit.allowed) {
+      return {
+        success: false,
+        error: `Batas ${ROLE_LABEL[role]} tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO.`,
+      };
+    }
+
+    // Cek apakah sudah jadi staff di toko ini
+    const existingUser = await db.user.findUnique({
+      where:  { email: normalizedEmail },
+      select: { id: true, name: true, emailVerified: true },
+    });
+
+    if (existingUser) {
+      const alreadyStaff = await db.storeStaff.findUnique({
+        where: { storeId_userId: { storeId, userId: existingUser.id } },
+      });
+      if (alreadyStaff) {
+        return {
+          success: false,
+          error: `${normalizedEmail} sudah terdaftar di toko ini sebagai ${ROLE_LABEL[alreadyStaff.role] ?? alreadyStaff.role}.`,
+        };
+      }
+    }
+
+    // Cek apakah sudah ada undangan pending untuk email + toko ini
+    const existingInvitation = await db.staffInvitation.findFirst({
+      where: { storeId, email: normalizedEmail, status: 'PENDING' },
+    });
+    if (existingInvitation) {
+      return {
+        success: false,
+        error: `Undangan untuk ${normalizedEmail} sudah dikirim dan masih menunggu respons.`,
+      };
+    }
+
+    // Ambil data store & inviter untuk email
+    const [store, inviter] = await Promise.all([
+      db.store.findUnique({ where: { id: storeId }, select: { name: true } }),
+      db.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    ]);
+
+    const token     = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + INVITATION_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
+    const appUrl    = getAppUrl();
+    const expiresIn = `${INVITATION_EXPIRES_DAYS} hari`;
+
+    // Buat invitation record
+    await db.staffInvitation.create({
+      data: {
+        storeId,
+        email:       normalizedEmail,
+        role,
+        invitedById: userId,
+        token,
+        expiresAt,
+      },
+    });
+
+    // Kirim email sesuai status user
+    if (existingUser) {
+      // User sudah terdaftar → kirim link accept/decline
+      const acceptLink  = `${appUrl}/invitation?token=${token}&action=accept`;
+      const declineLink = `${appUrl}/invitation?token=${token}&action=decline`;
+      const { subject, html } = staffInvitationExistingUserTemplate({
+        name:        existingUser.name,
+        storeName:   store!.name,
+        inviterName: inviter!.name,
+        role,
+        acceptLink,
+        declineLink,
+        expiresIn,
+      });
+      await sendEmail({ to: normalizedEmail, subject, html });
+    } else {
+      // User belum terdaftar → kirim link register dengan invitation token
+      const registerLink = `${appUrl}/register?invitationToken=${token}`;
+      const { subject, html } = staffInvitationNewUserTemplate({
+        storeName:   store!.name,
+        inviterName: inviter!.name,
+        role,
+        registerLink,
+        expiresIn,
+      });
+      await sendEmail({ to: normalizedEmail, subject, html });
+    }
+
+    revalidatePath(`/${storeSlug}/admin/settings/profile`);
+    return { success: true };
+
+  } catch (err) {
+    console.error('[inviteStaffAction]', err);
+    return { success: false, error: 'Terjadi kesalahan. Silakan coba lagi.' };
+  }
 }
 
-// ─── Helper ────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// respondInvitationAction
+// Dipanggil dari halaman /invitation?token=xxx
+// ─────────────────────────────────────────────────────────────────────────────
 
-async function getActor(storeId: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error('Unauthorized');
+export async function respondInvitationAction(
+  token: string,
+  accept: boolean
+): Promise<{ success: boolean; error?: string; storeSlug?: string }> {
+  try {
+    const session = await import('@/auth').then((m) => m.auth());
+    if (!session?.user?.id) {
+      return { success: false, error: 'Kamu harus login terlebih dahulu.' };
+    }
 
-  const staff = await db.storeStaff.findUnique({
-    where:  { storeId_userId: { storeId, userId: session.user.id } },
-    select: { role: true },
-  });
-  if (!staff) throw new Error('Kamu tidak terdaftar sebagai staff di toko ini.');
-  return { actorId: session.user.id, actorRole: staff.role as StaffRoleValue };
+    const invitation = await db.staffInvitation.findUnique({
+      where:   { token },
+      include: { store: { select: { slug: true, name: true } } },
+    });
+
+    if (!invitation) {
+      return { success: false, error: 'Undangan tidak ditemukan atau sudah tidak valid.' };
+    }
+    if (invitation.status !== 'PENDING') {
+      return { success: false, error: `Undangan ini sudah ${invitation.status === 'ACCEPTED' ? 'diterima' : 'ditolak'}.` };
+    }
+    if (invitation.expiresAt < new Date()) {
+      await db.staffInvitation.update({ where: { token }, data: { status: 'EXPIRED' } });
+      return { success: false, error: 'Undangan ini sudah kedaluwarsa.' };
+    }
+
+    // Verifikasi bahwa user yang login adalah pemilik email undangan
+    const user = await db.user.findUnique({
+      where:  { id: session.user.id },
+      select: { email: true },
+    });
+    if (user?.email !== invitation.email) {
+      return { success: false, error: 'Undangan ini bukan untuk akun kamu.' };
+    }
+
+    if (!accept) {
+      await db.staffInvitation.update({
+        where: { token },
+        data:  { status: 'DECLINED', respondedAt: new Date() },
+      });
+      return { success: true };
+    }
+
+    // Terima undangan → buat StoreStaff
+    await db.$transaction(async (tx) => {
+      await tx.storeStaff.create({
+        data: {
+          storeId: invitation.storeId,
+          userId:  session.user!.id!,
+          role:    invitation.role,
+        },
+      });
+      await tx.staffInvitation.update({
+        where: { token },
+        data:  { status: 'ACCEPTED', respondedAt: new Date() },
+      });
+    });
+
+    return { success: true, storeSlug: invitation.store.slug };
+
+  } catch (err) {
+    console.error('[respondInvitationAction]', err);
+    return { success: false, error: 'Terjadi kesalahan. Silakan coba lagi.' };
+  }
 }
 
-// ─── switchTeamMemberRole ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// switchTeamMemberRole — tidak berubah, tetap dipakai
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function switchTeamMemberRole(
   targetUserId: string,
-  newRole: SwitchableRole
-): Promise<SwitchRoleResult> {
-  const { storeId, storeSlug, storeRole } = await requireStoreAccess();
-
-  if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
-    return { success: false, error: 'Unauthorized' };
-  }
-
-  const staff = await db.storeStaff.findUnique({
-    where: { storeId_userId: { storeId, userId: targetUserId } },
-  });
-  if (!staff) return { success: false, error: 'Anggota tim tidak ditemukan di store ini' };
-
-  if (staff.role !== 'MANAGER' && staff.role !== 'CASHIER') {
-    return { success: false, error: 'Hanya Manager dan Kasir yang bisa dipindah peran' };
-  }
-  if (staff.role === newRole) {
-    return { success: false, error: `Sudah menjadi ${newRole === 'MANAGER' ? 'Manager' : 'Kasir'}` };
-  }
-
-  const limit = await checkPlanLimit(newRole === 'MANAGER' ? 'managers' : 'cashiers');
-  if (!limit.allowed) {
-    const label = newRole === 'MANAGER' ? 'manager' : 'kasir';
-    return {
-      success: false,
-      error:   `Batas ${label} tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO.`,
-    };
-  }
-
-  await db.storeStaff.update({
-    where: { storeId_userId: { storeId, userId: targetUserId } },
-    data:  { role: newRole },
-  });
-
-  revalidatePath(`/${storeSlug}/admin/settings/profile`);
-  return { success: true };
-}
-
-// ─── assignStaff (generic) ────────────────────────────────────────────────────
-
-async function assignStaff(
-  storeId: string,
-  targetUserId: string,
-  targetRole: 'MANAGER' | 'CASHIER'
-) {
-  const { actorRole } = await getActor(storeId);
-
-  if (!canAssignStaffRole(actorRole, targetRole)) {
-    throw new Error(`Role kamu (${actorRole}) tidak dapat meng-assign ${targetRole}.`);
-  }
-
-  const conflict = await checkStaffConflict(targetUserId, storeId, targetRole);
-  if (conflict.hasConflict) throw new Error(conflict.reason);
-
-  const storeStaff = await db.storeStaff.create({
-    data: { userId: targetUserId, storeId, role: targetRole },
-  });
-
-  return { storeStaff, warning: conflict.isWarning ? conflict.reason : undefined };
-}
-
-// ─── createManagerAction ──────────────────────────────────────────────────────
-
-export async function createManagerAction(storeId: string, targetUserId: string) {
+  newRole: 'MANAGER' | 'CASHIER'
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const result = await assignStaff(storeId, targetUserId, 'MANAGER');
-    revalidatePath(`/dashboard/${storeId}/team`);
-    return { success: true, ...result };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
-  }
-}
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
 
-// ─── createCashierAction ──────────────────────────────────────────────────────
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Unauthorized' };
+    }
 
-export async function createCashierAction(storeId: string, targetUserId: string) {
-  try {
-    const result = await assignStaff(storeId, targetUserId, 'CASHIER');
-    revalidatePath(`/dashboard/${storeId}/team`);
-    return { success: true, ...result };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
-  }
-}
-
-// ─── updateStoreUserRoleAction ────────────────────────────────────────────────
-
-export async function updateStoreUserRoleAction(
-  storeId: string,
-  targetUserId: string,
-  newRole: StaffRoleValue
-) {
-  try {
-    const { actorId, actorRole } = await getActor(storeId);
-
-    const target = await db.storeStaff.findUnique({
+    const staff = await db.storeStaff.findUnique({
       where: { storeId_userId: { storeId, userId: targetUserId } },
     });
-    if (!target) throw new Error('User tidak ditemukan sebagai staff di toko ini.');
-
-    if (target.role === 'OWNER' && actorRole !== 'OWNER') {
-      throw new Error('Hanya OWNER yang dapat mengubah role OWNER lain.');
+    if (!staff) return { success: false, error: 'Anggota tim tidak ditemukan di toko ini.' };
+    if (staff.role !== 'MANAGER' && staff.role !== 'CASHIER') {
+      return { success: false, error: 'Hanya Manager dan Kasir yang bisa dipindah peran.' };
     }
-    if (!canAssignStaffRole(actorRole, newRole) && actorId !== targetUserId) {
-      throw new Error(`Role kamu (${actorRole}) tidak dapat meng-assign ${newRole}.`);
+    if (staff.role === newRole) {
+      return { success: false, error: `Sudah menjadi ${ROLE_LABEL[newRole]}.` };
     }
 
-    const updated = await db.storeStaff.update({
+    const limit = await checkPlanLimit(newRole === 'MANAGER' ? 'managers' : 'cashiers');
+    if (!limit.allowed) {
+      return {
+        success: false,
+        error: `Batas ${ROLE_LABEL[newRole]} tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO.`,
+      };
+    }
+
+    await db.storeStaff.update({
       where: { storeId_userId: { storeId, userId: targetUserId } },
       data:  { role: newRole },
     });
 
-    revalidatePath(`/dashboard/${storeId}/team`);
-    return { success: true, data: updated };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
-  }
-}
-
-// ─── removeStaff / deleteManagerAction / deleteCashierAction ─────────────────
-
-async function removeStaff(
-  storeId: string,
-  targetUserId: string,
-  expectedRole?: StaffRoleValue
-) {
-  const { actorId, actorRole } = await getActor(storeId);
-
-  const target = await db.storeStaff.findUnique({
-    where: { storeId_userId: { storeId, userId: targetUserId } },
-  });
-  if (!target) throw new Error('User tidak ditemukan sebagai staff di toko ini.');
-
-  if (expectedRole && target.role !== expectedRole) {
-    throw new Error(`User ini bukan ${expectedRole} di toko ini.`);
-  }
-
-  if (actorId === targetUserId && target.role === 'OWNER') {
-    const ownerCount = await db.storeStaff.count({ where: { storeId, role: 'OWNER' } });
-    if (ownerCount <= 1) throw new Error('Kamu satu-satunya OWNER. Transfer ownership dulu.');
-  }
-
-  if (!canAssignStaffRole(actorRole, target.role as StaffRoleValue) && actorId !== targetUserId) {
-    throw new Error(`Role kamu (${actorRole}) tidak dapat menghapus ${target.role}.`);
-  }
-
-  await db.storeStaff.delete({ where: { storeId_userId: { storeId, userId: targetUserId } } });
-}
-
-export async function deleteManagerAction(storeId: string, targetUserId: string) {
-  try {
-    await removeStaff(storeId, targetUserId, 'MANAGER');
-    revalidatePath(`/dashboard/${storeId}/team`);
+    revalidatePath(`/${storeSlug}/admin/settings/profile`);
     return { success: true };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }
 }
 
-export async function deleteCashierAction(storeId: string, targetUserId: string) {
+// ─────────────────────────────────────────────────────────────────────────────
+// removeStaffAction — menggantikan deleteManagerAction + deleteCashierAction
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function removeStaffAction(
+  targetUserId: string
+): Promise<{ success: boolean; error?: string }> {
   try {
-    await removeStaff(storeId, targetUserId, 'CASHIER');
-    revalidatePath(`/dashboard/${storeId}/team`);
+    const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Kamu tidak memiliki izin untuk menghapus anggota tim.' };
+    }
+
+    const target = await db.storeStaff.findUnique({
+      where: { storeId_userId: { storeId, userId: targetUserId } },
+    });
+    if (!target) return { success: false, error: 'Anggota tim tidak ditemukan di toko ini.' };
+
+    // Tidak boleh hapus OWNER kecuali diri sendiri (dan hanya jika ada owner lain)
+    if (target.role === 'OWNER') {
+      if (userId !== targetUserId) {
+        return { success: false, error: 'Tidak bisa menghapus OWNER lain.' };
+      }
+      const ownerCount = await db.storeStaff.count({ where: { storeId, role: 'OWNER' } });
+      if (ownerCount <= 1) {
+        return { success: false, error: 'Kamu satu-satunya OWNER. Transfer ownership dulu sebelum keluar.' };
+      }
+    }
+
+    await db.storeStaff.delete({
+      where: { storeId_userId: { storeId, userId: targetUserId } },
+    });
+
+    revalidatePath(`/${storeSlug}/admin/settings/profile`);
     return { success: true };
   } catch (err) {
     return { success: false, error: (err as Error).message };
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// cancelInvitationAction — batalkan undangan yang masih PENDING
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function cancelInvitationAction(
+  invitationId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { storeId, storeSlug, storeRole } = await requireStoreAccess();
+
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const invitation = await db.staffInvitation.findUnique({
+      where: { id: invitationId },
+    });
+    if (!invitation || invitation.storeId !== storeId) {
+      return { success: false, error: 'Undangan tidak ditemukan.' };
+    }
+    if (invitation.status !== 'PENDING') {
+      return { success: false, error: 'Undangan ini sudah tidak aktif.' };
+    }
+
+    await db.staffInvitation.update({
+      where: { id: invitationId },
+      data:  { status: 'EXPIRED' },
+    });
+
+    revalidatePath(`/${storeSlug}/admin/settings/profile`);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// Backward-compat — hapus bertahap setelah UI diupdate
+/** @deprecated gunakan removeStaffAction */
+export async function deleteManagerAction(_storeId: string, targetUserId: string) {
+  return removeStaffAction(targetUserId);
+}
+/** @deprecated gunakan removeStaffAction */
+export async function deleteCashierAction(_storeId: string, targetUserId: string) {
+  return removeStaffAction(targetUserId);
 }

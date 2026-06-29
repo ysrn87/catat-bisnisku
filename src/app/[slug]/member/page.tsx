@@ -12,7 +12,6 @@ async function getMemberData(userId: string, storeId: string, page = 1, limit = 
   const today     = new Date(); today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
 
-  // FIX: PointHistory tidak lagi punya userId — harus via storeUser.id
   const storeUser = await db.storeUser.findUnique({
     where:  { storeId_userId: { storeId, userId } },
     select: { id: true, points: true },
@@ -21,10 +20,9 @@ async function getMemberData(userId: string, storeId: string, page = 1, limit = 
   const [user, pointsHistory, pointsTotal, todayPurchases, yesterdayPurchases] = await Promise.all([
     db.user.findUnique({
       where:  { id: userId },
-      // FIX: hapus pointsHistory dari select User — tidak ada relasi langsung lagi
-      select: { id: true, name: true, email: true, phone: true, address: true, birthday: true, photoUrl: true, createdAt: true },
+      // FIX: User tidak punya address — dihapus dari schema
+      select: { id: true, name: true, email: true, phone: true, birthday: true, photoUrl: true, createdAt: true },
     }),
-    // FIX: query via storeUserId
     db.pointHistory.findMany({
       where:   { storeUserId: storeUser?.id ?? '' },
       skip, take: limit,
@@ -32,11 +30,11 @@ async function getMemberData(userId: string, storeId: string, page = 1, limit = 
     }),
     db.pointHistory.count({ where: { storeUserId: storeUser?.id ?? '' } }),
     db.sale.findMany({
-      where:   { customerId: userId, storeId, createdAt: { gte: today } },
+      where:   { memberId: storeUser?.id, storeId, createdAt: { gte: today } },
       include: { items: { include: { variant: { include: { product: true } } } } },
     }),
     db.sale.findMany({
-      where:   { customerId: userId, storeId, createdAt: { gte: yesterday, lt: today } },
+      where:   { memberId: storeUser?.id, storeId, createdAt: { gte: yesterday, lt: today } },
       include: { items: true },
     }),
   ]);
@@ -64,7 +62,7 @@ export default async function MemberDashboard({ searchParams }: {
   const limit  = Number(params.limit) || 10;
 
   const { user, pointsHistory, pointsTotal, todayPurchases } =
-    await getMemberData(session.user.id, storeId, page, limit);
+    await getMemberData(session.user.id as string, storeId, page, limit);
 
   return (
     <div className="space-y-8">
@@ -77,9 +75,14 @@ export default async function MemberDashboard({ searchParams }: {
       {user && (
         <MemberCard
           user={{
-            id: user.id, name: user.name, email: user.email, phone: user.phone,
-            address: user.address, birthday: user.birthday, photoUrl: user.photoUrl,
-            points: user.points, createdAt: user.createdAt,
+            id:        user.id,
+            name:      user.name,
+            email:     user.email,
+            phone:     user.phone ?? undefined,   // FIX: phone optional di MemberCard
+            birthday:  user.birthday,
+            photoUrl:  user.photoUrl,
+            points:    user.points,
+            createdAt: user.createdAt,
           }}
           showMembershipId={true}
         />
@@ -88,46 +91,45 @@ export default async function MemberDashboard({ searchParams }: {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-semibold text-xl">
-            <Award className="w-5 h-5" /> Riwayat Poin
+            <ShoppingBag className="w-5 h-5 text-[#028697]" />
+            Pembelian Hari Ini
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <PointsHistoryTable
-            pointsHistory={pointsHistory}
-            currentPage={page}
-            pageSize={limit}
-            totalItems={pointsTotal}
-          />
+          {todayPurchases.length === 0 ? (
+            <p className="text-gray-500 text-sm">Belum ada pembelian hari ini.</p>
+          ) : (
+            <div className="space-y-3">
+              {todayPurchases.map((sale) => (
+                <div key={sale.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium">#{sale.saleNumber}</p>
+                    <p className="text-xs text-gray-500">{sale.items.length} item</p>
+                  </div>
+                  <p className="font-semibold text-sm text-[#028697]">
+                    {formatCurrency(Number(sale.total))}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 font-semibold text-xl">
-            <ShoppingBag className="w-5 h-5" /> Pembelian Hari Ini
+            <Award className="w-5 h-5 text-[#028697]" />
+            Riwayat Poin
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <p className="text-sm font-semibold">{todayPurchases.length}</p>
-                <p className="text-xs text-muted-foreground">Transaksi</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-semibold">
-                  {todayPurchases.reduce((sum, p) => sum + p.items.reduce((s, i) => s + i.quantity, 0), 0)}
-                </p>
-                <p className="text-xs text-muted-foreground">Item</p>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-semibold">
-                {formatCurrency(todayPurchases.reduce((sum, p) => sum + Number(p.total), 0))}
-              </p>
-              <p className="text-xs text-muted-foreground">Total Belanja</p>
-            </div>
-          </div>
+          <PointsHistoryTable
+            pointsHistory={pointsHistory}
+            totalItems={pointsTotal}
+            currentPage={page}
+            pageSize={limit}
+          />
         </CardContent>
       </Card>
     </div>

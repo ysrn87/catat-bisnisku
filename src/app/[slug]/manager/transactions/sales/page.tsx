@@ -20,7 +20,7 @@ async function getSales(storeId: string, params: {
       { customer: { name:  { contains: search, mode: 'insensitive' as const } } },
       { member:   { user: { name: { contains: search, mode: 'insensitive' as const } } } },
       { saleNumber: { contains: search, mode: 'insensitive' as const } },
-      { cashier:    { name:       { contains: search, mode: 'insensitive' as const } } },
+      { cashier: { user: { name: { contains: search, mode: 'insensitive' as const } } } },
     ];
   }
 
@@ -41,7 +41,7 @@ async function getSales(storeId: string, params: {
       where, skip, take: limit, orderBy,
       include: {
         customer: { select: { name: true, phone: true, address: true } },
-        member:   { select: { points: true, user: { select: { name: true, email: true, phone: true, address: true } } } },
+        member:   { select: { points: true, user: { select: { name: true, email: true, phone: true } } } },
         cashier:  { include: { user: { select: { name: true } } } },
         payment:  { select: { method: true, status: true } }, // FIX: include Payment
         items:    { include: { variant: { include: { product: true } } } },
@@ -52,19 +52,19 @@ async function getSales(storeId: string, params: {
 
   return {
     sales: sales.map((sale) => {
-      const { subtotal, discount, tax, total, items, payment, customer, member, ...rest } = sale;
+      const { subtotal, discount, tax, total, items, payment, customer, member, cashier, ...rest } = sale;
       return {
         ...rest,
         // FIX: customerName dipakai tabel (ringkas), customer/nonMemberCustomer dipakai dialog detail (lengkap)
         customerName: member?.user?.name ?? customer?.name ?? null,
-        cashierName: sale.cashier?.user?.name ?? null,
-        customer: member ? { name: member.user.name, email: member.user.email, phone: member.user.phone, address: member.user.address, points: member.points } : null,
+        cashierName: cashier?.user?.name ?? null,
+        customer: member ? { name: member.user.name, email: member.user.email, phone: member.user.phone ?? null, address: null, points: member.points } : null,
         nonMemberCustomer: customer ?? null,
         paymentMethod: payment?.method ?? 'CASH',
         paymentStatus: payment?.status ?? 'PAID',
         subtotal: Number(subtotal), discount: Number(discount),
         tax: Number(tax), ongkir: Number(sale.ongkir), total: Number(total),
-        items: items.map((item) => {
+        items: (items as any[]).map((item) => {
           const { price: vp, cost: vc, ...vr } = item.variant;
           return { ...item, price: Number(item.price), subtotal: Number(item.subtotal), variant: { ...vr, price: Number(vp), cost: Number(vc) } };
         }),

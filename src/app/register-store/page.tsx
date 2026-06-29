@@ -2,16 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { registerStoreAction, checkSlugAvailability, checkPhoneForStore } from '@/actions/register-store';
+import { registerStoreAction, checkEmailForStore, checkSlugAvailability } from '@/actions/register-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import {
-  Store, User, Phone, Mail, Lock, Eye, EyeOff,
+  Store, User, Mail, Lock, Eye, EyeOff,
   CheckCircle2, XCircle, ArrowRight, ArrowLeft,
-  Loader2, Check, AlertCircle, UserCheck, Info,
+  Loader2, Check, AlertCircle, UserCheck, Info, Phone,
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -26,26 +26,26 @@ function slugify(text: string): string {
 
 export default function RegisterStorePage() {
   const router = useRouter();
-  const [error, setError]             = useState<string | null>(null);
-  const [loading, setLoading]         = useState(false);
+  const [error, setError]               = useState<string | null>(null);
+  const [loading, setLoading]           = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Store fields
-  const [storeName, setStoreName] = useState('');
-  const [storeSlug, setStoreSlug] = useState('');
+  const [storeName, setStoreName]         = useState('');
+  const [storeSlug, setStoreSlug]         = useState('');
   const [slugManual, setSlugManual]       = useState(false);
   const [slugChecking, setSlugChecking]   = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
 
   // Owner fields
-  const [ownerName, setOwnerName]       = useState('');
-  const [ownerPhone, setOwnerPhone]     = useState('');
-  const [ownerEmail, setOwnerEmail]     = useState('');
+  const [ownerName, setOwnerName]         = useState('');
+  const [ownerEmail, setOwnerEmail]       = useState('');
+  const [ownerPhone, setOwnerPhone]       = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
 
-  // ── Existing user detection ─────────────────────────────────────────────────
-  const [existingUserName, setExistingUserName]       = useState<string | null>(null);
-  const [phoneChecking, setPhoneChecking]             = useState(false);
+  // Existing user detection (by email)
+  const [existingUserName, setExistingUserName] = useState<string | null>(null);
+  const [emailChecking, setEmailChecking]       = useState(false);
 
   // Auto-generate slug dari nama toko
   useEffect(() => {
@@ -66,18 +66,19 @@ export default function RegisterStorePage() {
     return () => clearTimeout(t);
   }, [storeSlug, checkSlug]);
 
-  // Debounce cek phone
+  // Debounce cek email
   useEffect(() => {
     setExistingUserName(null);
-    if (!ownerPhone || ownerPhone.replace(/\D/g, '').length < 9) return;
-    setPhoneChecking(true);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!ownerEmail || !emailRegex.test(ownerEmail)) return;
+    setEmailChecking(true);
     const t = setTimeout(async () => {
-      const { exists, name } = await checkPhoneForStore(ownerPhone);
+      const { exists, name } = await checkEmailForStore(ownerEmail);
       setExistingUserName(exists ? (name ?? '') : null);
-      setPhoneChecking(false);
+      setEmailChecking(false);
     }, 700);
     return () => clearTimeout(t);
-  }, [ownerPhone]);
+  }, [ownerEmail]);
 
   const isExistingUser = existingUserName !== null;
 
@@ -87,12 +88,14 @@ export default function RegisterStorePage() {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
-    if (isExistingUser) formData.set('isExistingUser', 'true');
-
-    const result = await registerStoreAction(formData);
+    const result   = await registerStoreAction(formData);
 
     if (result.success) {
-      router.push(`/login?registered=true&slug=${result.slug}`);
+      if (result.needsVerification) {
+        router.push(`/login?registered=true&verify=true`);
+      } else {
+        router.push(`/login?registered=true&slug=${result.slug}`);
+      }
     } else {
       setError(result.error || 'Terjadi kesalahan. Silakan coba lagi.');
       setLoading(false);
@@ -101,7 +104,7 @@ export default function RegisterStorePage() {
 
   const slugStatus = () => {
     if (!storeSlug || storeSlug.length < 3) return null;
-    if (slugChecking)          return <span className="flex items-center gap-1 text-gray-400 text-xs"><Loader2 className="w-3 h-3 animate-spin" />Mengecek...</span>;
+    if (slugChecking)           return <span className="flex items-center gap-1 text-gray-400 text-xs"><Loader2 className="w-3 h-3 animate-spin" />Mengecek...</span>;
     if (slugAvailable === true)  return <span className="flex items-center gap-1 text-green-600 text-xs"><Check className="w-3 h-3" />Tersedia</span>;
     if (slugAvailable === false) return <span className="flex items-center gap-1 text-red-500 text-xs"><AlertCircle className="w-3 h-3" />Sudah digunakan</span>;
     return null;
@@ -171,33 +174,32 @@ export default function RegisterStorePage() {
               </p>
             </div>
 
-            {/* Phone — selalu tampil */}
+            {/* Email — selalu tampil, primary identifier */}
             <div className="space-y-1.5">
-              <Label htmlFor="ownerPhone" className="text-xs font-medium flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-gray-400" />
-                Nomor WhatsApp <span className="text-red-500">*</span>
+              <Label htmlFor="ownerEmail" className="text-xs font-medium flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-gray-400" />
+                Email <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
                 <Input
-                  id="ownerPhone" name="ownerPhone" type="tel" required
-                  placeholder="08123456789" value={ownerPhone}
-                  onChange={(e) => setOwnerPhone(e.target.value.replace(/[^0-9+\-\s()]/g, ''))}
-                  disabled={loading} minLength={9} maxLength={20}
+                  id="ownerEmail" name="ownerEmail" type="email" required
+                  placeholder="pemilik@email.com" value={ownerEmail}
+                  onChange={(e) => setOwnerEmail(e.target.value.trim())}
+                  disabled={loading}
                   className="h-10 text-sm focus-visible:ring-[#028697] pr-8"
                 />
-                {phoneChecking && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-gray-400" />}
+                {emailChecking && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-gray-400" />}
               </div>
 
-              {/* Banner: nomor sudah terdaftar */}
+              {/* Banner: email sudah terdaftar */}
               {isExistingUser && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-1">
                   <p className="text-xs font-semibold text-blue-800 flex items-center gap-1.5">
                     <UserCheck className="w-3.5 h-3.5" />
-                    Nomor ini sudah terdaftar atas nama "{existingUserName}"
+                    Email ini terdaftar atas nama &quot;{existingUserName}&quot;
                   </p>
                   <p className="text-xs text-blue-600">
-                    Masukkan password akun kamu untuk membuat toko baru dengan akun yang sama.
-                    Kamu tidak perlu membuat akun baru.
+                    Masukkan password akun kamu untuk menambah toko baru ke akun yang sama.
                   </p>
                 </div>
               )}
@@ -218,24 +220,24 @@ export default function RegisterStorePage() {
               </div>
             )}
 
-            {/* Email — hanya untuk user baru */}
+            {/* No. HP — opsional */}
             {!isExistingUser && (
               <div className="space-y-1.5">
-                <Label htmlFor="ownerEmail" className="text-xs font-medium flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-gray-400" />
-                  Email <span className="text-gray-400 font-normal">(opsional)</span>
+                <Label htmlFor="ownerPhone" className="text-xs font-medium flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-gray-400" />
+                  No. WhatsApp <span className="text-gray-400 font-normal">(opsional)</span>
                 </Label>
                 <Input
-                  id="ownerEmail" name="ownerEmail" type="email"
-                  placeholder="pemilik@email.com"
-                  value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)}
-                  disabled={loading}
+                  id="ownerPhone" name="ownerPhone" type="tel"
+                  placeholder="08123456789" value={ownerPhone}
+                  onChange={(e) => setOwnerPhone(e.target.value.replace(/[^0-9+\-\s()]/g, ''))}
+                  disabled={loading} maxLength={20}
                   className="h-10 text-sm focus-visible:ring-[#028697]"
                 />
               </div>
             )}
 
-            {/* Password — selalu tampil */}
+            {/* Password */}
             <div className="space-y-1.5">
               <Label htmlFor="ownerPassword" className="text-xs font-medium flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-gray-400" />
@@ -246,9 +248,9 @@ export default function RegisterStorePage() {
                 <Input
                   id="ownerPassword" name="ownerPassword"
                   type={showPassword ? 'text' : 'password'} required
-                  placeholder={isExistingUser ? 'Masukkan password akun kamu' : 'Min. 6 karakter'}
+                  placeholder={isExistingUser ? 'Masukkan password akun kamu' : 'Min. 8 karakter + angka/simbol'}
                   value={ownerPassword} onChange={(e) => setOwnerPassword(e.target.value)}
-                  disabled={loading} minLength={isExistingUser ? 1 : 6}
+                  disabled={loading} minLength={isExistingUser ? 1 : 8}
                   className="h-10 text-sm pr-10 focus-visible:ring-[#028697]"
                 />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
@@ -258,6 +260,9 @@ export default function RegisterStorePage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {!isExistingUser && (
+                <p className="text-xs text-gray-400">Min. 8 karakter dan mengandung angka atau simbol (!@#$%^&*)</p>
+              )}
             </div>
 
             {/* Plan info — hanya untuk user baru */}
@@ -265,7 +270,7 @@ export default function RegisterStorePage() {
               <div className="p-3 bg-[#e0f9fc] rounded-lg border border-[#90e0d8] text-xs text-gray-600 space-y-1.5">
                 <p className="font-semibold text-[#028697]">Plan FREE — Gratis selamanya</p>
                 <div className="grid grid-cols-2 gap-1">
-                  {['Hingga 50 produk', 'Hingga 2 Manager', 'Kasir & Penjualan', 'Sistem Poin Member'].map((f) => (
+                  {['Hingga 15 produk', 'Hingga 1 Manager', 'Kasir & Penjualan', 'Sistem Poin Member'].map((f) => (
                     <span key={f} className="flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-[#028697] flex-shrink-0" /> {f}
                     </span>
@@ -278,7 +283,7 @@ export default function RegisterStorePage() {
             {isExistingUser && (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700 flex items-start gap-2">
                 <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                <span>Toko baru akan terhubung ke akun "{existingUserName}". Kamu bisa switch antar toko dari halaman pilih toko setelah login.</span>
+                <span>Toko baru akan terhubung ke akun &quot;{existingUserName}&quot;. Kamu bisa switch antar toko dari halaman pilih toko setelah login.</span>
               </div>
             )}
 

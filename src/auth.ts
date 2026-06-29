@@ -16,38 +16,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        identifier: { label: 'Email or Phone', type: 'text' },
-        password:   { label: 'Password',       type: 'password' },
+        email:    { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.identifier || !credentials?.password) return null;
+        if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await db.user.findFirst({
-          where: {
-            OR: [
-              { email: credentials.identifier as string },
-              { phone: credentials.identifier as string },
-            ],
-          },
+        const user = await db.user.findUnique({
+          where: { email: credentials.email as string },
         });
 
-        if (!user) return null;
+        if (!user)              return null;
+        if (!user.password)     return null;
+        if (!user.emailVerified) return null; // wajib verifikasi email dulu
 
-        // Walk-in customer accounts have no password — cannot log in directly
-        if (!user.password) return null;
-
-        const isPasswordValid = await bcrypt.compare(
+        const isValid = await bcrypt.compare(
           credentials.password as string,
           user.password
         );
+        if (!isValid) return null;
 
-        if (!isPasswordValid) return null;
-
-        // UPDATED: tidak ada storeRole di session level —
-        // role per toko diambil dari StoreStaff saat requireStoreAccess() dipanggil
         return {
           id:           user.id,
-          email:        user.email || user.phone,
+          email:        user.email,
           name:         user.name,
           isSuperAdmin: user.isSuperAdmin,
         };

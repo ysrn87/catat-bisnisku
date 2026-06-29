@@ -29,12 +29,14 @@ const resolveStore = cache(async (slug: string): Promise<StoreContext> => {
     store.planExpiresAt < new Date()
   ) {
     effectivePlan = 'FREE';
-    db.store.update({
-      where: { id: store.id },
-      data:  { plan: 'FREE', planExpiresAt: null, updatedAt: new Date() },
-    }).catch((err) => {
+    try {
+      await db.store.update({
+        where: { id: store.id },
+        data:  { plan: 'FREE', planExpiresAt: null, updatedAt: new Date() },
+      });
+    } catch (err) {
       console.error('[getStoreContext] Gagal auto-downgrade store:', err);
-    });
+    }
   }
 
   return { storeId: store.id, storeSlug: store.slug, storePlan: effectivePlan };
