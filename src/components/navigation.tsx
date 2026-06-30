@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useTransition, useState } from 'react';
+import { useTransition, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt } from 'lucide-react';
+import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt, ChevronDown, Search, Bell } from 'lucide-react';
 import { logoutAction } from '@/actions/auth';
 import { triggerLoader } from '@/components/layouts/navigation-loader';
 import { PlanBadge } from '@/components/plan/plan-badge';
@@ -37,6 +37,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [expandedHref, setExpandedHref] = useState<string | null>(null);
 
   const base = `/${storeSlug}`;
   const homeHref =
@@ -211,96 +212,124 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
     return false;
   };
 
+  useEffect(() => {
+    const active = navItems.find((item) => isNavItemActive(item) && item.subItems);
+    setExpandedHref(active ? active.href : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const activeItem = navItems.find((item) => isNavItemActive(item));
+  const activeSub = activeItem?.subItems?.find(
+    (sub) => pathname === sub.href || pathname.startsWith(sub.href)
+  );
+
   return (
     <>
       {/* ── DESKTOP SIDEBAR (lg dan ke atas) ── */}
-      <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-64 bg-white/95 border-r border-[#a8f0f8] shadow-md backdrop-blur-sm">
+      <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-60 bg-white border-r border-gray-100">
         {/* Logo + Store name */}
-        <div className="flex items-center gap-3 h-16 px-4 border-b border-[#a8f0f8] flex-shrink-0">
+        <div className="flex items-center gap-2.5 h-16 px-5 border-b border-gray-100 flex-shrink-0">
           {logoUrl ? (
-            <img src={logoUrl} alt={storeName ?? 'Logo'} className="w-8 h-8 rounded-lg object-contain flex-shrink-0" />
+            <img src={logoUrl} alt={storeName ?? 'Logo'} className="w-7 h-7 rounded-lg object-contain flex-shrink-0" />
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-[#028697] flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xs font-bold">{(storeName ?? 'C').charAt(0).toUpperCase()}</span>
+            <div className="w-7 h-7 rounded-lg bg-[#028697] flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-xs font-medium">{(storeName ?? 'C').charAt(0).toUpperCase()}</span>
             </div>
           )}
           <Link
             href={homeHref}
-            className="text-sm font-bold text-[#028697] truncate hover:opacity-80 transition-opacity leading-tight"
+            className="text-sm font-medium text-gray-900 truncate hover:opacity-80 transition-opacity leading-tight"
           >
             {storeName ?? 'Catat Bisnisku'}
           </Link>
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-0.5">
           {navItems.map((item) => {
             const isActive = isNavItemActive(item);
+            const hasSub = !!item.subItems;
+            const isExpanded = expandedHref === item.href;
+
+            const matchedSub = isActive && item.subItems
+              ? [...item.subItems]
+                  .sort((a, b) => b.href.length - a.href.length)
+                  .find((sub) => pathname === sub.href || pathname.startsWith(sub.href))
+              : undefined;
+
             return (
               <div key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`
-                    relative group flex items-center gap-3 px-3 py-2.5 rounded-lg
-                    font-medium text-sm transition-all duration-200
-                    ${isActive
-                      ? 'bg-[#028697] text-white shadow-md'
-                      : 'text-gray-600 hover:text-[#028697] hover:bg-[#e0f9fc]'
-                    }
-                  `}
-                >
-                  <span className="flex-shrink-0 transition-transform duration-200 group-hover:scale-110">
-                    {item.icon}
-                  </span>
-                  <span className="truncate">{item.label}</span>
-                </Link>
+                {hasSub ? (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedHref(isExpanded ? null : item.href)}
+                    className={`
+                      w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-lg
+                      text-sm transition-colors duration-150
+                      ${isActive
+                        ? 'bg-gray-50 text-gray-900 font-medium'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                      }
+                    `}
+                  >
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <span className={`flex-shrink-0 ${isActive ? 'text-[#028697]' : ''}`}>{item.icon}</span>
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 flex-shrink-0 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                ) : (
+                  <Link
+                    href={item.href}
+                    className={`
+                      flex items-center gap-2.5 px-3 py-2.5 rounded-lg
+                      text-sm transition-colors duration-150
+                      ${isActive
+                        ? 'bg-gray-50 text-gray-900 font-medium'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                      }
+                    `}
+                  >
+                    <span className={`flex-shrink-0 ${isActive ? 'text-[#028697]' : ''}`}>{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                )}
 
-                {item.subItems && (() => {
-                  // Sub-items selalu ditampilkan (expanded) di desktop sidebar.
-                  // Pilih sub-item paling spesifik yang cocok dengan path saat ini.
-                  // Perlu karena href Ringkasan ("/admin/summary") adalah prefix dari
-                  // href POS Kasir ("/admin") — tanpa ini keduanya akan
-                  // ke-highlight bersamaan saat berada di halaman POS Kasir.
-                  const matchedSub = isActive
-                    ? [...item.subItems]
-                        .sort((a, b) => b.href.length - a.href.length)
-                        .find((sub) => pathname === sub.href || pathname.startsWith(sub.href))
-                    : undefined;
-
-                  return (
-                    <div className="mt-1 mb-1 ml-[1.15rem] pl-4 border-l-2 border-[#a8f0f8] space-y-0.5">
-                      {item.subItems.map((sub) => {
-                        const subActive = matchedSub?.href === sub.href;
-                        return (
-                          <Link
-                            key={sub.href}
-                            href={sub.href}
-                            className={`
-                              block px-3 py-1.5 rounded-md text-sm truncate transition-colors duration-150
-                              ${subActive
-                                ? 'bg-[#e0f9fc] text-[#028697] font-medium'
-                                : 'text-gray-500 hover:text-[#028697] hover:bg-[#e0f9fc]/60'
-                              }
-                            `}
-                          >
-                            {sub.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                {hasSub && isExpanded && (
+                  <div className="mt-0.5 mb-1 ml-[1.65rem] pl-3 flex flex-col gap-0.5">
+                    {item.subItems!.map((sub) => {
+                      const subActive = matchedSub?.href === sub.href;
+                      return (
+                        <Link
+                          key={sub.href}
+                          href={sub.href}
+                          className={`
+                            block py-1.5 pl-3 text-sm truncate transition-colors duration-150 border-l-2
+                            ${subActive
+                              ? 'border-[#028697] text-[#028697] font-medium'
+                              : 'border-gray-100 text-gray-400 hover:text-gray-700 hover:border-gray-300'
+                            }
+                          `}
+                        >
+                          {sub.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </nav>
 
         {/* User info + logout */}
-        <div className="flex-shrink-0 border-t border-[#a8f0f8] p-4 space-y-3">
+        <div className="flex-shrink-0 border-t border-gray-100 p-4 space-y-3">
           <div className="text-sm">
             <p className="font-medium text-gray-900 truncate">{userName ?? 'User'}</p>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#e0f9fc] text-[#0fa8be] whitespace-nowrap">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-500 whitespace-nowrap">
                 {role}
               </span>
               <PlanBadge plan={storePlan} storeSlug={storeSlug} compact />
@@ -312,7 +341,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
               variant="outline"
               size="sm"
               type="submit"
-              className="w-full group relative overflow-hidden border-[#a8f0f8] text-[#028697] hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-all duration-300 hover:shadow-md"
+              className="w-full group relative overflow-hidden border-gray-200 text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors duration-200"
             >
               <LogOut className="w-4 h-4 mr-2 transition-transform duration-300 group-hover:rotate-12" />
               Logout
@@ -320,6 +349,43 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
           </form>
         </div>
       </aside>
+
+      {/* ── DESKTOP TOPBAR (lg dan ke atas) ── */}
+      <header className="hidden lg:flex lg:fixed lg:top-0 lg:left-60 lg:right-0 lg:z-30 h-16 items-center justify-between gap-4 px-8 bg-white border-b border-gray-100">
+        <div className="flex items-center gap-1.5 text-sm min-w-0">
+          <span className="text-gray-400 truncate">{activeItem?.label ?? 'Dashboard'}</span>
+          {activeSub && (
+            <>
+              <span className="text-gray-300">/</span>
+              <span className="text-gray-900 font-medium truncate">{activeSub.label}</span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="relative hidden xl:block w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Cari di sini..."
+              disabled
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-gray-50 border border-gray-100 text-gray-400 placeholder:text-gray-400 cursor-not-allowed"
+            />
+          </div>
+          <Bell className="w-[18px] h-[18px] text-gray-400 flex-shrink-0" />
+          <div className="w-px h-5 bg-gray-100" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="text-right min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate max-w-[140px]">{userName ?? 'User'}</p>
+              <p className="text-xs text-gray-400 truncate">{role}</p>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-medium text-[#028697]">
+                {(userName ?? 'U').charAt(0).toUpperCase()}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
 
       {/* ── MOBILE TOP BAR (di bawah lg) ── */}
       <nav className="lg:hidden bg-white/95 border-b border-[#a8f0f8] sticky top-0 z-40 shadow-md backdrop-blur-sm">

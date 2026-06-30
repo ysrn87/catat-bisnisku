@@ -894,7 +894,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         />
       )}
 
-      <div className="flex flex-col lg:flex-row gap-3 h-[calc(100vh-10rem)] min-h-[600px]">
+      <div className="flex flex-col lg:flex-row gap-3 h-[calc(100vh-10rem)] lg:h-[calc(100vh-9rem)] min-h-[600px]">
         {/* ── Left: Product browser ── */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
           {/* Search */}

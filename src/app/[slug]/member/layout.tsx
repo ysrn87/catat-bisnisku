@@ -24,7 +24,7 @@ export default async function MemberLayout({ children, params }: { children: Rea
         storeName={storeUser.store.name}
         storePlan={storeUser.store.plan as 'FREE' | 'PRO'}
       />
-      <main className="px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8 lg:ml-64 lg:px-8">{children}</main>
+      <main className="px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8 lg:ml-60 lg:px-8 lg:pt-24">{children}</main>
     </div>
   );
 }
