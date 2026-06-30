@@ -38,6 +38,7 @@ let _registerMemberLimiter:    Ratelimit | null = null;
 let _resendVerificationLimiter: Ratelimit | null = null;
 let _inviteStaffLimiter:       Ratelimit | null = null;
 let _joinStoreLimiter:         Ratelimit | null = null;
+let _adminPlanSecretLimiter:   Ratelimit | null = null;
 
 function getLoginLimiter(): Ratelimit {
   if (!_loginLimiter) {
@@ -103,6 +104,20 @@ function getJoinStoreLimiter(): Ratelimit {
     });
   }
   return _joinStoreLimiter;
+}
+
+function getAdminPlanSecretLimiter(): Ratelimit {
+  if (!_adminPlanSecretLimiter) {
+    _adminPlanSecretLimiter = new Ratelimit({
+      redis:   getRedis(),
+      // Sengaja ketat — endpoint ini cuma dipanggil manual oleh pemilik,
+      // jadi traffic sah seharusnya sangat jarang. 5 percobaan / jam per IP
+      // cukup untuk human error, terlalu sedikit untuk brute-force secret.
+      limiter: Ratelimit.slidingWindow(5, '1 h'),
+      prefix:  'rl:admin-plan-secret',
+    });
+  }
+  return _adminPlanSecretLimiter;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -180,6 +195,11 @@ export async function checkInviteStaffLimit(inviterUserId: string): Promise<Rate
 /** Join toko sebagai member: max 10 per 10 menit per user yang join */
 export async function checkJoinStoreLimit(userId: string): Promise<RateLimitResult> {
   return checkLimit(getJoinStoreLimiter, userId);
+}
+
+/** Endpoint admin /api/store/plan: max 5 percobaan per jam per IP */
+export async function checkAdminPlanSecretLimit(ip: string): Promise<RateLimitResult> {
+  return checkLimit(getAdminPlanSecretLimiter, ip);
 }
 
 /**

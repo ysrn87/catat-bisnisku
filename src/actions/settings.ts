@@ -277,6 +277,16 @@ export async function updateStoreBrandingAction(logoBase64: string | null): Prom
       return { success: false, error: 'Ukuran logo maksimal 100KB.' };
     }
 
+    // FIX: validasi format sebelumnya hanya ada di client (handleFileChange
+    // di branding-tab.tsx). Karena ini Server Action, validasi client bisa
+    // dilewati sepenuhnya dengan memanggil action ini langsung — server
+    // sebelumnya cuma cek panjang string, tidak cek isinya benar-benar data
+    // URI gambar atau bukan. Tanpa ini, kolom logoUrl bisa dipakai
+    // menyimpan string arbitrer apa saja asal di bawah 150KB.
+    if (logoBase64 && !/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/]+=*$/.test(logoBase64)) {
+      return { success: false, error: 'Format logo tidak valid. Gunakan JPG, PNG, atau WebP.' };
+    }
+
     await db.store.update({
       where: { id: storeId },
       data:  { logoUrl: logoBase64 },
