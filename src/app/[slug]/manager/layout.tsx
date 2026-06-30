@@ -12,7 +12,7 @@ export default async function ManagerLayout({ children, params }: { children: Re
   // UPDATED: query ke StoreStaff
   const staffRecord = await db.storeStaff.findFirst({
     where: { userId: session.user.id, store: { slug }, role: { in: ['OWNER', 'ADMINISTRATOR', 'MANAGER'] } },
-    include: { store: { select: { name: true, slug: true, plan: true } } },
+    include: { store: { select: { name: true, slug: true, plan: true, logoUrl: true } } },
   });
   if (!staffRecord) redirect('/unauthorized');
 
@@ -25,6 +25,7 @@ export default async function ManagerLayout({ children, params }: { children: Re
         storeSlug={slug}
         storeName={staffRecord.store.name}
         storePlan={staffRecord.store.plan as 'FREE' | 'PRO'}
+        logoUrl={staffRecord.store.logoUrl}
       />
       <main className="px-4 py-6 pb-28 md:px-6 md:py-8 lg:pb-8 lg:ml-60 lg:px-8 lg:pt-24">{children}</main>
     </div>
