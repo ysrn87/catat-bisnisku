@@ -39,6 +39,7 @@ let _resendVerificationLimiter: Ratelimit | null = null;
 let _inviteStaffLimiter:       Ratelimit | null = null;
 let _joinStoreLimiter:         Ratelimit | null = null;
 let _adminPlanSecretLimiter:   Ratelimit | null = null;
+let _logoUploadLimiter:        Ratelimit | null = null;
 
 function getLoginLimiter(): Ratelimit {
   if (!_loginLimiter) {
@@ -118,6 +119,20 @@ function getAdminPlanSecretLimiter(): Ratelimit {
     });
   }
   return _adminPlanSecretLimiter;
+}
+
+function getLogoUploadLimiter(): Ratelimit {
+  if (!_logoUploadLimiter) {
+    _logoUploadLimiter = new Ratelimit({
+      redis:   getRedis(),
+      // Upload logo legitimate jarang lebih dari beberapa kali per sesi
+      // ganti branding. 10/jam cukup longgar untuk coba-coba beberapa
+      // desain, terlalu sempit untuk dipakai membengkakkan Blob storage.
+      limiter: Ratelimit.slidingWindow(10, '1 h'),
+      prefix:  'rl:logo-upload',
+    });
+  }
+  return _logoUploadLimiter;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -200,6 +215,11 @@ export async function checkJoinStoreLimit(userId: string): Promise<RateLimitResu
 /** Endpoint admin /api/store/plan: max 5 percobaan per jam per IP */
 export async function checkAdminPlanSecretLimit(ip: string): Promise<RateLimitResult> {
   return checkLimit(getAdminPlanSecretLimiter, ip);
+}
+
+/** Upload logo toko: max 10 per jam per user yang upload */
+export async function checkLogoUploadLimit(userId: string): Promise<RateLimitResult> {
+  return checkLimit(getLogoUploadLimiter, userId);
 }
 
 /**

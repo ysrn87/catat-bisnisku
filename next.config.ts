@@ -17,7 +17,10 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.sandbox.midtrans.com https://app.midtrans.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://i0.wp.com https://i1.wp.com https://i2.wp.com",
+      // FIX: domain Vercel Blob ditambahkan supaya logo toko yang diupload
+      // bisa tampil — tanpa ini, <img src> ke *.public.blob.vercel-storage.com
+      // akan diblokir browser di production meski upload-nya sendiri berhasil
+      "img-src 'self' data: blob: https://i0.wp.com https://i1.wp.com https://i2.wp.com https://*.public.blob.vercel-storage.com",
       "connect-src 'self' https://app.sandbox.midtrans.com https://app.midtrans.com https://api.sandbox.midtrans.com https://api.midtrans.com",
       "frame-src https://app.sandbox.midtrans.com https://app.midtrans.com",
       "frame-ancestors 'none'",

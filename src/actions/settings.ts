@@ -262,8 +262,22 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
 }
 
 // ─── Branding ─────────────────────────────────────────────────────────────────
+//
+// Logo toko disimpan di Vercel Blob (object storage), bukan lagi base64
+// langsung di kolom logoUrl. logoUrl sekarang hanya berisi short URL
+// (~80 karakter) yang menunjuk ke file di Blob — payload sidebar di semua
+// role (Admin/Manager/Cashier/Member) jadi jauh lebih ringan dibanding
+// sebelumnya yang ikut membawa seluruh isi gambar di setiap render.
+//
+// Upload logo TIDAK ditangani di sini — lihat
+// src/app/api/store/branding/upload/route.ts (Route Handler terpisah,
+// karena upload file butuh keluar dari batas bodySizeLimit Server Actions
+// dan x-store-slug header yang dipakai requireStoreAccess() tidak pernah
+// tersedia di luar pola path /[slug]/(admin|manager|cashier|member|upgrade)).
+// removeStoreLogoAction di bawah tetap Server Action karena tidak ada body
+// besar yang dikirim — hanya storeId dari context, sama seperti action lain.
 
-export async function updateStoreBrandingAction(logoBase64: string | null): Promise<
+export async function removeStoreLogoAction(): Promise<
   { success: true } | { success: false; error: string }
 > {
   try {
@@ -273,31 +287,35 @@ export async function updateStoreBrandingAction(logoBase64: string | null): Prom
       return { success: false, error: 'Fitur custom branding hanya tersedia untuk plan PRO.' };
     }
 
-    if (logoBase64 && logoBase64.length > 150_000) {
-      return { success: false, error: 'Ukuran logo maksimal 100KB.' };
-    }
-
-    // FIX: validasi format sebelumnya hanya ada di client (handleFileChange
-    // di branding-tab.tsx). Karena ini Server Action, validasi client bisa
-    // dilewati sepenuhnya dengan memanggil action ini langsung — server
-    // sebelumnya cuma cek panjang string, tidak cek isinya benar-benar data
-    // URI gambar atau bukan. Tanpa ini, kolom logoUrl bisa dipakai
-    // menyimpan string arbitrer apa saja asal di bawah 150KB.
-    if (logoBase64 && !/^data:image\/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/]+=*$/.test(logoBase64)) {
-      return { success: false, error: 'Format logo tidak valid. Gunakan JPG, PNG, atau WebP.' };
-    }
+    const currentStore = await db.store.findUnique({
+      where:  { id: storeId },
+      select: { logoUrl: true },
+    });
 
     await db.store.update({
       where: { id: storeId },
-      data:  { logoUrl: logoBase64 },
+      data:  { logoUrl: null },
     });
+
+    if (currentStore?.logoUrl && currentStore.logoUrl.includes('.public.blob.vercel-storage.com')) {
+      try {
+        const { del } = await import('@vercel/blob');
+        await del(currentStore.logoUrl);
+      } catch (delErr) {
+        console.error('[removeStoreLogoAction] Gagal hapus logo dari Blob:', delErr);
+      }
+    }
 
     revalidatePath(`/${storeSlug}/admin`);
     revalidatePath(`/${storeSlug}/admin/settings/profile`);
+    revalidatePath(`/${storeSlug}/manager`);
+    revalidatePath(`/${storeSlug}/cashier`);
+    revalidatePath(`/${storeSlug}/member`);
+
     return { success: true };
   } catch (error) {
-    console.error('updateStoreBranding error:', error);
-    return { success: false, error: 'Gagal menyimpan logo.' };
+    console.error('removeStoreLogo error:', error);
+    return { success: false, error: 'Gagal menghapus logo.' };
   }
 }
 

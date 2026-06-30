@@ -664,7 +664,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
 
       {/* ── Branding Tab ── */}
       {activeTab === 'branding' && (
-        <BrandingTab storeSlug={storeSlug} storePlan={storePlan} />
+        <BrandingTab storeSlug={storeSlug} storeId={storeId} storePlan={storePlan} />
       )}
 
       {/* Invite Modal */}
