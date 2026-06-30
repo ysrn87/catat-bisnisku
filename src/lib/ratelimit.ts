@@ -32,9 +32,12 @@ function getRedis(): Redis {
 }
 
 // Lazy limiters
-let _loginLimiter:          Ratelimit | null = null;
-let _registerStoreLimiter:  Ratelimit | null = null;
-let _registerMemberLimiter: Ratelimit | null = null;
+let _loginLimiter:             Ratelimit | null = null;
+let _registerStoreLimiter:     Ratelimit | null = null;
+let _registerMemberLimiter:    Ratelimit | null = null;
+let _resendVerificationLimiter: Ratelimit | null = null;
+let _inviteStaffLimiter:       Ratelimit | null = null;
+let _joinStoreLimiter:         Ratelimit | null = null;
 
 function getLoginLimiter(): Ratelimit {
   if (!_loginLimiter) {
@@ -67,6 +70,39 @@ function getRegisterMemberLimiter(): Ratelimit {
     });
   }
   return _registerMemberLimiter;
+}
+
+function getResendVerificationLimiter(): Ratelimit {
+  if (!_resendVerificationLimiter) {
+    _resendVerificationLimiter = new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(3, '15 m'),
+      prefix:  'rl:resend-verification',
+    });
+  }
+  return _resendVerificationLimiter;
+}
+
+function getInviteStaffLimiter(): Ratelimit {
+  if (!_inviteStaffLimiter) {
+    _inviteStaffLimiter = new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(20, '1 h'),
+      prefix:  'rl:invite-staff',
+    });
+  }
+  return _inviteStaffLimiter;
+}
+
+function getJoinStoreLimiter(): Ratelimit {
+  if (!_joinStoreLimiter) {
+    _joinStoreLimiter = new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(10, '10 m'),
+      prefix:  'rl:join-store',
+    });
+  }
+  return _joinStoreLimiter;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -122,6 +158,28 @@ export async function checkRegisterStoreLimit(ip: string): Promise<RateLimitResu
 /** Register member: max 10 per jam per IP */
 export async function checkRegisterMemberLimit(ip: string): Promise<RateLimitResult> {
   return checkLimit(getRegisterMemberLimiter, ip);
+}
+
+/**
+ * Resend verification: max 3 per 15 menit, dicek per EMAIL dan per IP.
+ * Dua identifier sekaligus karena email bombing ke satu korban bisa datang
+ * dari banyak IP berbeda (proxy/VPN), tapi kita juga tidak mau satu IP
+ * memicu resend untuk banyak email berbeda secara berturut-turut.
+ */
+export async function checkResendVerificationLimit(email: string, ip: string): Promise<RateLimitResult> {
+  const byEmail = await checkLimit(getResendVerificationLimiter, `email:${email}`);
+  if (!byEmail.success) return byEmail;
+  return checkLimit(getResendVerificationLimiter, `ip:${ip}`);
+}
+
+/** Undang staff: max 20 undangan per jam per user yang mengundang */
+export async function checkInviteStaffLimit(inviterUserId: string): Promise<RateLimitResult> {
+  return checkLimit(getInviteStaffLimiter, inviterUserId);
+}
+
+/** Join toko sebagai member: max 10 per 10 menit per user yang join */
+export async function checkJoinStoreLimit(userId: string): Promise<RateLimitResult> {
+  return checkLimit(getJoinStoreLimiter, userId);
 }
 
 /**

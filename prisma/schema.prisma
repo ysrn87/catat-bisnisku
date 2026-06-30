@@ -39,13 +39,16 @@ model User {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EMAIL VERIFICATION
-// Token satu kali pakai untuk verifikasi email saat registrasi
+// Token satu kali pakai untuk verifikasi email.
+// newEmail = null   → verifikasi awal saat registrasi (set emailVerified=true)
+// newEmail = terisi → konfirmasi ganti email (set email=newEmail saat diklik)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model EmailVerification {
   id        String   @id @default(cuid())
   userId    String
   token     String   @unique
+  newEmail  String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 

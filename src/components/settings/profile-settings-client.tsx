@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { getAdminProfile, updateAdminProfile, updateAdminPassword } from '@/actions/settings';
+import { getAdminProfile, updateAdminProfile, updateAdminPassword, requestEmailChangeAction } from '@/actions/settings';
 import {
   inviteStaffAction,
   removeStaffAction,
@@ -139,6 +139,105 @@ function InviteModal({
   );
 }
 
+// ─── Change Email Modal ───────────────────────────────────────────────────────
+
+function ChangeEmailModal({
+  currentEmail, onClose,
+}: {
+  currentEmail: string;
+  onClose:      () => void;
+}) {
+  const [newEmail, setNewEmail]     = useState('');
+  const [password, setPassword]     = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [sent, setSent]             = useState(false);
+  const { toast }                   = useToast();
+
+  async function handleSubmit() {
+    if (!newEmail.trim()) {
+      toast({ title: 'Email baru wajib diisi', variant: 'destructive' });
+      return;
+    }
+    if (!password) {
+      toast({ title: 'Konfirmasi password wajib diisi', variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    const result = await requestEmailChangeAction(newEmail.trim(), password);
+    setLoading(false);
+
+    if (result.success) {
+      setSent(true);
+    } else {
+      toast({ title: 'Gagal mengganti email', description: result.error, variant: 'destructive' });
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-5 border-b">
+          <h2 className="font-semibold text-base">Ganti Email</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+
+        {sent ? (
+          <div className="p-5 space-y-3">
+            <p className="text-sm text-gray-700">
+              Link konfirmasi telah dikirim ke <strong>{newEmail}</strong>.
+            </p>
+            <p className="text-xs text-gray-500">
+              Klik link di email tersebut untuk mengaktifkan email baru. Email kamu
+              saat ini (<strong>{currentEmail}</strong>) tetap aktif sampai link itu dikonfirmasi.
+              Link berlaku selama 1 jam.
+            </p>
+          </div>
+        ) : (
+          <div className="p-5 space-y-4">
+            <p className="text-xs text-gray-500">
+              Email saat ini: <strong>{currentEmail}</strong>. Kami akan mengirim link
+              konfirmasi ke alamat baru — email tidak langsung berubah sampai link itu diklik.
+            </p>
+            <div className="grid gap-1.5">
+              <Label htmlFor="new-email" className="text-xs font-medium flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-gray-400" />Email Baru <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                id="new-email" type="email" value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="email-baru@contoh.com"
+                className="h-10 text-sm"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="confirm-current-password" className="text-xs font-medium flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-gray-400" />Password Saat Ini <span className="text-red-400">*</span>
+              </Label>
+              <PasswordInput id="confirm-current-password" value={password} onChange={setPassword} placeholder="Konfirmasi identitas kamu" />
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 p-5 border-t">
+          {sent ? (
+            <Button onClick={onClose} className="bg-[#028697] hover:bg-[#0fa8be]">Selesai</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={loading}>Batal</Button>
+              <Button onClick={handleSubmit} disabled={loading} className="bg-[#028697] hover:bg-[#0fa8be]">
+                {loading
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Mengirim...</>
+                  : <><Send className="w-4 h-4 mr-2" />Kirim Link Konfirmasi</>
+                }
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -167,6 +266,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
   const [deletingId, setDeletingId]         = useState<string | null>(null);
   const [switchingId, setSwitchingId]       = useState<string | null>(null);
   const [cancellingId, setCancellingId]     = useState<string | null>(null);
+  const [changeEmailModal, setChangeEmailModal] = useState(false);
 
   const { toast } = useToast();
 
@@ -199,7 +299,7 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
     setLoading(true);
     try {
       if (!adminName.trim()) { toast({ title: 'Nama wajib diisi', variant: 'destructive' }); return; }
-      await updateAdminProfile({ name: adminName, email: adminEmail || undefined, phone: adminPhone || undefined });
+      await updateAdminProfile({ name: adminName, phone: adminPhone || undefined });
       toast({ title: 'Profil berhasil disimpan' });
     } catch (error: any) {
       toast({ title: 'Gagal menyimpan profil', description: error.message, variant: 'destructive' });
@@ -374,11 +474,18 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
                   <Input id="adminName" value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Nama admin" className="h-10 text-sm" />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="adminEmail" className="text-xs font-medium flex items-center gap-1.5">
+                  <Label className="text-xs font-medium flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-gray-400" />Email
                   </Label>
-                  <Input id="adminEmail" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="admin@example.com" className="h-10 text-sm" disabled />
-                  <p className="text-xs text-gray-400">Email tidak bisa diubah dari sini karena dipakai untuk login.</p>
+                  <div className="flex items-center gap-2">
+                    <div className="h-10 flex-1 flex items-center px-3 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-600">
+                      {adminEmail || 'Belum ada email'}
+                    </div>
+                    <Button variant="outline" className="h-10 text-xs shrink-0" onClick={() => setChangeEmailModal(true)}>
+                      Ganti Email
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-400">Mengganti email butuh konfirmasi lewat link yang dikirim ke alamat baru.</p>
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="adminPhone" className="text-xs font-medium flex items-center gap-1.5">
@@ -566,6 +673,14 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
           role={inviteModal}
           onClose={() => setInviteModal(null)}
           onSaved={loadTeam}
+        />
+      )}
+
+      {/* Change Email Modal */}
+      {changeEmailModal && (
+        <ChangeEmailModal
+          currentEmail={adminEmail}
+          onClose={() => setChangeEmailModal(false)}
         />
       )}
     </div>

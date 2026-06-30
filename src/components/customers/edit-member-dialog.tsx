@@ -10,8 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import { updateCustomerAction } from '@/actions/members';
 import {
-  User, Phone, Mail, Calendar, ImageIcon,
-  Lock, Star, AlertTriangle, Loader2,
+  User, Mail, Star, AlertTriangle, Loader2, ShieldCheck,
 } from 'lucide-react';
 
 interface EditMemberDialogProps {
@@ -55,42 +54,19 @@ function SectionDivider({ label }: { label: string }) {
 }
 
 export function EditMemberDialog({ customer, open, onOpenChange }: EditMemberDialogProps) {
-  const [loading, setLoading]       = useState(false);
-  const [name, setName]             = useState(customer.name);
-  const [phone, setPhone]           = useState(customer.phone);
-  const [photoUrl, setPhotoUrl]     = useState(customer.photoUrl || '');
-  const [points, setPoints]         = useState(customer.points);
-  const [initialPoints]             = useState(customer.points);
-  const [emailError, setEmailError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [points, setPoints]   = useState(customer.points);
+  const [initialPoints]       = useState(customer.points);
   const { toast } = useToast();
 
   // Reset setiap kali dialog dibuka
   useEffect(() => {
     if (open) {
-      setName(customer.name);
-      setPhone(customer.phone);
-      setPhotoUrl(customer.photoUrl || '');
       setPoints(customer.points);
-      setEmailError('');
     }
   }, [open]);
 
   const pointsChanged = points !== initialPoints;
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw       = e.target.value.replace(/[^0-9+]/g, '');
-    const formatted = raw.replace(/(.{4})/g, '$1 ').trim();
-    setPhone(formatted);
-  };
-
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val   = e.target.value;
-    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-    setEmailError(val && !valid ? 'Masukkan alamat email yang valid' : '');
-  };
-
-  const toTitleCase = (val: string) =>
-    val.replace(/\b\w/g, (c) => c.toUpperCase());
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -112,7 +88,7 @@ export function EditMemberDialog({ customer, open, onOpenChange }: EditMemberDia
     try {
       const result = await updateCustomerAction(customer.id, formData);
       if (result.success) {
-        toast({ title: 'Data member diperbarui!' });
+        toast({ title: 'Poin member diperbarui!' });
         onOpenChange(false);
       } else {
         toast({
@@ -142,9 +118,12 @@ export function EditMemberDialog({ customer, open, onOpenChange }: EditMemberDia
         <div className="relative bg-gradient-to-br from-[#028697] to-[#016d7a] px-6 pt-6 pb-8 flex-shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="relative flex items-center gap-3">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <User className="w-5 h-5 text-white" />
-            </div>
+            <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-white/20">
+              <AvatarImage src={customer.photoUrl || undefined} alt={customer.name} className="object-cover" />
+              <AvatarFallback className="bg-white/15 text-white text-xs">
+                {customer.name?.slice(0, 2).toUpperCase() || 'MB'}
+              </AvatarFallback>
+            </Avatar>
             <DialogHeader className="space-y-0.5 text-left p-0">
               <DialogTitle className="text-white text-lg font-semibold leading-tight">
                 Edit Member
@@ -158,111 +137,27 @@ export function EditMemberDialog({ customer, open, onOpenChange }: EditMemberDia
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
 
-            {/* Nama */}
-            <div>
-              <FieldLabel icon={User} label="Nama" required />
-              <Input
-                name="name" required
-                value={name}
-                onChange={(e) => setName(toTitleCase(e.target.value))}
-                disabled={loading}
-                placeholder="Nama lengkap"
-                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors"
-              />
-            </div>
-
-            {/* Nomor HP */}
-            <div>
-              <FieldLabel icon={Phone} label="Nomor HP" required />
-              <Input
-                name="phone" required
-                value={phone}
-                onChange={handlePhoneChange}
-                onKeyDown={(e) => {
-                  const ok = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Home','End'];
-                  if (!ok.includes(e.key) && !/^[0-9+]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
-                    e.preventDefault();
-                  }
-                }}
-                inputMode="tel"
-                placeholder="0812 3456 7890"
-                disabled={loading}
-                maxLength={19}
-                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors"
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <FieldLabel icon={Mail} label="Email" hint="Opsional" />
-              <Input
-                name="email" type="email"
-                defaultValue={customer.email ?? ''}
-                placeholder="contoh@email.com"
-                onChange={handleEmailChange}
-                disabled={loading}
-                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
-              />
-              {emailError && <p className="text-[11px] text-red-500 mt-1">{emailError}</p>}
-            </div>
-
-            <SectionDivider label="Profil" />
-
-            {/* Birthday */}
-            <div>
-              <FieldLabel icon={Calendar} label="Tanggal Lahir" hint="Opsional" />
-              <Input
-                name="birthday" type="date"
-                max={new Date().toISOString().split('T')[0]}
-                defaultValue={
-                  customer.birthday
-                    ? new Date(customer.birthday).toISOString().split('T')[0]
-                    : ''
-                }
-                disabled={loading}
-                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors"
-              />
-            </div>
-
-            {/* Photo URL */}
-            <div>
-              <FieldLabel icon={ImageIcon} label="Photo URL" hint="Opsional" />
-              <div className="flex gap-3 items-center">
-                <Avatar className="w-10 h-10 flex-shrink-0 border-2 border-gray-100">
-                  <AvatarImage src={photoUrl || undefined} alt="Preview" className="object-cover" />
-                  <AvatarFallback className="bg-gradient-to-br from-[#028697] to-[#016d7a] text-white text-xs">
-                    {name?.slice(0, 2).toUpperCase() || 'MB'}
-                  </AvatarFallback>
-                </Avatar>
-                <Input
-                  name="photoUrl" type="url"
-                  value={photoUrl}
-                  onChange={(e) => setPhotoUrl(e.target.value)}
-                  placeholder="https://example.com/photo.jpg"
-                  disabled={loading}
-                  className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
-                />
+            {/* Identitas — read-only */}
+            <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-3.5 py-3 space-y-2">
+              <div className="flex items-center gap-2 text-[11px] font-medium text-gray-400">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Data akun member, hanya bisa diubah oleh member itu sendiri
               </div>
-            </div>
-
-            <SectionDivider label="Keamanan" />
-
-            {/* Password — opsional saat edit */}
-            <div>
-              <FieldLabel icon={Lock} label="Ubah Password" hint="Opsional" />
-              <Input
-                name="password" type="password"
-                placeholder="Biarkan kosong untuk tidak diubah"
-                minLength={6}
-                disabled={loading}
-                className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
-              />
-              <p className="text-[11px] text-gray-400 mt-1">Min. 6 karakter</p>
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <span className="truncate">{customer.name}</span>
+              </div>
+              {customer.email && (
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  <span className="truncate">{customer.email}</span>
+                </div>
+              )}
             </div>
 
             <SectionDivider label="Poin Loyalitas" />
 
-            {/* Poin */}
+            {/* Poin — satu-satunya yang bisa diubah Owner */}
             <div>
               <FieldLabel icon={Star} label="Jumlah Poin" />
               <Input
@@ -308,7 +203,7 @@ export function EditMemberDialog({ customer, open, onOpenChange }: EditMemberDia
             </button>
             <Button
               type="submit"
-              disabled={loading || !!emailError}
+              disabled={loading}
               className="bg-[#028697] hover:bg-[#027080] text-white shadow-sm min-w-[140px] transition-all"
             >
               {loading ? (

@@ -4,16 +4,9 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { requireStoreAccess, getStoreContext } from '@/lib/store-context';
-import { sanitizeName, sanitizeText } from '@/lib/sanitize';
-import bcrypt from 'bcryptjs';
 
 const normalizePhone = (phone: string): string =>
   phone.replace(/\s+/g, '').replace(/[^0-9+]/g, '');
-
-const normalizeEmail = (email: string | null | undefined): string | null => {
-  if (!email || email.trim() === '') return null;
-  return email.trim().toLowerCase();
-};
 
 // ─── Member-facing actions ─────────────────────────────────────────────────────
 
@@ -253,40 +246,20 @@ export async function updateCustomerAction(id: string, formData: FormData) {
       return { success: false, error: 'Unauthorized - Admin access required' };
     }
 
-    const name        = sanitizeName(formData.get('name') as string, 100);
-    const rawPhone    = formData.get('phone')        as string;
-    const rawEmail    = formData.get('email')        as string;
-    const birthday    = formData.get('birthday')     as string;
-    const photoUrl    = formData.get('photoUrl')     as string;
-    const newPassword = formData.get('password')     as string;
-    const points      = formData.get('points') ? parseInt(formData.get('points') as string) : undefined;
+    // FIX: name, phone, email, birthday, photoUrl, password DIHAPUS dari sini.
+    // Field-field ini ada di User — identitas global yang dipakai login lintas
+    // semua toko. Kalau Owner Toko Y bisa mengubahnya, login member tersebut
+    // di Toko X ikut rusak (persis bug yang sama dengan Manager/Kasir).
+    // Member yang mau ubah nama/email/phone/password harus lewat profil
+    // mereka sendiri. Owner toko hanya boleh menyesuaikan poin loyalty member
+    // di toko ini — itu murni data lokal di StoreUser, bukan data identitas.
+    const points       = formData.get('points') ? parseInt(formData.get('points') as string) : undefined;
     const pointsReason = formData.get('pointsReason') as string;
-
-    const phone = normalizePhone(rawPhone);
-    const email = normalizeEmail(rawEmail);
-
-    if (!name || !phone) return { success: false, error: 'Nama dan telepon wajib diisi' };
-    if (newPassword && newPassword.length < 6) return { success: false, error: 'Password minimal 6 karakter' };
-    if (phone.length < 10 || phone.length > 15) return { success: false, error: 'Nomor telepon tidak valid' };
 
     const currentStoreUser = await db.storeUser.findUnique({
       where: { storeId_userId: { storeId, userId: id } },
     });
     if (!currentStoreUser) return { success: false, error: 'Customer tidak ditemukan di store ini' };
-
-    const currentUser = await db.user.findUnique({ where: { id } });
-    if (!currentUser) return { success: false, error: 'Customer tidak ditemukan' };
-
-    // FIX: updateData tanpa address
-    const updateData: any = {
-      name, phone, email,
-      birthday: birthday ? new Date(birthday) : null,
-      photoUrl: photoUrl || null,
-    };
-
-    if (newPassword?.trim()) {
-      updateData.password = await bcrypt.hash(newPassword, 10);
-    }
 
     if (points !== undefined && points !== currentStoreUser.points) {
       if (!pointsReason?.trim()) return { success: false, error: 'Alasan wajib diisi saat mengubah poin' };
@@ -296,7 +269,6 @@ export async function updateCustomerAction(id: string, formData: FormData) {
           where: { storeId_userId: { storeId, userId: id } },
           data:  { points },
         });
-        // FIX: PointHistory pakai storeUserId + delta
         await tx.pointHistory.create({
           data: {
             storeUserId: currentStoreUser.id,
@@ -307,8 +279,6 @@ export async function updateCustomerAction(id: string, formData: FormData) {
         });
       });
     }
-
-    await db.user.update({ where: { id }, data: updateData });
 
     revalidatePath(`/${storeSlug}/admin/transactions/customers`);
     revalidatePath(`/${storeSlug}/manager/transactions/customers`);

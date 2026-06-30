@@ -3,8 +3,18 @@
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { checkJoinStoreLimit } from '@/lib/ratelimit';
 
 export async function searchStoreAction(query: string) {
+  // FIX: sebelumnya action ini bisa dipanggil tanpa login sama sekali.
+  // Middleware hanya memproteksi route halaman /join-store, bukan endpoint
+  // Server Action ini sendiri — keduanya punya jalur request yang berbeda,
+  // jadi action perlu cek session-nya sendiri juga.
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: 'Silakan login terlebih dahulu', data: [] };
+  }
+
   const q = query.trim();
   if (!q) return { success: true, data: [] };
 
@@ -34,6 +44,14 @@ export async function joinStoreAction(storeSlugOrId: string) {
     const session = await auth();
     if (!session?.user?.id) {
       return { success: false, error: 'Silakan login terlebih dahulu' };
+    }
+
+    // FIX: tanpa limit ini, satu akun bisa memanggil joinStoreAction() berkali-kali
+    // dalam waktu singkat untuk membuat banyak StoreUser + PointHistory record
+    // sekaligus, membebani database tanpa tujuan yang sah.
+    const rateLimited = await checkJoinStoreLimit(session.user.id);
+    if (!rateLimited.success) {
+      return { success: false, error: rateLimited.error };
     }
 
     const store = await db.store.findFirst({

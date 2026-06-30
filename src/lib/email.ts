@@ -228,3 +228,34 @@ export function staffInvitationNewUserTemplate(params: {
     `),
   };
 }
+
+// ─── Template: Konfirmasi Ganti Email ────────────────────────────────────────
+
+export function emailChangeConfirmationTemplate(params: {
+  name:     string;
+  oldEmail: string;
+  newEmail: string;
+  link:     string;
+}): { subject: string; html: string } {
+  return {
+    subject: 'Konfirmasi perubahan email — CatatBisnisku',
+    html: baseTemplate(`
+      <p style="margin:0 0 8px;font-size:16px;color:#111;">Halo, <strong>${params.name}</strong>!</p>
+      <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.6;">
+        Kami menerima permintaan untuk mengganti email akun kamu dari
+        <strong>${params.oldEmail}</strong> ke <strong>${params.newEmail}</strong>.
+        Klik tombol di bawah untuk mengonfirmasi email baru ini.
+      </p>
+      ${ctaButton(params.link, 'Konfirmasi Email Baru')}
+      <p style="margin:0;font-size:12px;color:#888;">
+        Link ini berlaku selama <strong>1 jam</strong>. Sebelum dikonfirmasi,
+        kamu tetap login menggunakan email lama. Jika kamu tidak meminta
+        perubahan ini, abaikan email ini dan email lama akan tetap aktif.
+      </p>
+      <p style="margin:12px 0 0;font-size:12px;color:#aaa;">
+        Atau copy link ini ke browser:<br>
+        <span style="color:#028697;">${params.link}</span>
+      </p>
+    `),
+  };
+}

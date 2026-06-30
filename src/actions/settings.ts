@@ -120,8 +120,13 @@ export async function getAdminProfile() {
 }
 
 export async function updateAdminProfile(data: {
-  name?: string; email?: string; phone?: string;
-  // FIX: address dihapus dari parameter
+  name?: string; phone?: string;
+  // FIX: email DIHAPUS dari sini — ganti email sekarang lewat
+  // requestEmailChangeAction() di bawah, yang butuh konfirmasi via link
+  // sebelum email benar-benar berubah. Mengganti email secara langsung
+  // tanpa konfirmasi membuka risiko account takeover: kalau email diganti
+  // ke alamat yang salah/dikuasai orang lain, status emailVerified tetap
+  // true padahal pemilik baru belum terbukti memegang akses ke alamat itu.
 }) {
   const { storeSlug, storeRole } = await requireStoreAccess();
   if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
@@ -130,13 +135,6 @@ export async function updateAdminProfile(data: {
 
   const session = await auth();
   const userId  = session!.user.id;
-
-  if (data.email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(data.email)) throw new Error('Format email tidak valid');
-    const existing = await db.user.findFirst({ where: { email: data.email, NOT: { id: userId } } });
-    if (existing) throw new Error('Email sudah digunakan');
-  }
 
   if (data.phone) {
     const phoneRegex = /^[0-9+\-\s()]+$/;
@@ -149,13 +147,88 @@ export async function updateAdminProfile(data: {
     where: { id: userId },
     data: {
       ...(data.name  && { name:  data.name }),
-      ...(data.email && { email: data.email }),
       ...(data.phone && { phone: data.phone }),
-      // FIX: hapus address
     },
   });
 
   revalidatePath(`/${storeSlug}/admin/settings`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// requestEmailChangeAction
+// Email TIDAK langsung berubah di sini. Kita kirim link konfirmasi ke email
+// BARU; baru saat link itu diklik (lihat /api/auth/confirm-email-change),
+// kolom User.email benar-benar diperbarui. Sebelum dikonfirmasi, user tetap
+// login dengan email lama seperti biasa.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function requestEmailChangeAction(
+  newEmailRaw: string,
+  currentPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { storeSlug, storeRole } = await requireStoreAccess();
+    if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
+      return { success: false, error: 'Unauthorized - Admin access required' };
+    }
+
+    const session = await auth();
+    const userId   = session!.user.id;
+
+    const newEmail = newEmailRaw.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      return { success: false, error: 'Format email tidak valid' };
+    }
+
+    const currentUser = await db.user.findUnique({ where: { id: userId } });
+    if (!currentUser) return { success: false, error: 'User tidak ditemukan' };
+
+    if (newEmail === currentUser.email) {
+      return { success: false, error: 'Email baru sama dengan email saat ini' };
+    }
+
+    // Wajib konfirmasi password — mencegah orang yang sekadar menumpang
+    // sesi yang sedang login (lupa logout di device bersama) mengganti email
+    if (!currentUser.password) {
+      return { success: false, error: 'Akun ini belum memiliki password' };
+    }
+    const bcrypt    = await import('bcryptjs');
+    const isValidPw = await bcrypt.compare(currentPassword, currentUser.password);
+    if (!isValidPw) {
+      return { success: false, error: 'Password saat ini tidak benar' };
+    }
+
+    const existing = await db.user.findFirst({ where: { email: newEmail, NOT: { id: userId } } });
+    if (existing) return { success: false, error: 'Email sudah digunakan akun lain' };
+
+    const { default: crypto } = await import('crypto');
+    const emailLib             = await import('@/lib/email');
+
+    // Hapus token pending sebelumnya (kalau ada permintaan ganti email sebelumnya yang belum dikonfirmasi)
+    await db.emailVerification.deleteMany({ where: { userId, newEmail: { not: null } } });
+
+    const token     = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 jam — lebih singkat dari verifikasi awal
+
+    await db.emailVerification.create({
+      data: { userId, token, newEmail, expiresAt },
+    });
+
+    const confirmLink        = `${emailLib.getAppUrl()}/api/auth/confirm-email-change?token=${token}`;
+    const { subject, html }  = emailLib.emailChangeConfirmationTemplate({
+      name:     currentUser.name,
+      oldEmail: currentUser.email,
+      newEmail,
+      link:     confirmLink,
+    });
+    await emailLib.sendEmail({ to: newEmail, subject, html });
+
+    return { success: true };
+  } catch (err) {
+    console.error('[requestEmailChangeAction]', err);
+    return { success: false, error: 'Terjadi kesalahan. Silakan coba lagi.' };
+  }
 }
 
 export async function updateAdminPassword(currentPassword: string, newPassword: string) {
@@ -171,7 +244,14 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
 
   const isValid = await bcrypt.compare(currentPassword, admin.password);
   if (!isValid) throw new Error('Password saat ini tidak benar');
-  if (newPassword.length < 6) throw new Error('Password minimal 6 karakter');
+
+  // FIX: samakan syarat dengan register-store.ts — sebelumnya halaman ini
+  // hanya mewajibkan 6 karakter tanpa syarat kompleksitas, sehingga user bisa
+  // "menurunkan" kekuatan password mereka sendiri lewat menu ganti password.
+  if (newPassword.length < 8) throw new Error('Password minimal 8 karakter');
+  if (!/[0-9!@#$%^&*]/.test(newPassword)) {
+    throw new Error('Password harus mengandung minimal 1 angka atau simbol (!@#$%^&*)');
+  }
 
   await db.user.update({
     where: { id: admin.id },

@@ -11,6 +11,7 @@ import {
   staffInvitationExistingUserTemplate,
   staffInvitationNewUserTemplate,
 } from '@/lib/email';
+import { checkInviteStaffLimit } from '@/lib/ratelimit';
 
 const INVITATION_EXPIRES_DAYS = 7;
 const ROLE_LABEL: Record<string, string> = {
@@ -31,6 +32,14 @@ export async function inviteStaffAction(
 ): Promise<{ success: boolean; error?: string; warning?: string }> {
   try {
     const { storeId, storeSlug, storeRole, userId } = await requireStoreAccess();
+
+    // FIX: tanpa limit ini, Owner/Admin toko (atau sesi mereka yang dibajak)
+    // bisa memicu sendEmail() berkali-kali ke alamat manapun tanpa batas —
+    // baik untuk spam ke satu korban maupun untuk membebani kuota SMTP.
+    const rateLimited = await checkInviteStaffLimit(userId);
+    if (!rateLimited.success) {
+      return { success: false, error: rateLimited.error };
+    }
 
     // Hanya OWNER dan ADMINISTRATOR yang bisa undang
     if (storeRole !== 'OWNER' && storeRole !== 'ADMINISTRATOR') {
