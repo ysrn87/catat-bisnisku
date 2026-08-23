@@ -54,7 +54,10 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
         {/* Tab navigasi sub-halaman — hanya untuk mobile/tablet.
             Di desktop (lg+), navigasi yang sama sudah tersedia di sidebar. */}
         <div className="lg:hidden sticky top-16 z-30 bg-gray-50 -mx-4 px-4 md:-mx-6 md:px-6 py-3 border-b border-gray-200 shadow-sm">
-          <TabsList className={`grid w-full max-w-${tabs.length === 2 ? 'md' : 'lg'} grid-cols-${tabs.length}`}>
+          <TabsList
+            className="grid w-full"
+            style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+          >
             {tabs.map((tab) =>
               tab.href ? (
                 <TabsTrigger

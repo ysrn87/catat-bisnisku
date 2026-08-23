@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTransition, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt, ChevronDown, Search, Bell } from 'lucide-react';
+import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt, ChevronDown, Search, Bell, Zap, Crown } from 'lucide-react';
 import { logoutAction } from '@/actions/auth';
 import { triggerLoader } from '@/components/layouts/navigation-loader';
 import { PlanBadge } from '@/components/plan/plan-badge';
@@ -114,11 +114,13 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
         `${base}/admin/settings/points`,
         `${base}/admin/settings/categories`,
         `${base}/admin/settings/profile`,
+        `${base}/admin/settings/subscription`,
       ],
       subItems: [
-        { href: `${base}/admin/settings/points`,     label: 'Sistem Poin' },
-        { href: `${base}/admin/settings/categories`, label: 'Kategori' },
-        { href: `${base}/admin/settings/profile`,    label: 'Profil Admin' },
+        { href: `${base}/admin/settings/points`,       label: 'Sistem Poin' },
+        { href: `${base}/admin/settings/categories`,   label: 'Kategori' },
+        { href: `${base}/admin/settings/profile`,      label: 'Profil Admin' },
+        { href: `${base}/admin/settings/subscription`, label: 'Langganan' },
       ],
     },
   ];
@@ -420,6 +422,26 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                 </Link>
               </div>
             </div>
+
+            {/* Mobile – upgrade button (FREE plan only, OWNER/ADMIN) */}
+            {storePlan === 'FREE' && (role === 'OWNER' || role === 'ADMINISTRATOR') && (
+              <Link
+                href={`/${storeSlug}/admin/settings/subscription`}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-100 active:bg-amber-200 transition-colors duration-150 flex-shrink-0"
+              >
+                <Zap className="w-3 h-3 fill-amber-500 text-amber-500" />
+                <span className="text-[10px] font-bold whitespace-nowrap">Upgrade PRO</span>
+              </Link>
+            )}
+            {storePlan === 'PRO' && (
+              <Link
+                href={`/${storeSlug}/admin/settings/subscription`}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 hover:bg-amber-100 active:bg-amber-200 transition-colors duration-150 flex-shrink-0"
+              >
+                <Crown className="w-3 h-3 fill-amber-500 text-amber-500" />
+                <span className="text-[10px] font-bold">PRO</span>
+              </Link>
+            )}
 
             {/* Mobile – user info + logout */}
             <div className="flex items-center gap-2">
