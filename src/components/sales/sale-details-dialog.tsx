@@ -37,9 +37,10 @@ interface SaleDetailsDialogProps {
       phone: string;
       address: string | null;
     } | null;
+    cashierName: string | null;
     cashier: {
       name: string;
-    };
+    } | null;
     items: Array<{
       id: string;
       quantity: number;
@@ -584,7 +585,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
             Dokumen ini digenerate secara otomatis.
           </div>
           <div class="footer-right">
-            Diinput oleh ${sale.cashier.name}<br>
+            Diinput oleh ${sale.cashierName ?? '-'}<br>
             Dicetak pada ${new Date().toLocaleString('id-ID', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
@@ -723,7 +724,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   </span>
                   </h4>
                 <p className="text-[11px] sm:text-sm"><span className="text-gray-600">Metode:</span> {sale.paymentMethod}</p>
-                <p className="text-[11px] sm:text-sm"><span className="text-gray-600">Cashier:</span> {sale.cashier.name}</p>
+                <p className="text-[11px] sm:text-sm"><span className="text-gray-600">Cashier:</span> {sale.cashierName ?? '-'}</p>
               </div>
             </div>
 
