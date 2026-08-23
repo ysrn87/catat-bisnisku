@@ -281,10 +281,16 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                     />
                   </button>
                 ) : (
-                  <Link
-                    href={item.href}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (pathname === item.href || (isPending && pendingHref === item.href)) return;
+                      setPendingHref(item.href);
+                      triggerLoader();
+                      startTransition(() => { router.push(item.href); });
+                    }}
                     className={`
-                      flex items-center gap-2.5 px-3 py-2.5 rounded-lg
+                      w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-lg
                       text-sm transition-colors duration-150
                       ${isActive
                         ? 'bg-gray-50 text-gray-900 font-medium'
@@ -292,29 +298,43 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                       }
                     `}
                   >
-                    <span className={`flex-shrink-0 ${isActive ? 'text-[#028697]' : ''}`}>{item.icon}</span>
-                    <span className="truncate">{item.label}</span>
-                  </Link>
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <span className={`flex-shrink-0 ${isActive ? 'text-[#028697]' : ''}`}>
+                        {isPending && pendingHref === item.href
+                          ? <Loader2 className="w-4 h-4 animate-spin text-[#028697]" />
+                          : item.icon}
+                      </span>
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                  </button>
                 )}
 
                 {hasSub && isExpanded && (
                   <div className="mt-0.5 mb-1 ml-[1.65rem] pl-3 flex flex-col gap-0.5">
                     {item.subItems!.map((sub) => {
                       const subActive = matchedSub?.href === sub.href;
+                      const subLoading = isPending && pendingHref === sub.href;
                       return (
-                        <Link
+                        <button
                           key={sub.href}
-                          href={sub.href}
+                          type="button"
+                          onClick={() => {
+                            if (pathname === sub.href || subLoading) return;
+                            setPendingHref(sub.href);
+                            triggerLoader();
+                            startTransition(() => { router.push(sub.href); });
+                          }}
                           className={`
-                            block py-1.5 pl-3 text-sm truncate transition-colors duration-150 border-l-2
+                            flex items-center justify-between py-1.5 pl-3 pr-2 text-sm truncate transition-colors duration-150 border-l-2 text-left w-full
                             ${subActive
                               ? 'border-[#028697] text-[#028697] font-medium'
                               : 'border-gray-100 text-gray-400 hover:text-gray-700 hover:border-gray-300'
                             }
                           `}
                         >
-                          {sub.label}
-                        </Link>
+                          <span className="truncate">{sub.label}</span>
+                          {subLoading && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0 ml-1.5 text-[#028697]" />}
+                        </button>
                       );
                     })}
                   </div>
