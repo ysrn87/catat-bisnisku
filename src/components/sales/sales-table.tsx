@@ -94,7 +94,7 @@ export function SalesTable({ sales, currentPage, pageSize, totalItems, conversio
                   <TableCell className="font-medium truncate">{sale.saleNumber}</TableCell>
                   <TableCell className='truncate'>{formatDateTime(sale.createdAt)}</TableCell>
                   <TableCell className='truncate'>{sale.customerName || 'Pelanggan Umum'}</TableCell>
-                  <TableCell className='truncate'>{sale.cashier.name}</TableCell>
+                  <TableCell className='truncate'>{sale.cashierName ?? '-'}</TableCell>
                   <TableCell className='truncate'>{sale.items.reduce((sum: any, item: any) => sum + item.quantity, 0)} pc(s)</TableCell>
                   <TableCell>{formatCurrency(sale.total)}</TableCell>
                   <TableCell>
@@ -149,7 +149,7 @@ export function SalesTable({ sales, currentPage, pageSize, totalItems, conversio
                 <div className="flex items-center text-[11px]">
                   <span className="text-gray-500">Cashier:</span>
                   <span className="text-gray-900 truncate ml-2 max-w-[180px]">
-                    {sale.cashier.name}
+                    {sale.cashierName ?? '-'}
                   </span>
                 </div>
               </div>
