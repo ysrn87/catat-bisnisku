@@ -41,13 +41,14 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
   };
 
   return (
-    <div className="-mt-7 md:-mt-0">
+    <div className="-mt-7 md:-mt-0 w-full">
       <div className="hidden md:block mb-6">
         <h1 className="text-3xl font-bold">{title}</h1>
         <p className="text-gray-600">{description}</p>
       </div>
 
       <Tabs
+        className="w-full"
         value={currentTab}
         onValueChange={useRouterPush ? (v) => startTransition(() => router.push(`${pathname.split('/').slice(0, -1).join('/')}/${v}`)) : undefined}
       >

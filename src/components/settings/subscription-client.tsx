@@ -1,6 +1,6 @@
 'use client';
 
-import { Crown, Zap, CheckCircle2, Clock, AlertTriangle, Package, Users, Receipt, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Crown, Zap, CheckCircle2, Clock, AlertTriangle, Package, Users, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
 import { UpgradeButton } from '@/components/plan/upgrade-button';
 import { useState } from 'react';
 
@@ -176,15 +176,14 @@ export function SubscriptionClient({ storeSlug, plan, planExpiresAt, usage, plan
 
         {/* CTA */}
         <div className="mt-4">
-          {plan === 'PRO' ? (
-            <div className="space-y-2">
-              <p className="text-xs text-gray-400 flex items-center gap-1">
-                <RefreshCw className="w-3 h-3" /> Perpanjang kapan saja, sisa hari akan ditambahkan
-              </p>
-              <UpgradeButton storeSlug={storeSlug} />
-            </div>
-          ) : (
+          {plan === 'FREE' && (
             <UpgradeButton storeSlug={storeSlug} />
+          )}
+          {plan === 'PRO' && (
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+              <span>Perpanjang otomatis menambah hari dari sisa aktif yang ada</span>
+            </div>
           )}
         </div>
       </div>

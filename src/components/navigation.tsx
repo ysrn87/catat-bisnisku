@@ -117,9 +117,9 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
         `${base}/admin/settings/subscription`,
       ],
       subItems: [
-        { href: `${base}/admin/settings/points`,       label: 'Sistem Poin' },
+        { href: `${base}/admin/settings/points`,       label: 'Poin' },
         { href: `${base}/admin/settings/categories`,   label: 'Kategori' },
-        { href: `${base}/admin/settings/profile`,      label: 'Profil Admin' },
+        { href: `${base}/admin/settings/profile`,      label: 'Profil' },
         { href: `${base}/admin/settings/subscription`, label: 'Langganan' },
       ],
     },

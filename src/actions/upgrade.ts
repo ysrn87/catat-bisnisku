@@ -39,6 +39,24 @@ export async function createSnapToken(storeSlug: string): Promise<
     }
     if (store.ownerId !== session.user.id) return { success: false, error: 'Unauthorized' };
 
+    // Cek apakah ada transaksi PENDING yang belum selesai
+    const pendingPayment = await db.upgradePayment.findFirst({
+      where: {
+        storeId: store.id,
+        status:  'PENDING',
+        // Anggap pending kadaluarsa setelah 24 jam (Midtrans default)
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (pendingPayment) {
+      return {
+        success: false,
+        error:   'Kamu masih memiliki pembayaran yang sedang diproses. Selesaikan pembayaran tersebut atau tunggu hingga kadaluarsa (maks. 24 jam).',
+      };
+    }
+
     const user = await db.user.findUnique({
       where:  { id: session.user.id },
       select: { name: true, email: true, phone: true },
@@ -98,6 +116,19 @@ export async function createSnapToken(storeSlug: string): Promise<
     }
 
     const data = await response.json() as { token: string; redirect_url: string };
+
+    // Simpan record PENDING agar tidak ada duplicate order sebelum webhook balik
+    await db.upgradePayment.create({
+      data: {
+        storeId:         store.id,
+        method:          'MIDTRANS',
+        status:          'PENDING',
+        amount:          99000,
+        midtransOrderId: orderId,
+        planDays:        30,
+      },
+    });
+
     return { success: true, token: data.token, orderId };
 
   } catch (error) {

@@ -67,20 +67,18 @@ export async function POST(request: NextRequest) {
     const isPending = transaction_status === 'pending';
     const isFailed  = ['deny', 'cancel', 'expire'].includes(transaction_status);
 
-    // 4. Idempotency check — order_id di titik ini selalu untuk upgrade (lihat filter "PRO-" di atas),
-    // jadi cek di UpgradePayment, bukan Payment (yang khusus transaksi POS).
+    // 4. Idempotency: skip kalau record sudah final (PAID/FAILED)
     const existingPayment = await db.upgradePayment.findUnique({
       where: { midtransOrderId: order_id },
     });
-    if (existingPayment) {
-      console.log(`[midtrans/webhook] Duplicate notification untuk order_id: ${order_id}, skip.`);
+    if (existingPayment && existingPayment.status !== 'PENDING') {
+      console.log(`[midtrans/webhook] Duplicate notification untuk order_id: ${order_id}, status sudah ${existingPayment.status}, skip.`);
       return NextResponse.json({ ok: true, duplicate: true });
     }
 
     if (isSuccess) {
       const store = await db.store.findUnique({
         where:  { slug: storeSlug },
-        // FIX: subscriptionExpiresAt → planExpiresAt
         select: { id: true, name: true, planExpiresAt: true },
       });
 
@@ -89,8 +87,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Store not found' }, { status: 404 });
       }
 
-      // Hitung expiry: +30 hari, perpanjang dari sisa kalau masih aktif
-      // FIX: subscriptionExpiresAt → planExpiresAt
       const baseDate =
         store.planExpiresAt && store.planExpiresAt > new Date()
           ? store.planExpiresAt
@@ -100,19 +96,16 @@ export async function POST(request: NextRequest) {
       expiresAt.setDate(expiresAt.getDate() + 30);
 
       await db.$transaction(async (tx) => {
-        // FIX: subscriptionExpiresAt → planExpiresAt
         await tx.store.update({
           where: { slug: storeSlug },
           data:  { plan: 'PRO', planExpiresAt: expiresAt, updatedAt: new Date() },
         });
 
-        // FIX: upgrade plan bukan transaksi POS — tidak ada Sale terkait,
-        // jadi dicatat di UpgradePayment (bukan Payment, yang wajib punya saleId).
-        // Sebelumnya kode ini memaksa saleId palsu ke Payment.create(), yang
-        // melanggar foreign key constraint dan membuat seluruh transaksi ini
-        // (termasuk update plan ke PRO di atas) di-rollback oleh Prisma.
-        await tx.upgradePayment.create({
-          data: {
+        // Update record PENDING yang dibuat saat token di-generate, atau buat baru (fallback)
+        await tx.upgradePayment.upsert({
+          where:  { midtransOrderId: order_id },
+          update: { status: 'PAID', paidAt: new Date(), amount: parseFloat(gross_amount) },
+          create: {
             storeId:         store.id,
             method:          'MIDTRANS',
             status:          'PAID',
@@ -129,8 +122,10 @@ export async function POST(request: NextRequest) {
     } else if (isFailed) {
       const store = await db.store.findUnique({ where: { slug: storeSlug }, select: { id: true } });
       if (store) {
-        await db.upgradePayment.create({
-          data: {
+        await db.upgradePayment.upsert({
+          where:  { midtransOrderId: order_id },
+          update: { status: 'FAILED' },
+          create: {
             storeId:         store.id,
             method:          'MIDTRANS',
             status:          'FAILED',
