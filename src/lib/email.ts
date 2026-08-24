@@ -1,43 +1,49 @@
 /**
  * lib/email.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Abstraksi pengiriman email.
- * Provider sekarang: Nodemailer + Gmail (development)
- * Untuk production: ganti implementasi di sini ke Resend — semua caller
- * tidak perlu diubah sama sekali.
+ * Abstraksi pengiriman email menggunakan Resend.
  *
- * Setup Gmail:
- *   1. Aktifkan 2-Step Verification di Google Account
- *   2. Buka Security → App Passwords → buat password untuk "Mail"
- *   3. Set env:
- *        GMAIL_USER=kamu@gmail.com
- *        GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+ * Setup:
+ *   1. Daftar di https://resend.com (gratis: 3.000 email/bulan, 100/hari)
+ *   2. Tambahkan dan verifikasi domain kamu di Resend Dashboard → Domains
+ *   3. Buat API key di Resend Dashboard → API Keys
+ *   4. Set env:
+ *        RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+ *        RESEND_FROM_EMAIL=noreply@yourdomain.com
+ *
+ * Install:
+ *   npm install resend
+ *   npm uninstall nodemailer @types/nodemailer
  */
 
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-// ─── Transporter (lazy singleton) ────────────────────────────────────────────
+// ─── Client (lazy singleton) ──────────────────────────────────────────────────
 
-let _transporter: nodemailer.Transporter | null = null;
+let _resend: Resend | null = null;
 
-function getTransporter(): nodemailer.Transporter {
-  if (_transporter) return _transporter;
+function getResend(): Resend {
+  if (_resend) return _resend;
 
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+  if (!process.env.RESEND_API_KEY) {
     throw new Error(
-      '[email] GMAIL_USER dan GMAIL_APP_PASSWORD belum diset di .env'
+      '[email] RESEND_API_KEY belum diset di .env. ' +
+      'Daftar di https://resend.com dan buat API key.'
     );
   }
 
-  _transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
+  _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
-  return _transporter;
+function getFromEmail(): string {
+  if (!process.env.RESEND_FROM_EMAIL) {
+    throw new Error(
+      '[email] RESEND_FROM_EMAIL belum diset di .env. ' +
+      'Contoh: RESEND_FROM_EMAIL=noreply@yourdomain.com'
+    );
+  }
+  return process.env.RESEND_FROM_EMAIL;
 }
 
 // ─── Core send ───────────────────────────────────────────────────────────────
@@ -49,10 +55,14 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
-  const transporter = getTransporter();
-  const from        = process.env.GMAIL_USER;
+  const resend = getResend();
+  const from   = getFromEmail();
 
-  await transporter.sendMail({ from, to, subject, html });
+  const { error } = await resend.emails.send({ from, to, subject, html });
+
+  if (error) {
+    throw new Error(`[email] Resend error: ${error.message}`);
+  }
 }
 
 // ─── App URL helper ───────────────────────────────────────────────────────────

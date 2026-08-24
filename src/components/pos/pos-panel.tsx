@@ -614,11 +614,11 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         ) : (
           cart.map((item) => (
             <div key={item.variantId} className="flex items-center gap-2 py-1.5 border-b border-border/50 last:border-0">
-              <span className="text-lg leading-none shrink-0">{item.emoji}</span>
+              {/* <span className="text-lg leading-none shrink-0">{item.emoji}</span> */}
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium leading-snug truncate">{item.productName}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{item.productName}</p>
                 {item.variantName !== item.productName && (
-                  <p className="text-[11px] text-muted-foreground truncate">{item.variantName}</p>
+                  <p className="text-xs font-medium leading-snug truncate">{item.variantName}</p>
                 )}
                 <p className="text-[11px] text-muted-foreground">{formatCurrency(item.price)}</p>
               </div>
@@ -988,9 +988,9 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
                       {/* Name */}
                       <div className="w-full text-center">
-                        <p className="text-[11px] font-semibold leading-snug line-clamp-2">{variant.product.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{variant.product.name}</p>
                         {variant.name !== variant.product.name && (
-                          <p className="text-[10px] text-muted-foreground truncate">{variant.name}</p>
+                          <p className="text-[11px] font-semibold leading-snug line-clamp-2">{variant.name}</p>
                         )}
                       </div>
 
