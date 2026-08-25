@@ -239,6 +239,35 @@ export function staffInvitationNewUserTemplate(params: {
   };
 }
 
+// ─── Template: Reset Password ────────────────────────────────────────────────
+
+export function passwordResetTemplate(params: {
+  name:      string;
+  link:      string;
+  expiresIn: string;
+}): { subject: string; html: string } {
+  return {
+    subject: 'Reset password kamu — CatatBisnisku',
+    html: baseTemplate(`
+      <p style="margin:0 0 8px;font-size:16px;color:#111;">Halo, <strong>${params.name}</strong>!</p>
+      <p style="margin:0 0 16px;font-size:14px;color:#444;line-height:1.6;">
+        Kami menerima permintaan untuk mereset password akun kamu. Klik tombol
+        di bawah untuk membuat password baru.
+      </p>
+      ${ctaButton(params.link, 'Reset Password')}
+      <p style="margin:0;font-size:12px;color:#888;">
+        Link ini berlaku selama <strong>${params.expiresIn}</strong>. Jika kamu
+        tidak meminta reset password, abaikan email ini — password kamu tidak
+        akan berubah.
+      </p>
+      <p style="margin:12px 0 0;font-size:12px;color:#aaa;">
+        Atau copy link ini ke browser:<br>
+        <span style="color:#028697;">${params.link}</span>
+      </p>
+    `),
+  };
+}
+
 // ─── Template: Konfirmasi Ganti Email ────────────────────────────────────────
 
 export function emailChangeConfirmationTemplate(params: {

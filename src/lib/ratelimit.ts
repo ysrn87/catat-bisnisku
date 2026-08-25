@@ -36,6 +36,8 @@ let _loginLimiter:             Ratelimit | null = null;
 let _registerStoreLimiter:     Ratelimit | null = null;
 let _registerMemberLimiter:    Ratelimit | null = null;
 let _resendVerificationLimiter: Ratelimit | null = null;
+let _forgotPasswordLimiter:     Ratelimit | null = null;
+let _resetPasswordLimiter:      Ratelimit | null = null;
 let _inviteStaffLimiter:       Ratelimit | null = null;
 let _registerFromInvitationLimiter: Ratelimit | null = null;
 let _joinStoreLimiter:         Ratelimit | null = null;
@@ -84,6 +86,31 @@ function getResendVerificationLimiter(): Ratelimit {
     });
   }
   return _resendVerificationLimiter;
+}
+
+function getForgotPasswordLimiter(): Ratelimit {
+  if (!_forgotPasswordLimiter) {
+    _forgotPasswordLimiter = new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(3, '15 m'),
+      prefix:  'rl:forgot-password',
+    });
+  }
+  return _forgotPasswordLimiter;
+}
+
+function getResetPasswordLimiter(): Ratelimit {
+  if (!_resetPasswordLimiter) {
+    _resetPasswordLimiter = new Ratelimit({
+      redis:   getRedis(),
+      // Bukan proteksi utama (token 32-byte random sudah cukup kuat), ini
+      // lapisan kedua supaya percobaan menebak/brute-force token tetap
+      // dibatasi per IP.
+      limiter: Ratelimit.slidingWindow(10, '15 m'),
+      prefix:  'rl:reset-password',
+    });
+  }
+  return _resetPasswordLimiter;
 }
 
 function getInviteStaffLimiter(): Ratelimit {
@@ -222,6 +249,23 @@ export async function checkInviteStaffLimit(inviterUserId: string): Promise<Rate
 /** Registrasi via link undangan staff: max 10 per jam per IP */
 export async function checkRegisterFromInvitationLimit(ip: string): Promise<RateLimitResult> {
   return checkLimit(getRegisterFromInvitationLimiter, ip);
+}
+
+/**
+ * Lupa password (kirim link reset): max 3 per 15 menit, dicek per EMAIL dan
+ * per IP — pola sama persis dengan checkResendVerificationLimit, alasannya
+ * juga sama: email bombing bisa datang dari banyak IP, dan satu IP tidak
+ * boleh dipakai menembak reset ke banyak email berturut-turut.
+ */
+export async function checkForgotPasswordLimit(email: string, ip: string): Promise<RateLimitResult> {
+  const byEmail = await checkLimit(getForgotPasswordLimiter, `email:${email}`);
+  if (!byEmail.success) return byEmail;
+  return checkLimit(getForgotPasswordLimiter, `ip:${ip}`);
+}
+
+/** Submit password baru dari link reset: max 10 percobaan per 15 menit per IP */
+export async function checkResetPasswordLimit(ip: string): Promise<RateLimitResult> {
+  return checkLimit(getResetPasswordLimiter, ip);
 }
 
 /** Join toko sebagai member: max 10 per 10 menit per user yang join */

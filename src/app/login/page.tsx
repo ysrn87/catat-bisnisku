@@ -114,10 +114,15 @@ function LoginForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-xs font-light flex items-center gap-2">
-                <Lock className="w-4 h-4 text-gray-500" />
-                Password
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-xs font-light flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-gray-500" />
+                  Password
+                </Label>
+                <Link href="/forgot-password" className="text-xs text-[#028697] hover:underline">
+                  Lupa password?
+                </Link>
+              </div>
               <div className="relative">
                 <Input
                   id="password" name="password"

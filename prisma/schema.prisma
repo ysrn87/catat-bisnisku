@@ -33,6 +33,7 @@ model User {
   linkedCustomers    Customer[]
   sentInvitations    StaffInvitation[] @relation("InvitedBy")
   emailVerifications EmailVerification[]
+  passwordResets     PasswordReset[]
 
   @@map("users")
 }
@@ -56,6 +57,26 @@ model EmailVerification {
 
   @@index([userId])
   @@map("email_verifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PASSWORD RESET
+// Token satu kali pakai untuk "lupa password" via email.
+// Sengaja tabel terpisah dari EmailVerification (bukan numpang field baru di
+// sana) karena masa berlaku, alur redeem, dan implikasi keamanannya beda.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
