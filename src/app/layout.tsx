@@ -9,12 +9,12 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Catat Bisnisku',
-  description: 'Product and Sales Recording System',
+  description: 'Aplikasi manajemen bisnis dan kasir untuk UMKM Indonesia',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
-    title: 'Catat Bisnisku',
+    statusBarStyle: 'black-translucent',
+    title: 'CatatBisnisku',
   },
   formatDetection: {
     telephone: false,
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#000000',
+  themeColor: '#028697',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,

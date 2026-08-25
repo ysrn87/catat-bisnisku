@@ -22,16 +22,19 @@ const AUTH_ONLY_ROUTES = [
 ];
 
 // ─── File statis ──────────────────────────────────────────────────────────────
-const STATIC_EXT = /\.(?:ico|png|jpg|jpeg|svg|gif|webp|css|js|woff2?|ttf|map)$/;
+const STATIC_EXT = /\.(?:ico|png|jpg|jpeg|svg|gif|webp|css|js|json|woff2?|ttf|map)$/;
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip: next internals & statis
+  // Skip: next internals, statis, dan PWA files
   if (
     STATIC_EXT.test(pathname) ||
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/auth')
+    pathname.startsWith('/api/auth') ||
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    pathname.startsWith('/workbox-')
   ) {
     return NextResponse.next();
   }
