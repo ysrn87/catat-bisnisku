@@ -2,7 +2,7 @@
   "name": "Catat Bisnisku",
   "short_name": "CatatBisnisku",
   "description": "Aplikasi manajemen bisnis dan kasir untuk UMKM Indonesia",
-  "start_url": "/",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
