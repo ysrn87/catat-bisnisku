@@ -23,9 +23,6 @@ function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
 
-  // Invitation token — jika datang dari link undangan staff
-  const invitationToken = searchParams.get('invitationToken') ?? '';
-
   useEffect(() => {
     const sid = searchParams.get('storeId');
     if (sid) setStoreId(sid);
@@ -101,8 +98,7 @@ function RegisterForm() {
     setLoading(true);
     const formData = new FormData(e.currentTarget);
     formData.set('birthday', birthdayValue);
-    if (storeId)         formData.set('storeId', storeId);
-    if (invitationToken) formData.set('invitationToken', invitationToken);
+    if (storeId) formData.set('storeId', storeId);
 
     const result = await registerMemberAction(formData);
 

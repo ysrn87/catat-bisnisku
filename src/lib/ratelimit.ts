@@ -37,6 +37,7 @@ let _registerStoreLimiter:     Ratelimit | null = null;
 let _registerMemberLimiter:    Ratelimit | null = null;
 let _resendVerificationLimiter: Ratelimit | null = null;
 let _inviteStaffLimiter:       Ratelimit | null = null;
+let _registerFromInvitationLimiter: Ratelimit | null = null;
 let _joinStoreLimiter:         Ratelimit | null = null;
 let _adminPlanSecretLimiter:   Ratelimit | null = null;
 let _logoUploadLimiter:        Ratelimit | null = null;
@@ -94,6 +95,17 @@ function getInviteStaffLimiter(): Ratelimit {
     });
   }
   return _inviteStaffLimiter;
+}
+
+function getRegisterFromInvitationLimiter(): Ratelimit {
+  if (!_registerFromInvitationLimiter) {
+    _registerFromInvitationLimiter = new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(10, '1 h'),
+      prefix:  'rl:register-invitation',
+    });
+  }
+  return _registerFromInvitationLimiter;
 }
 
 function getJoinStoreLimiter(): Ratelimit {
@@ -205,6 +217,11 @@ export async function checkResendVerificationLimit(email: string, ip: string): P
 /** Undang staff: max 20 undangan per jam per user yang mengundang */
 export async function checkInviteStaffLimit(inviterUserId: string): Promise<RateLimitResult> {
   return checkLimit(getInviteStaffLimiter, inviterUserId);
+}
+
+/** Registrasi via link undangan staff: max 10 per jam per IP */
+export async function checkRegisterFromInvitationLimit(ip: string): Promise<RateLimitResult> {
+  return checkLimit(getRegisterFromInvitationLimiter, ip);
 }
 
 /** Join toko sebagai member: max 10 per 10 menit per user yang join */

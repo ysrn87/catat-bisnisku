@@ -42,7 +42,7 @@ export default async function InvitationPage({ searchParams }: Props) {
     });
     const redirectPath = existingUser
       ? `/login?callbackUrl=/invitation?token=${token}`
-      : `/register?invitationToken=${token}`;
+      : `/invitation/register?token=${token}`;
     redirect(redirectPath);
   }
 

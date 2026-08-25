@@ -25,9 +25,12 @@ function LoginForm() {
     const slug       = searchParams.get('slug');
 
     if (registered === 'true') {
-      const verify = searchParams.get('verify');
+      const verify  = searchParams.get('verify');
+      const invited = searchParams.get('invited');
       if (verify === 'true') {
         setSuccessMessage('Akun berhasil dibuat! Cek email kamu untuk verifikasi sebelum login.');
+      } else if (invited === 'true') {
+        setSuccessMessage('Undangan diterima! Login untuk masuk ke dasbor toko kamu.');
       } else if (slug) {
         setNewStoreSlug(slug);
         setSuccessMessage('Toko berhasil dibuat! Login untuk masuk ke dasbor toko kamu.');

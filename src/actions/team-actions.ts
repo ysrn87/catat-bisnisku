@@ -11,7 +11,9 @@ import {
   staffInvitationExistingUserTemplate,
   staffInvitationNewUserTemplate,
 } from '@/lib/email';
-import { checkInviteStaffLimit } from '@/lib/ratelimit';
+import { checkInviteStaffLimit, checkRegisterFromInvitationLimit, getIP } from '@/lib/ratelimit';
+import { headers } from 'next/headers';
+import bcrypt from 'bcryptjs';
 
 const INVITATION_EXPIRES_DAYS = 7;
 const ROLE_LABEL: Record<string, string> = {
@@ -133,8 +135,9 @@ export async function inviteStaffAction(
       });
       await sendEmail({ to: normalizedEmail, subject, html });
     } else {
-      // User belum terdaftar → kirim link register dengan invitation token
-      const registerLink = `${appUrl}/register?invitationToken=${token}`;
+      // User belum terdaftar → kirim link register khusus penerima undangan
+      // (bukan /register — itu form "Daftar Member" untuk pelanggan, beda tujuan)
+      const registerLink = `${appUrl}/invitation/register?token=${token}`;
       const { subject, html } = staffInvitationNewUserTemplate({
         storeName:   store!.name,
         inviterName: inviter!.name,
@@ -222,6 +225,105 @@ export async function respondInvitationAction(
   } catch (err) {
     console.error('[respondInvitationAction]', err);
     return { success: false, error: 'Terjadi kesalahan. Silakan coba lagi.' };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// registerFromInvitationAction
+// Dipanggil dari /invitation/register?token=xxx — khusus orang yang diundang
+// jadi staff (Manager/Kasir) TAPI belum pernah punya akun. Terpisah dari
+// registerMemberAction (form "Daftar Member") karena tujuannya beda: yang ini
+// langsung membuat StoreStaff & menandai StaffInvitation ACCEPTED, bukan
+// StoreUser/poin loyalty.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function registerFromInvitationAction(
+  token: string,
+  formData: FormData
+): Promise<{ success: boolean; error?: string; storeSlug?: string }> {
+  try {
+    const name     = (formData.get('name') as string)?.trim();
+    const password = formData.get('password') as string;
+
+    const ip          = getIP(await headers());
+    const rateLimited = await checkRegisterFromInvitationLimit(ip);
+    if (!rateLimited.success) {
+      return { success: false, error: rateLimited.error };
+    }
+
+    if (!name)     return { success: false, error: 'Nama wajib diisi.' };
+    if (!password || password.length < 8) {
+      return { success: false, error: 'Password minimal 8 karakter.' };
+    }
+
+    const invitation = await db.staffInvitation.findUnique({
+      where:   { token },
+      include: { store: { select: { slug: true } } },
+    });
+
+    if (!invitation) {
+      return { success: false, error: 'Undangan tidak ditemukan atau sudah tidak valid.' };
+    }
+    if (invitation.status !== 'PENDING') {
+      return { success: false, error: `Undangan ini sudah ${invitation.status === 'ACCEPTED' ? 'diterima' : 'ditolak'}.` };
+    }
+    if (invitation.expiresAt < new Date()) {
+      await db.staffInvitation.update({ where: { token }, data: { status: 'EXPIRED' } });
+      return { success: false, error: 'Undangan ini sudah kedaluwarsa.' };
+    }
+
+    // Race condition guard: mungkin saja email ini sudah didaftarkan lewat
+    // jalur lain (mis. buka dua tab) di antara load halaman & submit form.
+    const existingUser = await db.user.findUnique({
+      where:  { email: invitation.email },
+      select: { id: true, password: true },
+    });
+    if (existingUser?.password) {
+      return { success: false, error: 'Akun untuk email ini sudah ada. Silakan login untuk menerima undangan.' };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const storeSlug = await db.$transaction(async (tx) => {
+      // Email undangan sudah terbukti milik penerima (dikirim langsung ke
+      // alamat itu, token 32-byte random hanya diketahui penerima) — sama
+      // seperti alur "user tanpa password" di registerMemberAction, jadi
+      // tidak perlu proses verifikasi email terpisah.
+      const user = existingUser
+        ? await tx.user.update({
+            where: { id: existingUser.id },
+            data:  { name, password: hashedPassword, emailVerified: true },
+          })
+        : await tx.user.create({
+            data: {
+              name,
+              email:         invitation.email,
+              password:      hashedPassword,
+              emailVerified: true,
+            },
+          });
+
+      await tx.storeStaff.create({
+        data: {
+          storeId: invitation.storeId,
+          userId:  user.id,
+          role:    invitation.role,
+        },
+      });
+
+      await tx.staffInvitation.update({
+        where: { token },
+        data:  { status: 'ACCEPTED', respondedAt: new Date() },
+      });
+
+      return invitation.store.slug;
+    });
+
+    return { success: true, storeSlug };
+
+  } catch (err) {
+    console.error('[registerFromInvitationAction]', err);
+    return { success: false, error: 'Gagal membuat akun. Silakan coba lagi.' };
   }
 }
 
