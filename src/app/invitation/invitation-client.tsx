@@ -53,7 +53,10 @@ export default function InvitationClient({
       if (res.success) {
         setResult(accept ? 'accepted' : 'declined');
         if (accept && res.storeSlug) {
-          setTimeout(() => router.push(`/${res.storeSlug}/admin`), 1500);
+          // Redirect ke root store, bukan langsung /admin — halaman itu yang
+          // menentukan tujuan sesuai role (admin/manager/cashier). Undangan
+          // bisa untuk role apa pun, jadi tidak boleh hardcode satu tujuan.
+          setTimeout(() => router.push(`/${res.storeSlug}`), 1500);
         }
       } else {
         setError(res.error ?? 'Terjadi kesalahan.');
