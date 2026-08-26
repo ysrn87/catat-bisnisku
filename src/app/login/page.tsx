@@ -11,6 +11,12 @@ import Link from 'next/link';
 import { LogIn, Mail, Lock, Sparkles, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 
+function isSafeRedirect(url: string | null): url is string {
+  // Cegah open-redirect: hanya izinkan path relatif ("/xxx"), bukan
+  // "//evil.com" (protocol-relative) atau URL absolut ("https://evil.com").
+  return !!url && url.startsWith('/') && !url.startsWith('//') && !/^\/\\/.test(url) && !url.includes('://');
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,7 +60,8 @@ function LoginForm() {
     const result   = await loginAction(formData);
 
     if (result.success) {
-      router.push('/store-select');
+      const callbackUrl = searchParams.get('callbackUrl');
+      router.push(isSafeRedirect(callbackUrl) ? callbackUrl : '/store-select');
       router.refresh();
     } else {
       setError(result.error || 'Email atau password salah.');
