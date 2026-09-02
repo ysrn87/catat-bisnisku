@@ -7,6 +7,7 @@ import { headers } from 'next/headers';
 import { checkRegisterStoreLimit, getIP } from '@/lib/ratelimit';
 import { MAX_STORES_PER_USER } from '@/lib/store-context';
 import { sendEmail, getAppUrl, emailVerificationTemplate } from '@/lib/email';
+import { seedDefaultAccounts } from '@/modules/accounting/lib/journal-engine';
 
 function slugify(text: string): string {
   return text
@@ -106,6 +107,9 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
         return newStore;
       });
 
+      // Seed Chart of Accounts default (di luar transaksi)
+      await seedDefaultAccounts(store.id);
+
       return { success: true, slug: store.slug };
     }
 
@@ -151,6 +155,9 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
       await createDefaultSettings(tx, newStore.id);
       return { store: newStore, owner };
     });
+
+    // Seed Chart of Accounts default (di luar transaksi)
+    await seedDefaultAccounts(store.store.id);
 
     // Kirim email verifikasi (di luar transaksi agar tidak block commit)
     try {

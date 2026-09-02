@@ -6,6 +6,7 @@ import { requireStoreAccess } from '@/lib/store-context';
 import { generateSaleNumber } from '@/lib/utils';
 import { getPointsConversionRate } from './settings';
 import { sanitizeText } from '@/lib/sanitize';
+import { generateSaleJournals } from '@/modules/accounting/lib/journal-engine';
 
 interface SaleItemInput {
   variantId: string;
@@ -191,6 +192,31 @@ export async function createSaleAction(input: CreateSaleInput) {
     revalidatePath(`/${storeSlug}/admin/inventory/stock`);
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
     revalidatePath(`/${storeSlug}/cashier`);
+
+    // Generate jurnal akuntansi — non-blocking, pakai field 'cost' dari ProductVariant
+    ;(async () => {
+      try {
+        const variants = await db.productVariant.findMany({
+          where:  { id: { in: items.map((i) => i.variantId) } },
+          select: { id: true, cost: true },
+        });
+        const costMap  = new Map(variants.map((v) => [v.id, Number(v.cost ?? 0)]));
+        const hppTotal = items.reduce((sum, i) => sum + (costMap.get(i.variantId) ?? 0) * i.quantity, 0);
+
+        await generateSaleJournals({
+          storeId,
+          saleId:        sale.id,
+          total,
+          hpp:           hppTotal,
+          paymentMethod,
+          date:          sale.createdAt,
+          saleNumber:    sale.saleNumber,
+        });
+      } catch (err: any) {
+        console.warn('Sale journal generation skipped (CoA not seeded?):', err.message);
+      }
+    })();
+
     return { success: true, saleId: sale.id, saleNumber: sale.saleNumber, createdAt: sale.createdAt };
   } catch (error) {
     console.error('Create sale error:', error);

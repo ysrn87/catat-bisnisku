@@ -144,3 +144,42 @@ a:focus-visible {
 .animate-fade-up-delay-2    { animation: fadeUp .7s .2s ease both; }
 .animate-fade-up-delay-3    { animation: fadeUp .7s .35s ease both; }
 .animate-fade-up-delay-4    { animation: fadeUp .7s .5s ease both; }
+
+@media print {
+  /* Sembunyikan elemen navigasi saat print */
+  header,
+  nav,
+  aside,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset background */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Pastikan card tidak punya shadow */
+  .card,
+  [class*="shadow"] {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* Ukuran font sedikit lebih kecil untuk muat di A4 */
+  #sak-report {
+    font-size: 11px;
+  }
+
+  /* Page break antar laporan */
+  #sak-report > div > div {
+    break-inside: avoid;
+  }
+
+  /* Header laporan selalu di atas */
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+}

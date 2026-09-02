@@ -108,6 +108,8 @@ model Store {
   payments        Payment[]
   upgradePayments UpgradePayment[]
   invitations     StaffInvitation[]
+  accounts        Account[]
+  journalEntries  JournalEntry[]
 
   @@map("stores")
 }
@@ -414,6 +416,50 @@ model Cashflow {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ACCOUNTING MODULE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Account {
+  id        String      @id @default(cuid())
+  storeId   String
+  code      String      // e.g. "1001"
+  name      String      // e.g. "Kas"
+  type      AccountType // ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE
+  isSystem  Boolean     @default(false) // true = tidak boleh dihapus user
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  debitEntries  JournalEntry[] @relation("DebitAccount")
+  creditEntries JournalEntry[] @relation("CreditAccount")
+
+  @@unique([storeId, code])
+  @@index([storeId, type])
+  @@map("accounts")
+}
+
+model JournalEntry {
+  id          String            @id @default(cuid())
+  storeId     String
+  date        DateTime
+  debitId     String
+  creditId    String
+  amount      Decimal           @db.Decimal(10, 2)
+  description String
+  sourceType  JournalSourceType // POS_SALE | CASHFLOW
+  sourceId    String            // Sale.id | Cashflow.id
+  createdAt   DateTime          @default(now())
+
+  store  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  debit  Account @relation("DebitAccount",  fields: [debitId],  references: [id])
+  credit Account @relation("CreditAccount", fields: [creditId], references: [id])
+
+  @@index([storeId, date])
+  @@index([sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STOCK MOVEMENT
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -513,4 +559,17 @@ enum PointTxType {
   EXPIRE
   REGISTER
   UPGRADE
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalSourceType {
+  POS_SALE
+  CASHFLOW
 }

@@ -14,8 +14,8 @@ export default async function FinanceLayout({
       title="Keuangan"
       description="Kelola cashflow dan laporan keuangan"
       tabs={[
-        { value: 'cashflow', label: 'Cashflow',         href: `/${slug}/admin/finance/cashflow` },
-        { value: 'reports',  label: 'Laporan Keuangan', href: `/${slug}/admin/finance/reports` },
+        { value: 'cashflow',   label: 'Cashflow',         href: `/${slug}/admin/finance/cashflow` },
+        { value: 'reports',    label: 'Laporan Keuangan', href: `/${slug}/admin/finance/reports` },
       ]}
     >
       {children}

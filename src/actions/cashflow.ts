@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { sanitizeText, sanitizeCategory } from '@/lib/sanitize';
 import { requireStoreAccess } from '@/lib/store-context';
+import { generateCashflowJournal, deleteJournalsBySource } from '@/modules/accounting/lib/journal-engine';
 
 export async function createCashflowAction(formData: FormData) {
   try {
@@ -28,7 +29,7 @@ export async function createCashflowAction(formData: FormData) {
     if (!type || !amount || !category || !dateStr) return { success: false, error: 'Data tidak lengkap' };
     if (amount <= 0) return { success: false, error: 'Jumlah harus lebih dari 0' };
 
-    await db.cashflow.create({
+    const created = await db.cashflow.create({
       data: {
         storeId,
         type,
@@ -39,6 +40,18 @@ export async function createCashflowAction(formData: FormData) {
         // FIX: hapus createdById
       },
     });
+
+    // Generate jurnal akuntansi — non-blocking
+    generateCashflowJournal({
+      storeId,
+      cashflowId:    created.id,
+      type,
+      category,
+      amount,
+      paymentMethod: 'CASH',
+      date:          occurredAt,
+      description:   description || `${type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'} - ${category}`,
+    }).catch((err) => console.warn('Journal generation skipped:', err.message));
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
     revalidatePath(`/${storeSlug}/admin/finance/reports`);
@@ -79,6 +92,18 @@ export async function updateCashflowAction(id: string, formData: FormData) {
       data:  { type, amount, category, description, occurredAt },
     });
 
+    // Re-generate jurnal — non-blocking
+    generateCashflowJournal({
+      storeId,
+      cashflowId:    id,
+      type,
+      category,
+      amount,
+      paymentMethod: 'CASH',
+      date:          occurredAt,
+      description:   description || `${type === 'INCOME' ? 'Pemasukan' : 'Pengeluaran'} - ${category}`,
+    }).catch((err) => console.warn('Journal re-generation skipped:', err.message));
+
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
     revalidatePath(`/${storeSlug}/admin/finance/reports`);
     return { success: true };
@@ -101,6 +126,10 @@ export async function deleteCashflowAction(id: string) {
     if (cashflow.saleId) return { success: false, error: 'Transaksi dari penjualan tidak dapat dihapus.' };
 
     await db.cashflow.delete({ where: { id } });
+
+    // Hapus jurnal terkait — non-blocking
+    deleteJournalsBySource('CASHFLOW', id)
+      .catch((err) => console.warn('Journal deletion skipped:', err.message));
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);
     revalidatePath(`/${storeSlug}/admin/finance/reports`);

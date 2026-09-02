@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTransition, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt, ChevronDown, Search, Bell, Zap, Crown } from 'lucide-react';
+import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt, ChevronDown, Search, Bell, Zap, Crown, BookMarked } from 'lucide-react';
 import { logoutAction } from '@/actions/auth';
 import { triggerLoader } from '@/components/layouts/navigation-loader';
 import { PlanBadge } from '@/components/plan/plan-badge';
@@ -12,6 +12,7 @@ import { PlanBadge } from '@/components/plan/plan-badge';
 interface SubNavItem {
   href: string;
   label: string;
+  group?: string; // label pemisah grup, tampil sebelum item ini
 }
 
 interface NavItem {
@@ -103,6 +104,22 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       subItems: [
         { href: `${base}/admin/finance/cashflow`, label: 'Cashflow' },
         { href: `${base}/admin/finance/reports`,  label: 'Laporan Keuangan' },
+      ],
+    },
+    {
+      href: `${base}/admin/accounting/profit-loss`,
+      label: 'Akuntansi',
+      mobileLabel: 'Akuntansi',
+      icon: <BookMarked className="w-4 h-4" />,
+      matchPaths: [
+        `${base}/admin/accounting`,
+      ],
+      subItems: [
+        { href: `${base}/admin/accounting/profit-loss`, label: 'Laba Rugi' },
+        { href: `${base}/admin/accounting/journal`,     label: 'Jurnal' },
+        { href: `${base}/admin/accounting/ledger`,      label: 'Buku Besar' },
+        { href: `${base}/admin/accounting/sak-report`,  label: 'Laporan SAK' },
+        { href: `${base}/admin/accounting/accounts`,    label: 'Kelola Akun' },
       ],
     },
     {
@@ -317,26 +334,32 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
                       const subActive = matchedSub?.href === sub.href;
                       const subLoading = isPending && pendingHref === sub.href;
                       return (
-                        <button
-                          key={sub.href}
-                          type="button"
-                          onClick={() => {
-                            if (pathname === sub.href || subLoading) return;
-                            setPendingHref(sub.href);
-                            triggerLoader();
-                            startTransition(() => { router.push(sub.href); });
-                          }}
-                          className={`
-                            flex items-center justify-between py-1.5 pl-3 pr-2 text-sm truncate transition-colors duration-150 border-l-2 text-left w-full
-                            ${subActive
-                              ? 'border-[#028697] text-[#028697] font-medium'
-                              : 'border-gray-100 text-gray-400 hover:text-gray-700 hover:border-gray-300'
-                            }
-                          `}
-                        >
-                          <span className="truncate">{sub.label}</span>
-                          {subLoading && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0 ml-1.5 text-[#028697]" />}
-                        </button>
+                        <div key={sub.href}>
+                          {sub.group && (
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 px-3 pt-2 pb-0.5 select-none">
+                              {sub.group}
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (pathname === sub.href || subLoading) return;
+                              setPendingHref(sub.href);
+                              triggerLoader();
+                              startTransition(() => { router.push(sub.href); });
+                            }}
+                            className={`
+                              flex items-center justify-between py-1.5 pl-3 pr-2 text-sm truncate transition-colors duration-150 border-l-2 text-left w-full
+                              ${subActive
+                                ? 'border-[#028697] text-[#028697] font-medium'
+                                : 'border-gray-100 text-gray-400 hover:text-gray-700 hover:border-gray-300'
+                              }
+                            `}
+                          >
+                            <span className="truncate">{sub.label}</span>
+                            {subLoading && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0 ml-1.5 text-[#028697]" />}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>

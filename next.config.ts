@@ -30,6 +30,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: [
+    '192.168.1.*',  // subnet WiFi rumah/kantor paling umum
+    '192.168.0.*',  // subnet alternatif
+    '10.0.0.*',     // subnet hotspot/router alternatif
+  ],
   async headers() {
     return [
       {
@@ -40,12 +45,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      // Default 1mb cukup untuk semua action kecuali upload logo
-      // Upload logo ditangani via API route khusus
       bodySizeLimit: '1mb',
     },
   },
-  // INTERNAL_API_SECRET tidak di-expose ke client — cukup pakai process.env di server
   turbopack: {},
 };
 
@@ -76,8 +78,6 @@ export default withPWA({
       handler: 'NetworkOnly',
     },
     {
-      // Halaman sensitif — tidak boleh di-cache service worker
-      // Di perangkat shared, user lain bisa akses cached data keuangan
       urlPattern: /\/(admin|manager|finance|reports|customers|members|upgrade|settings)/i,
       handler: 'NetworkOnly',
     },
