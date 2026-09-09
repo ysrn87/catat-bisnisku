@@ -126,13 +126,14 @@ export default async function ProfitLossPage({
                 Belum ada data pendapatan pada periode ini
               </p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+              <table className="w-full text-sm min-w-[280px]">
                 <tbody className="divide-y divide-gray-50">
                   {report.revenues.map((r) => (
                     <tr key={r.code}>
                       <td className="py-2.5 pr-2 text-[10px] text-gray-400 font-mono w-10">{r.code}</td>
                       <td className="py-2.5 text-gray-700">{r.name}</td>
-                      <td className="py-2.5 text-right font-mono text-green-700 font-medium">
+                      <td className="py-2.5 text-right font-mono text-green-700 font-medium whitespace-nowrap">
                         {formatCurrency(r.amount)}
                       </td>
                     </tr>
@@ -141,12 +142,13 @@ export default async function ProfitLossPage({
                 <tfoot>
                   <tr className="border-t-2 border-green-200">
                     <td colSpan={2} className="pt-3 text-xs font-semibold text-green-800">Total Pendapatan</td>
-                    <td className="pt-3 text-right font-bold font-mono text-green-700">
+                    <td className="pt-3 text-right font-bold font-mono text-green-700 whitespace-nowrap">
                       {formatCurrency(report.totalRevenue)}
                     </td>
                   </tr>
                 </tfoot>
               </table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -162,13 +164,14 @@ export default async function ProfitLossPage({
                 Belum ada data beban pada periode ini
               </p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+              <table className="w-full text-sm min-w-[280px]">
                 <tbody className="divide-y divide-gray-50">
                   {report.expenses.map((e) => (
                     <tr key={e.code}>
                       <td className="py-2.5 pr-2 text-[10px] text-gray-400 font-mono w-10">{e.code}</td>
                       <td className="py-2.5 text-gray-700">{e.name}</td>
-                      <td className="py-2.5 text-right font-mono text-red-700 font-medium">
+                      <td className="py-2.5 text-right font-mono text-red-700 font-medium whitespace-nowrap">
                         {formatCurrency(e.amount)}
                       </td>
                     </tr>
@@ -177,12 +180,13 @@ export default async function ProfitLossPage({
                 <tfoot>
                   <tr className="border-t-2 border-red-200">
                     <td colSpan={2} className="pt-3 text-xs font-semibold text-red-800">Total Beban</td>
-                    <td className="pt-3 text-right font-bold font-mono text-red-700">
+                    <td className="pt-3 text-right font-bold font-mono text-red-700 whitespace-nowrap">
                       {formatCurrency(report.totalExpense)}
                     </td>
                   </tr>
                 </tfoot>
               </table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -192,33 +196,33 @@ export default async function ProfitLossPage({
       <Card className={`border-2 ${isProfit ? 'border-green-200 bg-green-50/30' : 'border-red-200 bg-red-50/30'}`}>
         <CardContent className="pt-5">
           <div className="space-y-2.5 text-sm">
-            <div className="flex justify-between text-gray-600">
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-gray-600">
               <span>Total Pendapatan</span>
-              <span className="font-mono font-medium text-green-700">{formatCurrency(report.totalRevenue)}</span>
+              <span className="font-mono font-medium text-green-700 whitespace-nowrap">{formatCurrency(report.totalRevenue)}</span>
             </div>
-            <div className="flex justify-between text-gray-600">
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-gray-600">
               <span>HPP (Harga Pokok Penjualan)</span>
-              <span className="font-mono text-red-600">
+              <span className="font-mono text-red-600 whitespace-nowrap">
                 ({formatCurrency(report.expenses.find(e => e.code === '5001')?.amount ?? 0)})
               </span>
             </div>
-            <div className="flex justify-between text-gray-700 font-medium border-t pt-2">
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-gray-700 font-medium border-t pt-2">
               <span>Laba Kotor</span>
-              <span className="font-mono">{formatCurrency(report.grossProfit)}</span>
+              <span className="font-mono whitespace-nowrap">{formatCurrency(report.grossProfit)}</span>
             </div>
-            <div className="flex justify-between text-gray-600">
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-gray-600">
               <span>Beban Operasional</span>
-              <span className="font-mono text-red-600">
+              <span className="font-mono text-red-600 whitespace-nowrap">
                 ({formatCurrency(
                   report.totalExpense - (report.expenses.find(e => e.code === '5001')?.amount ?? 0)
                 )})
               </span>
             </div>
-            <div className={`flex justify-between font-bold text-base pt-2.5 border-t-2 ${
+            <div className={`flex flex-wrap justify-between gap-x-3 gap-y-0.5 font-bold text-base pt-2.5 border-t-2 ${
               isProfit ? 'border-green-300 text-green-700' : 'border-red-300 text-red-700'
             }`}>
               <span>{isProfit ? '✅ Laba Bersih' : '❌ Rugi Bersih'}</span>
-              <span className="font-mono">{formatCurrency(Math.abs(report.netProfit))}</span>
+              <span className="font-mono whitespace-nowrap">{formatCurrency(Math.abs(report.netProfit))}</span>
             </div>
           </div>
         </CardContent>

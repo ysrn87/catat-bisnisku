@@ -30,10 +30,10 @@ export function LedgerAccountFilter({ accounts, currentAccount }: LedgerAccountF
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
       <Label className="text-xs text-muted-foreground whitespace-nowrap">Filter Akun</Label>
       <Select value={currentAccount ?? 'all'} onValueChange={onChange}>
-        <SelectTrigger className="h-8 text-xs w-56">
+        <SelectTrigger className="h-8 text-xs w-full sm:w-56">
           <SelectValue placeholder="Semua Akun" />
         </SelectTrigger>
         <SelectContent>

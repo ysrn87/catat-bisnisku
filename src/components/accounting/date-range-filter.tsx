@@ -64,9 +64,9 @@ export function DateRangeFilter({ defaultFrom, defaultTo }: DateRangeFilterProps
   const isFiltered = !!(defaultFrom || defaultTo);
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <div className="flex flex-col gap-3">
       {/* Preset buttons */}
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {PRESETS.map((p) => (
           <Button
             key={p.label}
@@ -86,44 +86,48 @@ export function DateRangeFilter({ defaultFrom, defaultTo }: DateRangeFilterProps
       </div>
 
       {/* Manual input */}
-      <div className="flex items-end gap-2">
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Dari</Label>
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-8 text-xs w-36"
-          />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:items-end">
+          <div className="space-y-1 min-w-0">
+            <Label className="text-xs text-muted-foreground">Dari</Label>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-8 text-xs w-full sm:w-36"
+            />
+          </div>
+          <div className="space-y-1 min-w-0">
+            <Label className="text-xs text-muted-foreground">Sampai</Label>
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="h-8 text-xs w-full sm:w-36"
+            />
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Sampai</Label>
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-8 text-xs w-36"
-          />
-        </div>
-        <Button
-          size="sm"
-          className="h-8 text-xs gap-1.5"
-          onClick={() => apply(from, to)}
-        >
-          <CalendarDays className="w-3.5 h-3.5" />
-          Terapkan
-        </Button>
-        {isFiltered && (
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
-            variant="ghost"
-            className="h-8 text-xs gap-1 text-muted-foreground"
-            onClick={reset}
+            className="h-8 text-xs gap-1.5"
+            onClick={() => apply(from, to)}
           >
-            <X className="w-3.5 h-3.5" />
-            Reset
+            <CalendarDays className="w-3.5 h-3.5" />
+            Terapkan
           </Button>
-        )}
+          {isFiltered && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs gap-1 text-muted-foreground"
+              onClick={reset}
+            >
+              <X className="w-3.5 h-3.5" />
+              Reset
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

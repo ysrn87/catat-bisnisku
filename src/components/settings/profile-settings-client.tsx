@@ -424,8 +424,8 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
   return (
     <div className="space-y-4 max-w-2xl">
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200">
+      {/* Tabs — scrollable horizontal di mobile supaya tab ketiga tidak terpotong */}
+      <div className="flex border-b border-gray-200 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
         {([
           { key: 'profile',  label: 'Profil Admin',   icon: User    },
           { key: 'team',     label: 'Kelola Tim',      icon: Users   },
@@ -434,13 +434,13 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 shrink-0 whitespace-nowrap px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
               activeTab === key
                 ? 'border-[#028697] text-[#028697]'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            <Icon className="w-4 h-4" />{label}
+            <Icon className="w-4 h-4 shrink-0" />{label}
           </button>
         ))}
       </div>
@@ -460,9 +460,9 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
                 <div className="w-14 h-14 rounded-2xl bg-[#028697] flex items-center justify-center shadow-md shrink-0">
                   <span className="text-white text-lg font-bold">{initials}</span>
                 </div>
-                <div>
-                  <p className="font-semibold text-sm">{adminName || '–'}</p>
-                  <p className="text-xs text-gray-500">{adminEmail || 'Belum ada email'}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm truncate">{adminName || '–'}</p>
+                  <p className="text-xs text-gray-500 truncate">{adminEmail || 'Belum ada email'}</p>
                 </div>
               </div>
               <hr className="border-t border-gray-100" />
@@ -477,11 +477,14 @@ export function ProfileSettingsClient({ storePlan, storeSlug, storeId }: Props) 
                   <Label className="text-xs font-medium flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-gray-400" />Email
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <div className="h-10 flex-1 flex items-center px-3 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-600">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div
+                      className="h-10 min-w-0 sm:flex-1 flex items-center px-3 text-sm bg-gray-50 border border-gray-200 rounded-md text-gray-600 truncate"
+                      title={adminEmail || 'Belum ada email'}
+                    >
                       {adminEmail || 'Belum ada email'}
                     </div>
-                    <Button variant="outline" className="h-10 text-xs shrink-0" onClick={() => setChangeEmailModal(true)}>
+                    <Button variant="outline" className="h-10 text-xs shrink-0 w-full sm:w-auto" onClick={() => setChangeEmailModal(true)}>
                       Ganti Email
                     </Button>
                   </div>

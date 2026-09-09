@@ -87,7 +87,8 @@ export default async function SAKReportPage({
           </p>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <table className="w-full text-sm min-w-[380px]">
             <tbody>
 
               {/* Pendapatan */}
@@ -96,12 +97,12 @@ export default async function SAKReportPage({
                 <tr key={r.code} className="border-b border-gray-50">
                   <td className="py-2 pl-4 font-mono text-[10px] text-gray-400 w-12">{r.code}</td>
                   <td className="py-2 text-gray-700">{r.name}</td>
-                  <td className="py-2 text-right font-mono">{formatCurrency(r.amount)}</td>
+                  <td className="py-2 text-right font-mono whitespace-nowrap">{formatCurrency(r.amount)}</td>
                 </tr>
               ))}
               <tr className="bg-gray-50">
                 <td colSpan={2} className="py-2 pl-4 text-xs font-semibold">Total Pendapatan</td>
-                <td className="py-2 text-right font-mono font-semibold">{formatCurrency(pl.pendapatan.reduce((s,l) => s+l.amount, 0))}</td>
+                <td className="py-2 text-right font-mono whitespace-nowrap font-semibold">{formatCurrency(pl.pendapatan.reduce((s,l) => s+l.amount, 0))}</td>
               </tr>
 
               {/* HPP */}
@@ -109,11 +110,11 @@ export default async function SAKReportPage({
               <tr className="border-b border-gray-50">
                 <td className="py-2 pl-4 font-mono text-[10px] text-gray-400">5001</td>
                 <td className="py-2 text-gray-700">Harga Pokok Penjualan</td>
-                <td className="py-2 text-right font-mono text-red-700">({formatCurrency(pl.hpp)})</td>
+                <td className="py-2 text-right font-mono whitespace-nowrap text-red-700">({formatCurrency(pl.hpp)})</td>
               </tr>
               <tr className="bg-green-50">
                 <td colSpan={2} className="py-2 pl-4 text-xs font-semibold text-green-800">Laba Kotor</td>
-                <td className="py-2 text-right font-mono font-semibold text-green-700">{formatCurrency(pl.labaKotor)}</td>
+                <td className="py-2 text-right font-mono whitespace-nowrap font-semibold text-green-700">{formatCurrency(pl.labaKotor)}</td>
               </tr>
 
               {/* Beban Operasional */}
@@ -124,12 +125,12 @@ export default async function SAKReportPage({
                     <tr key={e.code} className="border-b border-gray-50">
                       <td className="py-2 pl-4 font-mono text-[10px] text-gray-400 w-12">{e.code}</td>
                       <td className="py-2 text-gray-700">{e.name}</td>
-                      <td className="py-2 text-right font-mono text-red-700">({formatCurrency(e.amount)})</td>
+                      <td className="py-2 text-right font-mono whitespace-nowrap text-red-700">({formatCurrency(e.amount)})</td>
                     </tr>
                   ))}
                   <tr className="bg-gray-50">
                     <td colSpan={2} className="py-2 pl-4 text-xs font-semibold">Total Beban Operasional</td>
-                    <td className="py-2 text-right font-mono font-semibold text-red-700">
+                    <td className="py-2 text-right font-mono whitespace-nowrap font-semibold text-red-700">
                       ({formatCurrency(pl.bebanOperasional.reduce((s,l) => s+l.amount, 0))})
                     </td>
                   </tr>
@@ -141,13 +142,14 @@ export default async function SAKReportPage({
                 <td colSpan={2} className={`py-3 pl-2 text-sm font-bold ${pl.isProfit ? 'text-green-800' : 'text-red-800'}`}>
                   {pl.isProfit ? 'Laba Bersih Periode Berjalan' : 'Rugi Bersih Periode Berjalan'}
                 </td>
-                <td className={`py-3 text-right font-mono font-bold text-base ${pl.isProfit ? 'text-green-700' : 'text-red-700'}`}>
+                <td className={`py-3 text-right font-mono whitespace-nowrap font-bold text-base ${pl.isProfit ? 'text-green-700' : 'text-red-700'}`}>
                   {formatCurrency(Math.abs(pl.labaBersih))}
                 </td>
               </tr>
 
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -169,8 +171,8 @@ export default async function SAKReportPage({
           <div className="grid md:grid-cols-2 gap-6">
 
             {/* ASET */}
-            <div>
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+              <table className="w-full text-sm min-w-[300px]">
                 <thead><tr><th colSpan={3} className="text-left py-2 text-xs uppercase tracking-wide font-bold border-b-2 border-gray-800">ASET</th></tr></thead>
                 <tbody>
                   <tr><td colSpan={3} className="py-2 text-xs font-semibold text-gray-600">Aset Lancar</td></tr>
@@ -178,7 +180,7 @@ export default async function SAKReportPage({
                     <tr key={a.code} className="border-b border-gray-50">
                       <td className="py-1.5 pl-3 font-mono text-[10px] text-gray-400 w-10">{a.code}</td>
                       <td className="py-1.5 text-gray-700 text-xs">{a.name}</td>
-                      <td className="py-1.5 text-right font-mono text-xs">{formatCurrency(a.amount)}</td>
+                      <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs">{formatCurrency(a.amount)}</td>
                     </tr>
                   ))}
                   {bs.asetTidakLancar.filter(a => a.amount !== 0).length > 0 && (
@@ -188,22 +190,22 @@ export default async function SAKReportPage({
                         <tr key={a.code} className="border-b border-gray-50">
                           <td className="py-1.5 pl-3 font-mono text-[10px] text-gray-400">{a.code}</td>
                           <td className="py-1.5 text-gray-700 text-xs">{a.name}</td>
-                          <td className="py-1.5 text-right font-mono text-xs">{formatCurrency(a.amount)}</td>
+                          <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs">{formatCurrency(a.amount)}</td>
                         </tr>
                       ))}
                     </>
                   )}
                   <tr className="border-t-2 border-gray-800 bg-gray-50">
                     <td colSpan={2} className="py-2 text-xs font-bold">TOTAL ASET</td>
-                    <td className="py-2 text-right font-mono font-bold">{formatCurrency(bs.totalAset)}</td>
+                    <td className="py-2 text-right font-mono whitespace-nowrap font-bold">{formatCurrency(bs.totalAset)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             {/* LIABILITAS + EKUITAS */}
-            <div>
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+              <table className="w-full text-sm min-w-[300px]">
                 <thead><tr><th colSpan={3} className="text-left py-2 text-xs uppercase tracking-wide font-bold border-b-2 border-gray-800">LIABILITAS & EKUITAS</th></tr></thead>
                 <tbody>
                   {/* Liabilitas */}
@@ -212,7 +214,7 @@ export default async function SAKReportPage({
                     <tr key={l.code} className="border-b border-gray-50">
                       <td className="py-1.5 pl-3 font-mono text-[10px] text-gray-400 w-10">{l.code}</td>
                       <td className="py-1.5 text-gray-700 text-xs">{l.name}</td>
-                      <td className="py-1.5 text-right font-mono text-xs">{formatCurrency(l.amount)}</td>
+                      <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs">{formatCurrency(l.amount)}</td>
                     </tr>
                   ))}
                   {bs.liabilitasJangkaPanjang.filter(l => l.amount !== 0).length > 0 && (
@@ -222,14 +224,14 @@ export default async function SAKReportPage({
                         <tr key={l.code} className="border-b border-gray-50">
                           <td className="py-1.5 pl-3 font-mono text-[10px] text-gray-400">{l.code}</td>
                           <td className="py-1.5 text-gray-700 text-xs">{l.name}</td>
-                          <td className="py-1.5 text-right font-mono text-xs">{formatCurrency(l.amount)}</td>
+                          <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs">{formatCurrency(l.amount)}</td>
                         </tr>
                       ))}
                     </>
                   )}
                   <tr className="border-t border-gray-200 bg-gray-50">
                     <td colSpan={2} className="py-1.5 text-xs font-semibold">Total Liabilitas</td>
-                    <td className="py-1.5 text-right font-mono text-xs font-semibold">{formatCurrency(bs.totalLiabilitas)}</td>
+                    <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs font-semibold">{formatCurrency(bs.totalLiabilitas)}</td>
                   </tr>
 
                   {/* Ekuitas */}
@@ -238,7 +240,7 @@ export default async function SAKReportPage({
                     <tr key={e.code} className="border-b border-gray-50">
                       <td className="py-1.5 pl-3 font-mono text-[10px] text-gray-400">{e.code}</td>
                       <td className="py-1.5 text-gray-700 text-xs">{e.name}</td>
-                      <td className="py-1.5 text-right font-mono text-xs">{formatCurrency(e.amount)}</td>
+                      <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs">{formatCurrency(e.amount)}</td>
                     </tr>
                   ))}
                   <tr className="border-b border-gray-50">
@@ -246,18 +248,18 @@ export default async function SAKReportPage({
                     <td className="py-1.5 text-gray-700 text-xs italic">
                       {pl.isProfit ? 'Laba' : 'Rugi'} Periode Berjalan
                     </td>
-                    <td className={`py-1.5 text-right font-mono text-xs ${pl.isProfit ? 'text-green-700' : 'text-red-700'}`}>
+                    <td className={`py-1.5 text-right font-mono whitespace-nowrap text-xs ${pl.isProfit ? 'text-green-700' : 'text-red-700'}`}>
                       {formatCurrency(bs.labaPeriodeBerjalan)}
                     </td>
                   </tr>
                   <tr className="border-t border-gray-200 bg-gray-50">
                     <td colSpan={2} className="py-1.5 text-xs font-semibold">Total Ekuitas</td>
-                    <td className="py-1.5 text-right font-mono text-xs font-semibold">{formatCurrency(bs.totalEkuitas)}</td>
+                    <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs font-semibold">{formatCurrency(bs.totalEkuitas)}</td>
                   </tr>
 
                   <tr className="border-t-2 border-gray-800 bg-gray-50">
                     <td colSpan={2} className="py-2 text-xs font-bold">TOTAL LIABILITAS & EKUITAS</td>
-                    <td className="py-2 text-right font-mono font-bold">{formatCurrency(bs.totalLiabilitas + bs.totalEkuitas)}</td>
+                    <td className="py-2 text-right font-mono whitespace-nowrap font-bold">{formatCurrency(bs.totalLiabilitas + bs.totalEkuitas)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -284,7 +286,8 @@ export default async function SAKReportPage({
           </p>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <table className="w-full text-sm min-w-[380px]">
             <tbody>
 
               {/* Aktivitas Operasi */}
@@ -294,7 +297,7 @@ export default async function SAKReportPage({
               <CashFlowRow label="Pembayaran Beban Operasional"   value={cf.pembayaranBebanOperasi}  />
               <tr className="bg-gray-50 border-t">
                 <td className="py-2 text-xs font-semibold">Arus Kas Bersih dari Aktivitas Operasi</td>
-                <td className={`py-2 text-right font-mono font-semibold ${cf.arusKasOperasi >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                <td className={`py-2 text-right font-mono whitespace-nowrap font-semibold ${cf.arusKasOperasi >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   {cf.arusKasOperasi >= 0 ? '' : '('}{formatCurrency(Math.abs(cf.arusKasOperasi))}{cf.arusKasOperasi >= 0 ? '' : ')'}
                 </td>
               </tr>
@@ -304,7 +307,7 @@ export default async function SAKReportPage({
               <CashFlowRow label="Pembelian Aset Tetap" value={cf.pembelianAset} />
               <tr className="bg-gray-50 border-t">
                 <td className="py-2 text-xs font-semibold">Arus Kas Bersih dari Aktivitas Investasi</td>
-                <td className={`py-2 text-right font-mono font-semibold ${cf.arusKasInvestasi >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                <td className={`py-2 text-right font-mono whitespace-nowrap font-semibold ${cf.arusKasInvestasi >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   {cf.arusKasInvestasi >= 0 ? '' : '('}{formatCurrency(Math.abs(cf.arusKasInvestasi))}{cf.arusKasInvestasi >= 0 ? '' : ')'}
                 </td>
               </tr>
@@ -315,7 +318,7 @@ export default async function SAKReportPage({
               <CashFlowRow label="Pembayaran Utang Bank"       value={cf.pembayaranUtang}  />
               <tr className="bg-gray-50 border-t">
                 <td className="py-2 text-xs font-semibold">Arus Kas Bersih dari Aktivitas Pendanaan</td>
-                <td className={`py-2 text-right font-mono font-semibold ${cf.arusKasPendanaan >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                <td className={`py-2 text-right font-mono whitespace-nowrap font-semibold ${cf.arusKasPendanaan >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   {cf.arusKasPendanaan >= 0 ? '' : '('}{formatCurrency(Math.abs(cf.arusKasPendanaan))}{cf.arusKasPendanaan >= 0 ? '' : ')'}
                 </td>
               </tr>
@@ -325,21 +328,22 @@ export default async function SAKReportPage({
                 <td className="py-2 text-xs font-semibold">
                   {cf.kenaikanPenurunanKas >= 0 ? 'Kenaikan' : 'Penurunan'} Kas Bersih
                 </td>
-                <td className={`py-2 text-right font-mono font-semibold ${cf.kenaikanPenurunanKas >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                <td className={`py-2 text-right font-mono whitespace-nowrap font-semibold ${cf.kenaikanPenurunanKas >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                   {formatCurrency(Math.abs(cf.kenaikanPenurunanKas))}
                 </td>
               </tr>
               <tr>
                 <td className="py-1.5 text-xs text-gray-600">Saldo Kas Awal Periode</td>
-                <td className="py-1.5 text-right font-mono text-xs">{formatCurrency(cf.saldoKasAwal)}</td>
+                <td className="py-1.5 text-right font-mono whitespace-nowrap text-xs">{formatCurrency(cf.saldoKasAwal)}</td>
               </tr>
               <tr className="bg-blue-50 border-t border-blue-200">
                 <td className="py-2 text-xs font-bold text-blue-800">Saldo Kas Akhir Periode</td>
-                <td className="py-2 text-right font-mono font-bold text-blue-700">{formatCurrency(cf.saldoKasAkhir)}</td>
+                <td className="py-2 text-right font-mono whitespace-nowrap font-bold text-blue-700">{formatCurrency(cf.saldoKasAkhir)}</td>
               </tr>
 
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -386,7 +390,7 @@ function CashFlowRow({ label, value, positive = false }: { label: string; value:
   return (
     <tr className="border-b border-gray-50">
       <td className="py-1.5 pl-4 text-gray-600">{label}</td>
-      <td className={`py-1.5 text-right font-mono ${positive ? 'text-gray-800' : 'text-red-700'}`}>
+      <td className={`py-1.5 text-right font-mono whitespace-nowrap ${positive ? 'text-gray-800' : 'text-red-700'}`}>
         {display}
       </td>
     </tr>

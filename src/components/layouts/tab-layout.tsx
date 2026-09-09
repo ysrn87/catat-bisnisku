@@ -53,11 +53,12 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
         onValueChange={useRouterPush ? (v) => startTransition(() => router.push(`${pathname.split('/').slice(0, -1).join('/')}/${v}`)) : undefined}
       >
         {/* Tab navigasi sub-halaman — hanya untuk mobile/tablet.
-            Di desktop (lg+), navigasi yang sama sudah tersedia di sidebar. */}
+            Di desktop (lg+), navigasi yang sama sudah tersedia di sidebar.
+            Discroll horizontal (bukan grid rata) supaya label tidak terpotong/overlap
+            saat jumlah tab banyak di layar sempit. */}
         <div className="lg:hidden sticky top-16 z-30 bg-gray-50 -mx-4 px-4 md:-mx-6 md:px-6 py-3 border-b border-gray-200 shadow-sm">
           <TabsList
-            className="grid w-full"
-            style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+            className="flex w-full h-auto justify-start gap-1 overflow-x-auto scrollbar-hide p-1 -mx-1 px-1"
           >
             {tabs.map((tab) =>
               tab.href ? (
@@ -65,7 +66,7 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
                   key={tab.value}
                   value={tab.value}
                   onClick={() => handleTabClick(tab.href!)}
-                  className="flex items-center gap-1.5"
+                  className="flex items-center gap-1.5 shrink-0 whitespace-nowrap text-xs sm:text-sm px-2.5 sm:px-3"
                 >
                   {isPending && currentTab !== tab.value && (
                     <Loader2 className="w-3 h-3 animate-spin shrink-0" />
@@ -76,7 +77,7 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
-                  className="flex items-center gap-1.5"
+                  className="flex items-center gap-1.5 shrink-0 whitespace-nowrap text-xs sm:text-sm px-2.5 sm:px-3"
                 >
                   {tab.label}
                 </TabsTrigger>

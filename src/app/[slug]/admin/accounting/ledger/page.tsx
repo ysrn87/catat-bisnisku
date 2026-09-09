@@ -67,31 +67,31 @@ export default async function LedgerPage({
           {ledger.map((account) => (
             <Card key={account.code}>
               <CardHeader className="pb-2">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground">{account.code}</span>
-                    <CardTitle className="text-sm">{account.name}</CardTitle>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="font-mono text-xs text-muted-foreground shrink-0">{account.code}</span>
+                    <CardTitle className="text-sm truncate">{account.name}</CardTitle>
                     <Badge
                       variant="outline"
-                      className={`text-[10px] px-1.5 py-0 ${ACCOUNT_TYPE_COLOR[account.type]}`}
+                      className={`text-[10px] px-1.5 py-0 shrink-0 ${ACCOUNT_TYPE_COLOR[account.type]}`}
                     >
                       {ACCOUNT_TYPE_LABEL[account.type]}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="whitespace-nowrap">
                       Total D:{' '}
                       <span className="font-mono text-blue-700 font-medium">
                         {formatCurrency(account.totalDebit)}
                       </span>
                     </span>
-                    <span>
+                    <span className="whitespace-nowrap">
                       Total K:{' '}
                       <span className="font-mono text-rose-600 font-medium">
                         {formatCurrency(account.totalCredit)}
                       </span>
                     </span>
-                    <span className="font-semibold text-gray-700">
+                    <span className="font-semibold text-gray-700 whitespace-nowrap">
                       Saldo:{' '}
                       <span className={`font-mono ${account.endBalance >= 0 ? 'text-gray-800' : 'text-red-600'}`}>
                         {formatCurrency(Math.abs(account.endBalance))}
@@ -131,13 +131,13 @@ export default async function LedgerPage({
                               {line.sourceType === 'POS_SALE' ? 'POS' : 'Manual'}
                             </span>
                           </td>
-                          <td className="py-2.5 pr-3 text-right font-mono text-blue-700">
+                          <td className="py-2.5 pr-3 text-right font-mono text-blue-700 whitespace-nowrap">
                             {line.debit > 0 ? formatCurrency(line.debit) : '–'}
                           </td>
-                          <td className="py-2.5 pr-3 text-right font-mono text-rose-600">
+                          <td className="py-2.5 pr-3 text-right font-mono text-rose-600 whitespace-nowrap">
                             {line.credit > 0 ? formatCurrency(line.credit) : '–'}
                           </td>
-                          <td className={`py-2.5 text-right font-mono font-medium ${
+                          <td className={`py-2.5 text-right font-mono font-medium whitespace-nowrap ${
                             line.balance >= 0 ? 'text-gray-800' : 'text-red-600'
                           }`}>
                             {formatCurrency(Math.abs(line.balance))}
@@ -148,13 +148,13 @@ export default async function LedgerPage({
                     <tfoot>
                       <tr className="border-t-2 border-gray-200 font-semibold">
                         <td colSpan={2} className="pt-3 text-xs text-gray-600">Total</td>
-                        <td className="pt-3 text-right font-mono text-blue-700">
+                        <td className="pt-3 text-right font-mono text-blue-700 whitespace-nowrap">
                           {formatCurrency(account.totalDebit)}
                         </td>
-                        <td className="pt-3 text-right font-mono text-rose-600">
+                        <td className="pt-3 text-right font-mono text-rose-600 whitespace-nowrap">
                           {formatCurrency(account.totalCredit)}
                         </td>
-                        <td className={`pt-3 text-right font-mono font-bold ${
+                        <td className={`pt-3 text-right font-mono font-bold whitespace-nowrap ${
                           account.endBalance >= 0 ? 'text-gray-900' : 'text-red-600'
                         }`}>
                           {formatCurrency(Math.abs(account.endBalance))}

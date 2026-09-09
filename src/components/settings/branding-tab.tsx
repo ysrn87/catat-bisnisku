@@ -137,7 +137,7 @@ export function BrandingTab({ storeSlug, storeId, storePlan }: BrandingTabProps)
       <CardContent className="space-y-5">
 
         {/* Preview area */}
-        <div className="flex items-start gap-5">
+        <div className="flex flex-col items-center text-center gap-4 sm:flex-row sm:items-start sm:text-left sm:gap-5">
           <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0 relative">
             {uploading && (
               <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
@@ -158,14 +158,14 @@ export function BrandingTab({ storeSlug, storeId, storePlan }: BrandingTabProps)
             )}
           </div>
 
-          <div className="space-y-2 pt-1">
+          <div className="space-y-2 pt-1 w-full sm:w-auto">
             <p className="text-sm font-medium text-gray-700">{storeName}</p>
             <p className="text-xs text-gray-400 leading-relaxed">
               Format: JPG, PNG, atau WebP<br />
               Ukuran maks: 1MB<br />
               Rekomendasi: persegi (1:1), min. 200×200px
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
               <Button
                 variant="outline"
                 size="sm"

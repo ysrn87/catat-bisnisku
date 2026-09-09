@@ -79,13 +79,14 @@ export default async function AccountsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+              <table className="w-full text-sm min-w-[420px]">
                 <thead>
                   <tr className="border-b text-[10px] text-muted-foreground uppercase tracking-wide">
                     <th className="text-left py-2 pr-3 font-medium w-16">Kode</th>
                     <th className="text-left py-2 pr-3 font-medium">Nama Akun</th>
                     <th className="text-center py-2 pr-3 font-medium w-20">Status</th>
-                    <th className="text-right py-2 font-medium w-24">Aksi</th>
+                    <th className="text-right py-2 font-medium w-16">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -96,18 +97,18 @@ export default async function AccountsPage() {
                     >
                       {/* Kode */}
                       <td className="py-2.5 pr-3">
-                        <span className="font-mono text-xs text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                        <span className="font-mono text-xs text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
                           {account.code}
                         </span>
                       </td>
 
                       {/* Nama */}
-                      <td className="py-2.5 pr-3">
-                        <div className="flex items-center gap-1.5">
+                      <td className="py-2.5 pr-3 max-w-[160px] sm:max-w-none">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           {account.isSystem && (
                             <Lock className="w-3 h-3 text-gray-400 shrink-0" />
                           )}
-                          <span className={`text-sm ${!account.isActive ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                          <span className={`text-sm truncate ${!account.isActive ? 'line-through text-gray-400' : 'text-gray-800'}`}>
                             {account.name}
                           </span>
                         </div>
@@ -117,7 +118,7 @@ export default async function AccountsPage() {
                       <td className="py-2.5 pr-3 text-center">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] px-1.5 ${
+                          className={`text-[10px] px-1.5 whitespace-nowrap ${
                             account.isActive
                               ? 'border-green-200 text-green-700 bg-green-50'
                               : 'border-gray-200 text-gray-400'
@@ -144,6 +145,7 @@ export default async function AccountsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </CardContent>
           </Card>
         );

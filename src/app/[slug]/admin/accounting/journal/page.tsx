@@ -120,25 +120,25 @@ export default async function JournalPage({
                   <p className="text-xs text-gray-600 leading-relaxed">{entry.description}</p>
 
                   {/* Debit */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-gray-400 w-10">{entry.debit.code}</span>
-                      <span className="text-sm text-gray-800">{entry.debit.name}</span>
-                      <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1 rounded">D</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-[10px] text-gray-400 w-10 shrink-0">{entry.debit.code}</span>
+                      <span className="text-sm text-gray-800 truncate">{entry.debit.name}</span>
+                      <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1 rounded shrink-0">D</span>
                     </div>
-                    <span className="font-mono text-sm text-blue-700 font-medium">
+                    <span className="font-mono text-sm text-blue-700 font-medium shrink-0 whitespace-nowrap">
                       {formatCurrency(Number(entry.amount))}
                     </span>
                   </div>
 
                   {/* Kredit — indented */}
-                  <div className="flex items-center justify-between pl-5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-gray-400 w-10">{entry.credit.code}</span>
-                      <span className="text-sm text-gray-500 italic">{entry.credit.name}</span>
-                      <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1 rounded">K</span>
+                  <div className="flex items-center justify-between gap-2 pl-5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-[10px] text-gray-400 w-10 shrink-0">{entry.credit.code}</span>
+                      <span className="text-sm text-gray-500 italic truncate">{entry.credit.name}</span>
+                      <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1 rounded shrink-0">K</span>
                     </div>
-                    <span className="font-mono text-sm text-rose-600 font-medium">
+                    <span className="font-mono text-sm text-rose-600 font-medium shrink-0 whitespace-nowrap">
                       {formatCurrency(Number(entry.amount))}
                     </span>
                   </div>

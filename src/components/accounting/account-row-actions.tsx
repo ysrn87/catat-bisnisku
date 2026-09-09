@@ -75,7 +75,7 @@ export function AccountRowActions({ account }: AccountRowActionsProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-7 w-7 p-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
             disabled={loading}
           >
             <MoreHorizontal className="w-4 h-4" />
