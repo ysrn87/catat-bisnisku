@@ -3,6 +3,14 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDateTime } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Package } from 'lucide-react';
+
+const MOVEMENT_LABELS: Record<string, string> = {
+  PURCHASE: 'Pembelian',
+  SALE: 'Penjualan',
+  ADJUSTMENT: 'Penyesuaian',
+  RETURN: 'Retur',
+  DAMAGED: 'Rusak/Hilang',
+};
 import { Pagination } from '@/components/ui/pagination';
 
 interface StockMovement {
@@ -60,9 +68,9 @@ export function StockMovementsTable({
             <div key={movement.id} className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-3">
                 <div>
-                  {movement.type === 'IN' ? (
+                  {movement.type === 'PURCHASE' || movement.type === 'RETURN' ? (
                     <TrendingUp className="h-5 w-5 text-green-600" />
-                  ) : movement.type === 'OUT' ? (
+                  ) : movement.type === 'SALE' || movement.type === 'DAMAGED' ? (
                     <TrendingDown className="h-5 w-5 text-red-600" />
                   ) : (
                     <Package className="h-5 w-5 text-blue-600" />
@@ -73,7 +81,7 @@ export function StockMovementsTable({
                     {movement.variant.product.name} - {movement.variant.name}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {movement.type} • {movement.quantity} units
+                    {MOVEMENT_LABELS[movement.type] ?? movement.type} • {movement.quantity} units
                     {movement.notes && ` • ${movement.notes}`}
                   </p>
                 </div>

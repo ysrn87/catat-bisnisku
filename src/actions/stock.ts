@@ -11,12 +11,21 @@ export async function adjustStockAction(formData: FormData) {
 
     const variantId = formData.get('variantId') as string;
     // FIX: type sekarang pakai MovementType enum: PURCHASE | ADJUSTMENT | RETURN | DAMAGED
-    const type      = formData.get('type') as 'PURCHASE' | 'ADJUSTMENT' | 'RETURN' | 'DAMAGED';
-    const quantity  = parseInt(formData.get('quantity') as string);
+    const rawType   = formData.get('type') as string;
+    const quantity  = parseInt(formData.get('quantity') as string, 10);
     const notes     = (formData.get('reason') as string) || undefined;
 
-    if (!variantId || !type || !quantity) {
+    const ALLOWED_TYPES = ['PURCHASE', 'ADJUSTMENT', 'RETURN', 'DAMAGED'] as const;
+    type AllowedType = (typeof ALLOWED_TYPES)[number];
+
+    if (!variantId || !ALLOWED_TYPES.includes(rawType as AllowedType) || Number.isNaN(quantity)) {
       return { success: false, error: 'Data tidak lengkap' };
+    }
+    const type = rawType as AllowedType;
+
+    // ADJUSTMENT boleh 0 (stok opname ke nol); tipe lain harus > 0
+    if (quantity < 0 || (type !== 'ADJUSTMENT' && quantity === 0)) {
+      return { success: false, error: 'Kuantitas harus lebih dari 0' };
     }
 
     const variant = await db.productVariant.findFirst({

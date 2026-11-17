@@ -21,6 +21,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   RefreshCw,
+  RotateCcw,
   FileText,
 } from 'lucide-react';
 
@@ -30,7 +31,7 @@ interface StockAdjustmentDialogProps {
   currentStock: number;
 }
 
-type MovementType = 'IN' | 'OUT' | 'ADJUSTMENT' | '';
+type MovementType = 'PURCHASE' | 'RETURN' | 'DAMAGED' | 'ADJUSTMENT' | '';
 
 function FieldLabel({
   icon: Icon,
@@ -57,9 +58,9 @@ function FieldLabel({
 
 const MOVEMENT_TYPES = [
   {
-    value: 'IN' as const,
-    label: 'Stok Masuk',
-    sublabel: 'Tambah stok baru',
+    value: 'PURCHASE' as const,
+    label: 'Pembelian',
+    sublabel: 'Stok masuk, dicatat pengeluaran',
     icon: ArrowDownToLine,
     activeClass: 'border-emerald-500 bg-emerald-50 text-emerald-700',
     dotClass: 'bg-emerald-500',
@@ -67,8 +68,18 @@ const MOVEMENT_TYPES = [
     iconBg: 'bg-emerald-100',
   },
   {
-    value: 'OUT' as const,
-    label: 'Stok Keluar',
+    value: 'RETURN' as const,
+    label: 'Retur',
+    sublabel: 'Stok masuk, tanpa pengeluaran',
+    icon: RotateCcw,
+    activeClass: 'border-sky-500 bg-sky-50 text-sky-700',
+    dotClass: 'bg-sky-500',
+    iconClass: 'text-sky-600',
+    iconBg: 'bg-sky-100',
+  },
+  {
+    value: 'DAMAGED' as const,
+    label: 'Rusak/Hilang',
     sublabel: 'Kurangi stok',
     icon: ArrowUpFromLine,
     activeClass: 'border-red-400 bg-red-50 text-red-700',
@@ -79,7 +90,7 @@ const MOVEMENT_TYPES = [
   {
     value: 'ADJUSTMENT' as const,
     label: 'Refresh Stok',
-    sublabel: 'Sesuaikan stok ',
+    sublabel: 'Set stok sesuai hitungan fisik',
     icon: RefreshCw,
     activeClass: 'border-[#028697] bg-[#028697]/8 text-[#028697]',
     dotClass: 'bg-[#028697]',
@@ -107,14 +118,14 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
   // Preview the resulting stock
   const parsedQty = parseInt(parseNumber(quantity)) || 0;
   const previewStock =
-    movementType === 'IN' ? currentStock + parsedQty
-    : movementType === 'OUT' ? currentStock - parsedQty
+    movementType === 'PURCHASE' || movementType === 'RETURN' ? currentStock + parsedQty
+    : movementType === 'DAMAGED' ? currentStock - parsedQty
     : movementType === 'ADJUSTMENT' ? parsedQty
     : null;
 
   const handleSubmit = async (formData: FormData) => {
     if (!movementType) {
-      toast({ title: 'Pilih tipe pergerakan', description: 'Pilih Stok Masuk, Keluar, atau Penyesuaian.', variant: 'destructive' });
+      toast({ title: 'Pilih tipe pergerakan', description: 'Pilih Pembelian, Retur, Rusak/Hilang, atau Refresh Stok.', variant: 'destructive' });
       return;
     }
     formData.set('quantity', parseNumber(quantity));
@@ -195,7 +206,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
             {/* Movement type selector */}
             <div className="space-y-2">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Tipe Pergerakan <span className="text-red-400">*</span></p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {MOVEMENT_TYPES.map(({ value, icon: Icon, label, sublabel, activeClass, dotClass, iconBg, iconClass }) => {
                   const isActive = movementType === value;
                   return (
@@ -248,9 +259,9 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
                 <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium border ${
                   previewStock < 0
                     ? 'bg-red-50 border-red-200 text-red-700'
-                    : selectedType?.value === 'IN'
+                    : selectedType?.value === 'PURCHASE' || selectedType?.value === 'RETURN'
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : selectedType?.value === 'OUT'
+                    : selectedType?.value === 'DAMAGED'
                     ? 'bg-orange-50 border-orange-200 text-orange-700'
                     : 'bg-[#028697]/5 border-[#028697]/20 text-[#028697]'
                 }`}>
@@ -268,7 +279,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
               <Input
                 id="reason"
                 name="reason"
-                placeholder="Contoh: Restock, Barang rusak, Opname..."
+                placeholder="Contoh: Restock, Retur pelanggan, Barang rusak, Opname..."
                 disabled={loading}
                 maxLength={100}
                 className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
