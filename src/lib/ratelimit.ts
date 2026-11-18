@@ -146,6 +146,19 @@ function getJoinStoreLimiter(): Ratelimit {
   return _joinStoreLimiter;
 }
 
+let _deleteStoreLimiter: Ratelimit | null = null;
+
+function getDeleteStoreLimiter(): Ratelimit {
+  if (!_deleteStoreLimiter) {
+    _deleteStoreLimiter = new Ratelimit({
+      redis:   getRedis(),
+      limiter: Ratelimit.slidingWindow(5, '15 m'),
+      prefix:  'rl:delete-store',
+    });
+  }
+  return _deleteStoreLimiter;
+}
+
 function getAdminPlanSecretLimiter(): Ratelimit {
   if (!_adminPlanSecretLimiter) {
     _adminPlanSecretLimiter = new Ratelimit({
@@ -271,6 +284,11 @@ export async function checkResetPasswordLimit(ip: string): Promise<RateLimitResu
 /** Join toko sebagai member: max 10 per 10 menit per user yang join */
 export async function checkJoinStoreLimit(userId: string): Promise<RateLimitResult> {
   return checkLimit(getJoinStoreLimiter, userId);
+}
+
+/** Hapus toko: max 5 percobaan per 15 menit per user (melindungi password dari brute-force) */
+export async function checkDeleteStoreLimit(userId: string): Promise<RateLimitResult> {
+  return checkLimit(getDeleteStoreLimiter, userId);
 }
 
 /** Endpoint admin /api/store/plan: max 5 percobaan per jam per IP */

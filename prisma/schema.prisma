@@ -620,3 +620,12 @@ enum JournalSourceType {
   POS_SALE
   CASHFLOW
 }
+
+// Slug toko yang baru dihapus ditahan sementara agar tidak langsung dipakai
+// toko lain (mencegah webhook pembayaran lama menaikkan toko baru ke PRO).
+model DeletedStoreSlug {
+  slug      String   @id
+  deletedAt DateTime @default(now())
+
+  @@map("deleted_store_slugs")
+}

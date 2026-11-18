@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { isSlugOnHold } from '@/lib/deleted-slugs';
 import { createHash } from 'crypto';
 
 /**
@@ -83,6 +84,11 @@ export async function POST(request: NextRequest) {
       });
 
       if (!store) {
+        // Toko sudah dihapus pemiliknya: jawab 200 agar Midtrans berhenti mengulang.
+        if (await isSlugOnHold(storeSlug)) {
+          console.warn('[midtrans/webhook] Abaikan: toko sudah dihapus:', storeSlug);
+          return NextResponse.json({ ok: true, ignored: 'store_deleted' });
+        }
         console.error('[midtrans/webhook] Store tidak ditemukan:', storeSlug);
         return NextResponse.json({ error: 'Store not found' }, { status: 404 });
       }

@@ -18,6 +18,7 @@ export default async function SettingsLayout({
         { value: 'categories',    label: 'Kategori',     href: `/${slug}/admin/settings/categories` },
         { value: 'profile',       label: 'Profil', href: `/${slug}/admin/settings/profile` },
         { value: 'subscription',  label: 'Langganan',    href: `/${slug}/admin/settings/subscription` },
+        { value: 'danger',        label: 'Hapus Toko',   href: `/${slug}/admin/settings/danger` },
       ]}
     >
       {children}

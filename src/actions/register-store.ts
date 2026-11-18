@@ -7,6 +7,7 @@ import { headers } from 'next/headers';
 import { checkRegisterStoreLimit, getIP } from '@/lib/ratelimit';
 import { MAX_STORES_PER_USER } from '@/lib/store-context';
 import { isReservedSlug } from '@/lib/reserved-slugs';
+import { isSlugOnHold } from '@/lib/deleted-slugs';
 import { sendEmail, getAppUrl, emailVerificationTemplate } from '@/lib/email';
 import { seedDefaultAccounts } from '@/modules/accounting/lib/journal-engine';
 
@@ -68,7 +69,7 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
 
     // ── Cek slug sudah dipakai ─────────────────────────────────────────────────
     const existingSlug = await db.store.findUnique({ where: { slug: storeSlug } });
-    if (existingSlug) {
+    if (existingSlug || (await isSlugOnHold(storeSlug))) {
       return { success: false, error: `Slug "${storeSlug}" sudah digunakan. Pilih slug lain.` };
     }
 
@@ -213,5 +214,6 @@ export async function checkSlugAvailability(slug: string): Promise<{ available: 
   if (!slug || slug.length < 3) return { available: false };
   if (isReservedSlug(slug)) return { available: false };
   const existing = await db.store.findUnique({ where: { slug } });
-  return { available: !existing };
+  if (existing) return { available: false };
+  return { available: !(await isSlugOnHold(slug)) };
 }
