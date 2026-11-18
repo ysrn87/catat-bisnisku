@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { headers } from 'next/headers';
 import { checkRegisterStoreLimit, getIP } from '@/lib/ratelimit';
 import { MAX_STORES_PER_USER } from '@/lib/store-context';
+import { isReservedSlug } from '@/lib/reserved-slugs';
 import { sendEmail, getAppUrl, emailVerificationTemplate } from '@/lib/email';
 import { seedDefaultAccounts } from '@/modules/accounting/lib/journal-engine';
 
@@ -45,6 +46,9 @@ export async function registerStoreAction(formData: FormData): Promise<RegisterS
     const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     if (!slugRegex.test(storeSlug)) {
       return { success: false, error: 'Slug hanya boleh huruf kecil, angka, dan tanda hubung (-)' };
+    }
+    if (isReservedSlug(storeSlug)) {
+      return { success: false, error: `Slug "${storeSlug}" tidak tersedia. Pilih slug lain.` };
     }
     if (storeSlug.length < 3 || storeSlug.length > 50) {
       return { success: false, error: 'Slug harus antara 3–50 karakter' };
@@ -207,6 +211,7 @@ export async function checkEmailForStore(email: string): Promise<{ exists: boole
 
 export async function checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
   if (!slug || slug.length < 3) return { available: false };
+  if (isReservedSlug(slug)) return { available: false };
   const existing = await db.store.findUnique({ where: { slug } });
   return { available: !existing };
 }

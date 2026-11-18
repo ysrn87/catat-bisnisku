@@ -43,7 +43,7 @@ const plans = [
     period: '/ bulan',
     highlight: true,
     features: [
-      { label: 'Hingga 1.000 produk (10 varian/produk)', ok: true },
+      { label: 'Hingga 1.000 produk (varian tak terbatas)', ok: true },
       { label: 'Hingga 5 Manager',        ok: true },
       { label: 'Kasir & Penjualan',       ok: true },
       { label: 'Sistem Poin Member',      ok: true },

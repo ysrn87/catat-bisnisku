@@ -2,7 +2,7 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { getStoreContext } from '@/lib/store-context';
-import { PLAN_LIMITS } from '@/lib/store-context';
+import { PLAN_LIMITS, getEffectiveLimits, getPlanLevelLimits } from '@/lib/store-context';
 import { SubscriptionClient } from '@/components/settings/subscription-client';
 
 export default async function SubscriptionPage({
@@ -28,6 +28,23 @@ export default async function SubscriptionPage({
   });
   if (!store) redirect('/store-select');
 
+  // Batas efektif: override toko → konfigurasi global paket → default kode
+  const [effective, proLevel] = await Promise.all([
+    getEffectiveLimits(storeId, storePlan),
+    getPlanLevelLimits('PRO'),
+  ]);
+  type L = { products: number; managers: number; cashiers: number; dailyTransactions: number };
+  const planLimits: { FREE: L; PRO: L } = {
+    FREE: { products: PLAN_LIMITS.FREE.products, managers: PLAN_LIMITS.FREE.managers, cashiers: PLAN_LIMITS.FREE.cashiers, dailyTransactions: PLAN_LIMITS.FREE.dailyTransactions },
+    PRO:  { products: proLevel.products, managers: proLevel.managers, cashiers: proLevel.cashiers, dailyTransactions: PLAN_LIMITS.PRO.dailyTransactions },
+  };
+  planLimits[storePlan] = {
+    ...planLimits[storePlan],
+    products: effective.products,
+    managers: effective.managers,
+    cashiers: effective.cashiers,
+  };
+
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
@@ -50,7 +67,7 @@ export default async function SubscriptionPage({
       plan={store.plan as 'FREE' | 'PRO'}
       planExpiresAt={store.planExpiresAt?.toISOString() ?? null}
       usage={{ productCount, managerCount, cashierCount, todayTxCount }}
-      planLimits={PLAN_LIMITS}
+      planLimits={planLimits}
       paymentHistory={paymentHistory.map((p) => ({
         ...p,
         amount: Number(p.amount),

@@ -154,7 +154,8 @@ export async function createVariantAction(formData: FormData) {
     if (!limit.allowed) {
       return {
         success: false,
-        error: `Batas varian per produk tercapai (${limit.current}/${limit.limit}). Upgrade ke PRO untuk hingga 10 varian per produk.`,
+        error: `Batas varian per produk tercapai (${limit.current}/${limit.limit}).` +
+          (limit.plan === 'FREE' ? ' Upgrade ke PRO untuk varian tak terbatas.' : ' Hubungi admin untuk menambah batas.'),
       };
     }
 

@@ -110,6 +110,7 @@ model Store {
   invitations     StaffInvitation[]
   accounts        Account[]
   journalEntries  JournalEntry[]
+  limitOverride   StoreLimitOverride?
 
   @@map("stores")
 }
@@ -524,6 +525,52 @@ enum MemberTier {
 enum Plan {
   FREE
   PRO
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BATAS PAKET YANG DIATUR SUPERADMIN
+// Urutan prioritas: StoreLimitOverride → PlanLimitConfig → PLAN_LIMITS (kode)
+// Nilai: null = ikut level di atasnya, -1 = tak terbatas, >= 1 = batas
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PlanLimitConfig {
+  plan               Plan     @id
+  products           Int?
+  variantsPerProduct Int?
+  managers           Int?
+  cashiers           Int?
+  updatedById        String?
+  updatedAt          DateTime @updatedAt
+
+  @@map("plan_limit_configs")
+}
+
+model StoreLimitOverride {
+  storeId            String   @id
+  products           Int?
+  variantsPerProduct Int?
+  managers           Int?
+  cashiers           Int?
+  updatedById        String?
+  updatedAt          DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("store_limit_overrides")
+}
+
+model SuperAdminAuditLog {
+  id          String   @id @default(cuid())
+  actorId     String
+  actorEmail  String
+  scope       String   // 'PLAN' | 'STORE'
+  targetId    String   // nama paket atau storeId
+  targetLabel String
+  changes     Json
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("superadmin_audit_logs")
 }
 
 enum ProductType {

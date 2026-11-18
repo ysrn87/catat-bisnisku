@@ -39,20 +39,23 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+function feature(n: number, noun: string) {
+  return Number.isFinite(n) ? `${n.toLocaleString('id-ID')} ${noun}` : `${noun[0].toUpperCase()}${noun.slice(1)} tak terbatas`;
+}
+
 function UsageBar({
   label,
   icon: Icon,
   current,
   limit,
-  isPro,
 }: {
   label: string;
   icon: React.ElementType;
   current: number;
   limit: number;
-  isPro: boolean;
+  isPro?: boolean;
 }) {
-  if (isPro) {
+  if (!Number.isFinite(limit)) {
     return (
       <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
         <div className="flex items-center gap-2.5 text-sm text-gray-700">
@@ -208,12 +211,12 @@ export function SubscriptionClient({ storeSlug, plan, planExpiresAt, usage, plan
             <p className="text-xs text-gray-500 font-medium mb-2.5">Dengan PRO kamu dapat:</p>
             <div className="grid grid-cols-2 gap-1.5">
               {[
-                `${proLimits.products} produk`,
-                `${proLimits.managers} manager`,
+                feature(proLimits.products, 'produk'),
+                feature(proLimits.managers, 'manager'),
                 'Export Excel',
                 'Custom branding',
                 'Transaksi unlimited',
-                `${proLimits.cashiers} kasir`,
+                feature(proLimits.cashiers, 'kasir'),
               ].map((f) => (
                 <div key={f} className="flex items-center gap-1.5 text-xs text-gray-600">
                   <CheckCircle2 className="w-3 h-3 text-[#028697] flex-shrink-0" />

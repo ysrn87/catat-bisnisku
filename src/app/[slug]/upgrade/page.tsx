@@ -13,7 +13,7 @@ import { UpgradeButton } from '@/components/plan/upgrade-button';
 import { PLAN_LIMITS } from '@/lib/store-context';
 
 const proFeatures = [
-  { icon: Package,  label: 'Hingga 1.000 produk',        desc: 'Maksimal 10 varian per produk' },
+  { icon: Package,  label: 'Hingga 1.000 produk',        desc: 'Varian per produk tak terbatas' },
   { icon: Users,    label: 'Hingga 5 manager',           desc: 'Kelola toko dengan lebih banyak staf' },
   { icon: FileDown, label: 'Export laporan (Excel)',      desc: 'Download semua laporan dalam format Excel' },
   { icon: Palette,  label: 'Custom branding',            desc: 'Upload logo toko sesuai brand kamu' },

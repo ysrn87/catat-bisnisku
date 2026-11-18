@@ -41,6 +41,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ─── Area superadmin ──────────────────────────────────────────────────────
+  // Halaman login superadmin publik; sisanya wajib session dengan isSuperAdmin.
+  // Catatan: ini hanya lapis pertama. Setiap page/action tetap memverifikasi
+  // ulang ke database (lihat lib/superadmin.ts) karena flag di JWT bisa basi.
+  if (pathname === '/superadmin/login') {
+    return NextResponse.next();
+  }
+  if (pathname === '/superadmin' || pathname.startsWith('/superadmin/')) {
+    const session = await auth();
+    if (!session) {
+      return NextResponse.redirect(new URL('/superadmin/login', request.url));
+    }
+    if (!session.user?.isSuperAdmin) {
+      return NextResponse.redirect(new URL('/unauthorized', request.url));
+    }
+    return NextResponse.next();
+  }
+
   // Skip: route publik
   if (PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'))) {
     return NextResponse.next();
