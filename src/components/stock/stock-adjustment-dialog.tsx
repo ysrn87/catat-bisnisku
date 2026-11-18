@@ -34,11 +34,13 @@ interface StockAdjustmentDialogProps {
 type MovementType = 'PURCHASE' | 'RETURN' | 'DAMAGED' | 'ADJUSTMENT' | '';
 
 function FieldLabel({
+  htmlFor,
   icon: Icon,
   label,
   required,
   hint,
 }: {
+  htmlFor?: string;
   icon?: React.ElementType;
   label: string;
   required?: boolean;
@@ -46,7 +48,7 @@ function FieldLabel({
 }) {
   return (
     <div className="flex items-center justify-between mb-1.5">
-      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-widest">
+      <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-widest">
         {Icon && <Icon className="w-3 h-3" />}
         {label}
         {required && <span className="text-red-400 ml-0.5">*</span>}
@@ -60,22 +62,16 @@ const MOVEMENT_TYPES = [
   {
     value: 'PURCHASE' as const,
     label: 'Pembelian',
-    sublabel: 'Stok masuk, dicatat pengeluaran',
+    sublabel: 'Masuk, catat pengeluaran',
     icon: ArrowDownToLine,
     activeClass: 'border-emerald-500 bg-emerald-50 text-emerald-700',
-    dotClass: 'bg-emerald-500',
-    iconClass: 'text-emerald-600',
-    iconBg: 'bg-emerald-100',
   },
   {
     value: 'RETURN' as const,
     label: 'Retur',
-    sublabel: 'Stok masuk, tanpa pengeluaran',
+    sublabel: 'Masuk, tanpa pengeluaran',
     icon: RotateCcw,
     activeClass: 'border-sky-500 bg-sky-50 text-sky-700',
-    dotClass: 'bg-sky-500',
-    iconClass: 'text-sky-600',
-    iconBg: 'bg-sky-100',
   },
   {
     value: 'DAMAGED' as const,
@@ -83,19 +79,13 @@ const MOVEMENT_TYPES = [
     sublabel: 'Kurangi stok',
     icon: ArrowUpFromLine,
     activeClass: 'border-red-400 bg-red-50 text-red-700',
-    dotClass: 'bg-red-400',
-    iconClass: 'text-red-500',
-    iconBg: 'bg-red-100',
   },
   {
     value: 'ADJUSTMENT' as const,
     label: 'Refresh Stok',
-    sublabel: 'Set stok sesuai hitungan fisik',
+    sublabel: 'Set sesuai hitungan fisik',
     icon: RefreshCw,
-    activeClass: 'border-[#028697] bg-[#028697]/8 text-[#028697]',
-    dotClass: 'bg-[#028697]',
-    iconClass: 'text-[#028697]',
-    iconBg: 'bg-[#028697]/10',
+    activeClass: 'border-[#028697] bg-[#028697]/5 text-[#028697]',
   },
 ];
 
@@ -159,37 +149,37 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className=" h-7 w-24 text-xs border-gray-200 hover:border-[#028697] hover:text-[#028697] transition-colors">
-          <SlidersHorizontal className="w-1 h-1" />
+        <Button variant="outline" size="sm" className="h-7 w-24 text-xs border-gray-200 hover:border-[#028697] hover:text-[#028697] transition-colors">
+          <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
           Atur Stok
         </Button>
       </DialogTrigger>
 
       <DialogContent
         aria-describedby={undefined}
-        className="sm:max-w-[460px] p-0 gap-0 overflow-hidden border-0 shadow-2xl"
+        className="sm:max-w-[460px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col"
       >
         {/* Header band */}
-        <div className="relative bg-gradient-to-br from-[#028697] to-[#015561] px-6 pt-6 pb-8">
+        <div className="relative bg-gradient-to-br from-[#028697] to-[#015561] px-5 sm:px-6 pt-5 sm:pt-6 pb-5 sm:pb-6 shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-8 w-16 h-16 rounded-full bg-white/5 translate-y-1/2 pointer-events-none" />
 
-          <div className="relative flex items-center gap-3">
+          <div className="relative flex items-center gap-3 pr-6">
             <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
               <SlidersHorizontal className="w-5 h-5 text-white" />
             </div>
-            <DialogHeader className="space-y-0.5 text-left p-0">
+            <DialogHeader className="space-y-0.5 text-left p-0 min-w-0">
               <DialogTitle className="text-white text-lg font-semibold leading-tight">
                 Atur Stok
               </DialogTitle>
-              <p className="text-white/65 text-xs font-normal truncate max-w-[260px]">
+              <p className="text-white/65 text-xs font-normal truncate">
                 {variantName}
               </p>
             </DialogHeader>
           </div>
 
           {/* Current stock badge */}
-          <div className="relative mt-4 inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-xl px-3 py-2">
+          <div className="relative mt-3 inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-xl px-3 py-2">
             <Package className="w-3.5 h-3.5 text-white/70" />
             <span className="text-white/70 text-[11px] font-medium">Stok Saat Ini</span>
             <span className="text-white text-base font-bold ml-1">{currentStock.toLocaleString('id-ID')}</span>
@@ -197,17 +187,17 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
           </div>
         </div>
 
-        {/* Form body */}
-        <form action={handleSubmit}>
+        {/* Form — body scrollable, footer tetap terlihat */}
+        <form action={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <input type="hidden" name="variantId" value={variantId} />
 
-          <div className="px-6 pt-5 pb-2 space-y-5">
+          <div className="px-5 sm:px-6 pt-5 pb-3 space-y-4 overflow-y-auto flex-1">
 
             {/* Movement type selector */}
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Tipe Pergerakan <span className="text-red-400">*</span></p>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Tipe Pergerakan <span className="text-red-400">*</span></p>
               <div className="grid grid-cols-2 gap-2">
-                {MOVEMENT_TYPES.map(({ value, icon: Icon, label, sublabel, activeClass, dotClass, iconBg, iconClass }) => {
+                {MOVEMENT_TYPES.map(({ value, icon: Icon, label, sublabel, activeClass }) => {
                   const isActive = movementType === value;
                   return (
                     <button
@@ -215,22 +205,18 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
                       type="button"
                       onClick={() => setMovementType(value)}
                       disabled={loading}
-                      className={`relative flex flex-col items-center gap-2 rounded-xl border-2 px-3 py-3 text-center transition-all duration-200 disabled:opacity-50 ${
+                      aria-pressed={isActive}
+                      className={`flex items-center gap-2.5 rounded-xl border-2 px-3 py-2.5 min-h-[52px] text-left transition-all disabled:opacity-50 ${
                         isActive
                           ? activeClass
-                          : 'border-gray-100 bg-gray-50/60 text-gray-500 hover:border-gray-200 hover:bg-gray-50'
+                          : 'border-gray-100 bg-gray-50/60 text-gray-500 hover:border-gray-200'
                       }`}
                     >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isActive ? iconBg : 'bg-gray-100'}`}>
-                        <Icon className={`w-4 h-4 ${isActive ? iconClass : 'text-gray-400'}`} />
-                      </div>
-                      <div>
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <div className="min-w-0">
                         <p className="text-xs font-semibold leading-tight">{label}</p>
                         <p className="text-[10px] opacity-60 leading-tight mt-0.5">{sublabel}</p>
                       </div>
-                      {isActive && (
-                        <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${dotClass}`} />
-                      )}
                     </button>
                   );
                 })}
@@ -241,11 +227,13 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
 
             {/* Quantity */}
             <div>
-              <FieldLabel icon={Plus} label="Kuantitas" required />
+              <FieldLabel htmlFor="quantity" icon={Plus} label="Kuantitas" required />
               <Input
                 id="quantity"
                 name="quantity"
                 type="tel"
+                inputMode="numeric"
+                autoComplete="off"
                 required
                 value={quantity}
                 onChange={(e) => handleNumberChange(e.target.value)}
@@ -255,8 +243,8 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
               />
 
               {/* Stock preview */}
-              {parsedQty > 0 && movementType && previewStock !== null && (
-                <div className={`mt-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium border ${
+              {quantity !== '' && movementType && previewStock !== null && (
+                <div className={`mt-2 flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-medium border ${
                   previewStock < 0
                     ? 'bg-red-50 border-red-200 text-red-700'
                     : selectedType?.value === 'PURCHASE' || selectedType?.value === 'RETURN'
@@ -266,7 +254,7 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
                     : 'bg-[#028697]/5 border-[#028697]/20 text-[#028697]'
                 }`}>
                   <span>Stok setelah perubahan</span>
-                  <span className="font-bold text-sm">
+                  <span className="font-bold text-sm whitespace-nowrap">
                     {previewStock < 0 ? '⚠ Tidak cukup' : `${previewStock.toLocaleString('id-ID')} unit`}
                   </span>
                 </div>
@@ -275,11 +263,12 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
 
             {/* Notes */}
             <div>
-              <FieldLabel icon={FileText} label="Keterangan" hint="Opsional" />
+              <FieldLabel htmlFor="reason" icon={FileText} label="Keterangan" hint="Opsional" />
               <Input
                 id="reason"
                 name="reason"
-                placeholder="Contoh: Restock, Retur pelanggan, Barang rusak, Opname..."
+                autoComplete="off"
+                placeholder="Contoh: Restock, Retur, Barang rusak, Opname"
                 disabled={loading}
                 maxLength={100}
                 className="h-10 border-gray-200 focus-visible:ring-[#028697]/30 focus-visible:border-[#028697] transition-colors placeholder:text-gray-300"
@@ -288,12 +277,12 @@ export function StockAdjustmentDialog({ variantId, variantName, currentStock }: 
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between gap-3 px-6 py-4 mt-2 border-t border-gray-100 bg-gray-50/50">
+          <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/50 shrink-0">
             <button
               type="button"
               onClick={() => setOpen(false)}
               disabled={loading}
-              className="text-sm text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+              className="text-sm text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 py-2 pr-2"
             >
               Batal
             </button>
