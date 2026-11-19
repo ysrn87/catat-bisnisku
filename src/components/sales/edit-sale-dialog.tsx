@@ -540,7 +540,7 @@ export function EditSaleDialog({
                   <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CASH">💵 Cash</SelectItem>
-                    <SelectItem value="CARD">💳 Kartu</SelectItem>
+                    <SelectItem value="QRIS">💳 QRIS</SelectItem>
                     <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
                   </SelectContent>
                 </Select>
