@@ -10,6 +10,7 @@ export const STORE_SCOPED_MODELS = [
   'ProductVariant', 'Product', 'Category', 'Account', 'Customer',
   'StoreUser', 'StoreStaff', 'StaffInvitation', 'StoreSetting',
   'UpgradePayment', 'StoreLimitOverride',
+  'Combo', 'ComboItem', 'ComboItemVariant', 'SaleCombo',
 ] as const;
 
 /** Model tanpa storeId yang terhapus lewat induknya (dihapus eksplisit di bawah). */
@@ -33,12 +34,16 @@ export async function purgeStoreData(
 ): Promise<void> {
   const storeId = store.id;
 
+  await tx.comboItemVariant.deleteMany({ where: { storeId } });
+  await tx.comboItem.deleteMany({ where: { storeId } });
+  await tx.combo.deleteMany({ where: { storeId } });
   await tx.journalEntry.deleteMany({ where: { storeId } });
   await tx.cashflow.deleteMany({ where: { storeId } });
   await tx.stockMovement.deleteMany({ where: { storeId } });
   await tx.payment.deleteMany({ where: { storeId } });
   await tx.pointHistory.deleteMany({ where: { storeUser: { storeId } } });
   await tx.saleItem.deleteMany({ where: { sale: { storeId } } });
+  await tx.saleCombo.deleteMany({ where: { storeId } });
   await tx.sale.deleteMany({ where: { storeId } });
   await tx.productVariant.deleteMany({ where: { storeId } });
   await tx.product.deleteMany({ where: { storeId } });
@@ -80,6 +85,10 @@ export async function purgeStoreData(
     StoreSetting:       await tx.storeSetting.count({ where: { storeId } }),
     UpgradePayment:     await tx.upgradePayment.count({ where: { storeId } }),
     StoreLimitOverride: await tx.storeLimitOverride.count({ where: { storeId } }),
+    Combo:              await tx.combo.count({ where: { storeId } }),
+    ComboItem:          await tx.comboItem.count({ where: { storeId } }),
+    ComboItemVariant:   await tx.comboItemVariant.count({ where: { storeId } }),
+    SaleCombo:          await tx.saleCombo.count({ where: { storeId } }),
   };
   const leftovers = Object.entries(residue).filter(([, n]) => n > 0);
   if (leftovers.length > 0 || (await tx.store.count({ where: { id: storeId } })) > 0) {

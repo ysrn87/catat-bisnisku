@@ -67,11 +67,13 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       icon: <Package className="w-4 h-4" />,
       matchPaths: [
         `${base}/admin/inventory/products`,
+        `${base}/admin/inventory/combos`,
         `${base}/admin/inventory/stock`,
         `${base}/admin/inventory/reports`,
       ],
       subItems: [
         { href: `${base}/admin/inventory/products`, label: 'Produk' },
+        { href: `${base}/admin/inventory/combos`,   label: 'Paket' },
         { href: `${base}/admin/inventory/stock`,    label: 'Stok' },
         { href: `${base}/admin/inventory/reports`,  label: 'Laporan' },
       ],
@@ -132,12 +134,14 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
         `${base}/admin/settings/categories`,
         `${base}/admin/settings/profile`,
         `${base}/admin/settings/subscription`,
+        `${base}/admin/settings/danger`,
       ],
       subItems: [
         { href: `${base}/admin/settings/points`,       label: 'Poin' },
         { href: `${base}/admin/settings/categories`,   label: 'Kategori' },
         { href: `${base}/admin/settings/profile`,      label: 'Profil' },
         { href: `${base}/admin/settings/subscription`, label: 'Langganan' },
+        { href: `${base}/admin/settings/danger`,       label: 'Hapus Toko' },
       ],
     },
   ];
@@ -237,10 +241,17 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  // Sub-item aktif = kecocokan TERPANJANG (mis. /admin/summary menang atas /admin) dan
+  // dibatasi segmen path (/stock tidak cocok dengan /stock-opname). Dipakai sidebar & breadcrumb.
+  const findActiveSub = (item?: NavItem) =>
+    item?.subItems
+      ? [...item.subItems]
+          .sort((a, b) => b.href.length - a.href.length)
+          .find((sub) => pathname === sub.href || pathname.startsWith(`${sub.href}/`))
+      : undefined;
+
   const activeItem = navItems.find((item) => isNavItemActive(item));
-  const activeSub = activeItem?.subItems?.find(
-    (sub) => pathname === sub.href || pathname.startsWith(sub.href)
-  );
+  const activeSub = findActiveSub(activeItem);
 
   return (
     <>
@@ -270,11 +281,7 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
             const hasSub = !!item.subItems;
             const isExpanded = expandedHref === item.href;
 
-            const matchedSub = isActive && item.subItems
-              ? [...item.subItems]
-                  .sort((a, b) => b.href.length - a.href.length)
-                  .find((sub) => pathname === sub.href || pathname.startsWith(sub.href))
-              : undefined;
+            const matchedSub = isActive ? findActiveSub(item) : undefined;
 
             return (
               <div key={item.href}>

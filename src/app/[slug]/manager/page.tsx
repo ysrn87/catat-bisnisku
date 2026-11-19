@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Package, ShoppingCart, Users, DollarSign } from 'lucide-react';
 import { DashboardTabs } from '@/components/pos/dashboard-tabs';
 import { PosPanel } from '@/components/pos/pos-panel';
+import { getCombosForPos } from '@/actions/combos';
 import { getPointsConversionRate } from '@/actions/settings';
 
 async function getManagerStats(storeId: string) {
@@ -136,7 +137,7 @@ export default async function ManagerDashboard({ params }: { params: Promise<{ s
   );
 
   const PosContent = (
-    <PosPanel variants={posVariants} members={members} walkInCustomers={nonMembers} conversionRate={conversionRate} storeSlug={slug} storeName={store?.name ?? 'Toko'} cashierName={session?.user?.name ?? undefined} />
+    <PosPanel combos={await getCombosForPos()} variants={posVariants} members={members} walkInCustomers={nonMembers} conversionRate={conversionRate} storeSlug={slug} storeName={store?.name ?? 'Toko'} cashierName={session?.user?.name ?? undefined} />
   );
 
   return <DashboardTabs ringkasanContent={RingkasanContent} posContent={PosContent} />;

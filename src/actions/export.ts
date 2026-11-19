@@ -30,10 +30,18 @@ export async function getSalesExportData() {
           variant: { include: { product: { select: { name: true } } } },
         },
       },
+      combos: { select: { id: true, name: true, discount: true } },
     },
   });
 
-  const rows = sales.map((s) => ({
+  const rows = sales.map((s) => {
+    const comboDiscount = s.combos.reduce((sum, c) => sum + Number(c.discount), 0);
+    const itemLabel = (i: (typeof s.items)[number]) => `${i.variant.product.name} - ${i.variant.name} (${i.quantity})`;
+    const itemParts = [
+      ...s.items.filter((i) => !i.saleComboId).map(itemLabel),
+      ...s.combos.map((c) => `Paket ${c.name}: ${s.items.filter((i) => i.saleComboId === c.id).map(itemLabel).join(', ')}`),
+    ];
+    return {
     'No. Transaksi': sanitizeCsvValue(s.saleNumber),
     'Tanggal':       s.createdAt.toLocaleDateString('id-ID', {
       day: '2-digit', month: '2-digit', year: 'numeric',
@@ -45,14 +53,14 @@ export async function getSalesExportData() {
     // FIX: s.paymentStatus → s.payment?.status
     'Status':        sanitizeCsvValue(s.payment?.status ?? '-'),
     'Subtotal':      Number(s.subtotal),
-    'Diskon':        Number(s.discount),
+    'Diskon':        Number(s.discount) - comboDiscount,
+    'Diskon Paket':  comboDiscount,
     'Pajak':         Number(s.tax),
     'Ongkir':        Number(s.ongkir ?? 0),
     'Total':         Number(s.total),
-    'Item':          sanitizeCsvValue(
-      s.items.map((i) => `${i.variant.product.name} - ${i.variant.name} (${i.quantity})`).join('; ')
-    ),
-  }));
+    'Item':          sanitizeCsvValue(itemParts.join('; ')),
+    };
+  });
 
   return { success: true as const, data: rows, filename: `laporan-penjualan-${Date.now()}` };
 }

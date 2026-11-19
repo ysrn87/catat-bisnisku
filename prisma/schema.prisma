@@ -27,11 +27,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  ownedStores        Store[]           @relation("StoreOwner")
+  ownedStores        Store[]             @relation("StoreOwner")
   staffRecords       StoreStaff[]
   storeUsers         StoreUser[]
   linkedCustomers    Customer[]
-  sentInvitations    StaffInvitation[] @relation("InvitedBy")
+  sentInvitations    StaffInvitation[]   @relation("InvitedBy")
   emailVerifications EmailVerification[]
   passwordResets     PasswordReset[]
 
@@ -94,7 +94,7 @@ model Store {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  owner           User              @relation("StoreOwner", fields: [ownerId], references: [id])
+  owner           User                @relation("StoreOwner", fields: [ownerId], references: [id])
   staffMembers    StoreStaff[]
   storeUsers      StoreUser[]
   customers       Customer[]
@@ -111,6 +111,11 @@ model Store {
   accounts        Account[]
   journalEntries  JournalEntry[]
   limitOverride   StoreLimitOverride?
+
+  combos            Combo[]
+  comboItems        ComboItem[]
+  comboItemVariants ComboItemVariant[]
+  saleCombos        SaleCombo[]
 
   @@map("stores")
 }
@@ -192,12 +197,12 @@ model StoreUser {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Customer {
-  id        String   @id @default(cuid())
-  storeId   String
-  name      String
-  phone     String?
-  address   String?
-  userId    String?  // diisi setelah upgrade ke member
+  id      String  @id @default(cuid())
+  storeId String
+  name    String
+  phone   String?
+  address String?
+  userId  String? // diisi setelah upgrade ke member
 
   createdAt DateTime @default(now())
 
@@ -215,19 +220,20 @@ model Customer {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Product {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   storeId     String
   categoryId  String?
   name        String
   sku         String
   description String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  category Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  variants ProductVariant[]
+  store      Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category   Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  variants   ProductVariant[]
+  comboItems ComboItem[]
 
   @@unique([storeId, sku])
   @@map("products")
@@ -254,10 +260,11 @@ model ProductVariant {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  saleItems      SaleItem[]
-  stockMovements StockMovement[]
+  store             Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product           Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  saleItems         SaleItem[]
+  stockMovements    StockMovement[]
+  comboItemVariants ComboItemVariant[]
 
   @@unique([storeId, sku])
   @@unique([storeId, barcode])
@@ -291,9 +298,9 @@ model Category {
 model Sale {
   id           String   @id @default(cuid())
   storeId      String
-  cashierId    String   // → StoreStaff.id
-  customerId   String?  // → Customer.id  (walk-in lokal)
-  memberId     String?  // → StoreUser.id (member loyalty)
+  cashierId    String // → StoreStaff.id
+  customerId   String? // → Customer.id  (walk-in lokal)
+  memberId     String? // → StoreUser.id (member loyalty)
   saleNumber   String
   subtotal     Decimal  @db.Decimal(10, 2)
   discount     Decimal  @default(0) @db.Decimal(10, 2)
@@ -312,22 +319,27 @@ model Sale {
   payment        Payment?
   pointHistories PointHistory[]
   cashflow       Cashflow?
+  combos         SaleCombo[]
 
   @@unique([storeId, saleNumber])
   @@map("sales")
 }
 
 model SaleItem {
-  id        String  @id @default(cuid())
-  saleId    String
-  variantId String
-  quantity  Int
-  price     Decimal @db.Decimal(10, 2)
-  subtotal  Decimal @db.Decimal(10, 2)
+  id          String  @id @default(cuid())
+  saleId      String
+  variantId   String
+  quantity    Int
+  price       Decimal @db.Decimal(10, 2)
+  subtotal    Decimal @db.Decimal(10, 2)
+  saleComboId String?
 
   sale    Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
   variant ProductVariant @relation(fields: [variantId], references: [id])
 
+  saleCombo SaleCombo? @relation(fields: [saleComboId], references: [id], onDelete: SetNull)
+
+  @@index([saleComboId])
   @@map("sale_items")
 }
 
@@ -423,8 +435,8 @@ model Cashflow {
 model Account {
   id        String      @id @default(cuid())
   storeId   String
-  code      String      // e.g. "1001"
-  name      String      // e.g. "Kas"
+  code      String // e.g. "1001"
+  name      String // e.g. "Kas"
   type      AccountType // ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE
   isSystem  Boolean     @default(false) // true = tidak boleh dihapus user
   isActive  Boolean     @default(true)
@@ -448,11 +460,11 @@ model JournalEntry {
   amount      Decimal           @db.Decimal(10, 2)
   description String
   sourceType  JournalSourceType // POS_SALE | CASHFLOW
-  sourceId    String            // Sale.id | Cashflow.id
+  sourceId    String // Sale.id | Cashflow.id
   createdAt   DateTime          @default(now())
 
   store  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  debit  Account @relation("DebitAccount",  fields: [debitId],  references: [id])
+  debit  Account @relation("DebitAccount", fields: [debitId], references: [id])
   credit Account @relation("CreditAccount", fields: [creditId], references: [id])
 
   @@index([storeId, date])
@@ -563,8 +575,8 @@ model SuperAdminAuditLog {
   id          String   @id @default(cuid())
   actorId     String
   actorEmail  String
-  scope       String   // 'PLAN' | 'STORE'
-  targetId    String   // nama paket atau storeId
+  scope       String // 'PLAN' | 'STORE'
+  targetId    String // nama paket atau storeId
   targetLabel String
   changes     Json
   createdAt   DateTime @default(now())
@@ -628,4 +640,85 @@ model DeletedStoreSlug {
   deletedAt DateTime @default(now())
 
   @@map("deleted_store_slugs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAKET (COMBO)
+// Combo → ComboItem (1 slot per PRODUK) → ComboItemVariant (varian yang boleh dipilih kasir)
+// Slot dengan 1 varian = otomatis ikut; > 1 varian = kasir memilih salah satu.
+// Saat dijual, isi paket "dipecah" menjadi SaleItem biasa (harga satuan) dan
+// dikelompokkan oleh SaleCombo (snapshot nama, harga paket, diskon).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Combo {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items      ComboItem[]
+  saleCombos SaleCombo[]
+
+  @@unique([storeId, name])
+  @@index([storeId])
+  @@map("combos")
+}
+
+model ComboItem {
+  id         String  @id @default(cuid())
+  storeId    String
+  comboId    String
+  productId  String
+  isRequired Boolean @default(true)
+  sortOrder  Int     @default(0)
+
+  store    Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  combo    Combo              @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  product  Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variants ComboItemVariant[]
+
+  @@unique([comboId, productId])
+  @@index([storeId])
+  @@map("combo_items")
+}
+
+model ComboItemVariant {
+  id          String @id @default(cuid())
+  storeId     String
+  comboItemId String
+  variantId   String
+  sortOrder   Int    @default(0)
+
+  store     Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  comboItem ComboItem      @relation(fields: [comboItemId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([comboItemId, variantId])
+  @@index([storeId])
+  @@map("combo_item_variants")
+}
+
+model SaleCombo {
+  id           String   @id @default(cuid())
+  storeId      String
+  saleId       String
+  comboId      String?
+  name         String
+  packagePrice Decimal  @db.Decimal(10, 2)
+  itemsTotal   Decimal  @db.Decimal(10, 2)
+  discount     Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+
+  store Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sale  Sale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  combo Combo?     @relation(fields: [comboId], references: [id], onDelete: SetNull)
+  items SaleItem[]
+
+  @@index([saleId])
+  @@index([storeId])
+  @@map("sale_combos")
 }

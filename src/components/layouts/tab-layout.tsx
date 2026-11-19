@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useTransition } from 'react';
+import { useEffect, useRef, useTransition } from 'react';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { triggerLoader } from '@/components/layouts/navigation-loader';
@@ -26,12 +26,19 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
   const pathname = usePathname();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const listRef = useRef<HTMLDivElement>(null);
 
   const currentTab = [...tabs]
     .sort((a, b) => (b.href?.length ?? 0) - (a.href?.length ?? 0))
     .find((t) =>
       t.href ? pathname === t.href || pathname.startsWith(t.href + '/') : pathname.endsWith(t.value)
     )?.value ?? tabs[0].value;
+
+  // Tab bisa banyak & digulir horizontal di layar sempit: pastikan tab aktif selalu terlihat
+  useEffect(() => {
+    const active = listRef.current?.querySelector<HTMLElement>('[data-state="active"]');
+    active?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
+  }, [currentTab]);
 
   const handleTabClick = (href: string) => {
     triggerLoader();
@@ -58,6 +65,7 @@ export function TabLayout({ title, description, tabs, children, useRouterPush = 
             saat jumlah tab banyak di layar sempit. */}
         <div className="lg:hidden sticky top-16 z-30 bg-gray-50 -mx-4 px-4 md:-mx-6 md:px-6 py-3 border-b border-gray-200 shadow-sm">
           <TabsList
+            ref={listRef}
             className="flex w-full h-auto justify-start gap-1 overflow-x-auto scrollbar-hide p-1 -mx-1 px-1"
           >
             {tabs.map((tab) =>

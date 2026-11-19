@@ -41,7 +41,10 @@ async function getRecapData(storeId: string, params: {
 
   const items = await db.saleItem.findMany({
     where: { sale: saleWhere, variant: variantWhere },
-    include: { variant: { include: { product: true } } },
+    include: {
+      variant:   { include: { product: true } },
+      saleCombo: { select: { itemsTotal: true, discount: true } },
+    },
   });
 
   const map = new Map<string, RecapRow>();
@@ -49,7 +52,10 @@ async function getRecapData(storeId: string, params: {
     const { variant } = item;
     const existing = map.get(variant.id);
     const qty = item.quantity;
-    const subtotal = Number(item.subtotal);
+    // Item dari paket: pendapatan bersih = harga satuan dikurangi bagian diskon paket (proporsional)
+    const comboItemsTotal = item.saleCombo ? Number(item.saleCombo.itemsTotal) : 0;
+    const comboShare = item.saleCombo && comboItemsTotal > 0 ? Number(item.saleCombo.discount) / comboItemsTotal : 0;
+    const subtotal = Number(item.subtotal) * (1 - comboShare);
     if (existing) {
       existing.totalQty        += qty;
       existing.totalRevenue    += subtotal;

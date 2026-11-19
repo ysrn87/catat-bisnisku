@@ -7,14 +7,15 @@ import { Package } from 'lucide-react';
 import { InventoryReportTable } from '@/components/reports/inventory-report-table';
 import { PlanGate } from '@/components/plan/plan-gate';
 import { ExportButton } from '@/components/reports/export-button';
+import { getInventoryTotals } from '@/lib/inventory-totals';
 
 async function getInventoryReport(storeId: string, page = 1, limit = 10) {
   const skip = (page - 1) * limit;
-  const [inventory, totalProducts, lowStockCount] = await Promise.all([
+  const [inventory, totalProducts, totals] = await Promise.all([
     db.productVariant.findMany({ where: { storeId }, skip, take: limit, include: { product: true }, orderBy: { stock: 'asc' } }),
     db.productVariant.count({ where: { storeId } }),
-    // FIX: lowStock → lowStockAt
-    db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } } }),
+    // Total SELURUH varian (kartu ringkasan), bukan hanya baris di halaman ini
+    getInventoryTotals(storeId),
   ]);
 
   const serialized = inventory.map((i) => ({ ...i, price: Number(i.price), cost: Number(i.cost) }));
@@ -22,9 +23,9 @@ async function getInventoryReport(storeId: string, page = 1, limit = 10) {
   return {
     inventory: serialized,
     totalProducts,
-    lowStockCount,
-    inventoryValue: serialized.reduce((sum, i) => sum + i.cost * i.stock, 0),
-    inventoryPrice: serialized.reduce((sum, i) => sum + i.price * i.stock, 0),
+    lowStockCount:  totals.lowStockCount,
+    inventoryValue: totals.inventoryValue,
+    inventoryPrice: totals.inventoryPrice,
   };
 }
 
@@ -34,7 +35,9 @@ export default async function InventoryReportsPage({ params, searchParams }: {
 }) {
   const [{ slug }, p] = await Promise.all([params, searchParams]);
   const { storeId, storePlan } = await getStoreContext();
-  const data = await getInventoryReport(storeId, Number(p.page) || 1, Number(p.limit) || 10);
+  const page  = Math.max(1, Math.floor(Number(p.page)) || 1);
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(p.limit)) || 10));
+  const data  = await getInventoryReport(storeId, page, limit);
 
   return (
     <div className="space-y-8">
@@ -57,7 +60,7 @@ export default async function InventoryReportsPage({ params, searchParams }: {
               </PlanGate>
             </CardHeader>
             <CardContent>
-              <InventoryReportTable inventory={data.inventory} currentPage={Number(p.page) || 1} pageSize={Number(p.limit) || 10} totalItems={data.totalProducts} />
+              <InventoryReportTable inventory={data.inventory} currentPage={page} pageSize={limit} totalItems={data.totalProducts} />
             </CardContent>
           </Card>
         </TabsContent>

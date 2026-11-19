@@ -15,6 +15,7 @@ export default async function InventoryLayout({
       description="Kelola produk, stok, dan laporan inventori"
       tabs={[
         { value: 'products', label: 'Produk',  href: `/${slug}/admin/inventory/products` },
+        { value: 'combos',   label: 'Paket',   href: `/${slug}/admin/inventory/combos` },
         { value: 'stock',    label: 'Stok',    href: `/${slug}/admin/inventory/stock` },
         { value: 'reports',  label: 'Laporan', href: `/${slug}/admin/inventory/reports` },
       ]}

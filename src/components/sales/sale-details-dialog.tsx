@@ -41,8 +41,16 @@ interface SaleDetailsDialogProps {
     cashier: {
       name: string;
     } | null;
+    combos?: Array<{
+      id: string;
+      name: string;
+      packagePrice: number;
+      itemsTotal: number;
+      discount: number;
+    }>;
     items: Array<{
       id: string;
+      saleComboId?: string | null;
       quantity: number;
       price: number;
       subtotal: number;
@@ -99,6 +107,15 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
 
   const pointsRedeemed = sale.pointsRedeemed || 0;
   const pointDiscount = pointsRedeemed * conversionRate;
+
+  // Paket: Sale.discount menyimpan diskon manual + diskon paket; pisahkan untuk tampilan
+  const combos            = sale.combos ?? [];
+  const hasCombos         = combos.length > 0;
+  const comboDiscountSum  = combos.reduce((sum, c) => sum + c.discount, 0);
+  const manualDiscount    = Math.max(0, sale.discount - comboDiscountSum);
+  const plainItems        = sale.items.filter((i) => !i.saleComboId);
+  const itemsOfCombo      = (comboId: string) => sale.items.filter((i) => i.saleComboId === comboId);
+  const escHtml           = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -469,7 +486,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
             </tr>
           </thead>
           <tbody>
-            ${sale.items.map(item => `
+            ${plainItems.map(item => `
               <tr>
                 <td>
                   <div class="item-name" classname=" text-xs">${item.variant.name}</div>
@@ -478,6 +495,30 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                 <td class="r" style="font-weight:100;">${formatCurrency(item.price)}</td>
                 <td class="r item-meta" style="font-weight:600;">x ${item.quantity}</td>
                 <td class="r" style="font-weight:600;">${formatCurrency(item.subtotal)}</td>
+              </tr>
+            `).join('')}
+            ${combos.map(c => `
+              <tr>
+                <td colspan="4" style="padding-top:10px;"><div class="item-name"><strong>${escHtml(c.name)}</strong></div></td>
+              </tr>
+              ${itemsOfCombo(c.id).map(item => `
+              <tr>
+                <td>
+                  <div class="item-name" style="padding-left:12px;">${item.variant.name}</div>
+                  <div class="item-meta" style="padding-left:12px;">${item.variant.product.name} &nbsp;·&nbsp; ${item.variant.sku}</div>
+                </td>
+                <td class="r" style="font-weight:100;">${formatCurrency(item.price)}</td>
+                <td class="r item-meta" style="font-weight:600;">x ${item.quantity}</td>
+                <td class="r" style="font-weight:600;">${formatCurrency(item.subtotal)}</td>
+              </tr>`).join('')}
+              ${c.discount > 0 ? `
+              <tr>
+                <td colspan="3" class="item-meta" style="padding-left:12px;">Diskon paket</td>
+                <td class="r" style="color:#16a34a;font-weight:600;">− ${formatCurrency(c.discount)}</td>
+              </tr>` : ''}
+              <tr>
+                <td colspan="3" style="padding-left:12px;"><strong>Harga paket</strong></td>
+                <td class="r" style="font-weight:700;">${formatCurrency(c.itemsTotal - c.discount)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -502,10 +543,15 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   <span class="label">Subtotal</span>
                   <span class="val">${formatCurrency(sale.subtotal)}</span>
                 </div>
-                ${sale.discount > 0 ? `
+                ${comboDiscountSum > 0 ? `
+                <div class="totals-row discount">
+                  <span class="label">Diskon Paket</span>
+                  <span class="val">− ${formatCurrency(comboDiscountSum)}</span>
+                </div>` : ''}
+                ${manualDiscount > 0 ? `
                 <div class="totals-row discount">
                   <span class="label">Diskon</span>
-                  <span class="val">− ${formatCurrency(sale.discount)}</span>
+                  <span class="val">− ${formatCurrency(manualDiscount)}</span>
                 </div>` : ''}
                 ${pointsRedeemed > 0 ? `
                 <div class="totals-row points-disc">
@@ -627,7 +673,11 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   <Printer className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Print Invoice</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} className="flex-1 sm:flex-initial">
+                <Button
+                  variant="outline" size="sm" onClick={() => setShowEditDialog(true)} className="flex-1 sm:flex-initial"
+                  disabled={hasCombos}
+                  title={hasCombos ? 'Transaksi berisi paket tidak dapat diedit. Hapus lalu buat ulang.' : undefined}
+                >
                   <Pencil className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Edit</span>
                 </Button>
@@ -732,7 +782,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
             <div>
               <h4 className="font-medium mb-3 text-sm sm:text-base">Items</h4>
               <div className="border border-gray-200 rounded-xl divide-y overflow-hidden shadow-sm">
-                {sale.items.map((item) => (
+                {plainItems.map((item) => (
                   <div key={item.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:justify-between gap-2 bg-white hover:bg-gray-50 transition-colors">
                     <div className="flex-1">
                       <p className="font-medium text-xs sm:text-sm">{item.variant.name}</p>
@@ -741,6 +791,31 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-xs sm:text-base">{formatCurrency(item.subtotal)}</p>
+                    </div>
+                  </div>
+                ))}
+
+                {combos.map((c) => (
+                  <div key={c.id} className="bg-white p-3 sm:p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-xs sm:text-sm">{c.name}</p>
+                      <p className="font-semibold text-xs sm:text-base">{formatCurrency(c.itemsTotal - c.discount)}</p>
+                    </div>
+                    <div className="space-y-1 border-l-2 border-[#028697]/30 pl-3">
+                      {itemsOfCombo(c.id).map((item) => (
+                        <div key={item.id} className="flex justify-between gap-2 text-[11px] sm:text-sm text-gray-600">
+                          <span className="min-w-0 truncate">
+                            {item.variant.product.name}{item.variant.name !== item.variant.product.name ? ` – ${item.variant.name}` : ''}
+                          </span>
+                          <span className="shrink-0">{formatCurrency(item.price)} x {item.quantity}</span>
+                        </div>
+                      ))}
+                      {c.discount > 0 && (
+                        <div className="flex justify-between text-[11px] sm:text-sm text-green-600">
+                          <span>Diskon paket</span>
+                          <span>-{formatCurrency(c.discount)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -754,10 +829,16 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   <span className="text-gray-500">Subtotal</span>
                   <span className="font-medium">{formatCurrency(sale.subtotal)}</span>
                 </div>
-                {sale.discount > 0 && (
+                {comboDiscountSum > 0 && (
+                  <div className="flex justify-between text-xs sm:text-sm text-green-600">
+                    <span>Diskon Paket</span>
+                    <span className="font-medium">-{formatCurrency(comboDiscountSum)}</span>
+                  </div>
+                )}
+                {manualDiscount > 0 && (
                   <div className="flex justify-between text-xs sm:text-sm text-green-600">
                     <span>Diskon</span>
-                    <span className="font-medium">-{formatCurrency(sale.discount)}</span>
+                    <span className="font-medium">-{formatCurrency(manualDiscount)}</span>
                   </div>
                 )}
                 {pointsRedeemed > 0 && (

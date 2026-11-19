@@ -45,6 +45,7 @@ async function getSales(storeId: string, cashierId: string, params: {
         cashier:  { include: { user: { select: { name: true } } } },
         payment:  { select: { method: true, status: true } }, // FIX
         items:    { include: { variant: { include: { product: true } } } },
+        combos:   true,
       },
     }),
     db.sale.count({ where }),
@@ -52,7 +53,7 @@ async function getSales(storeId: string, cashierId: string, params: {
 
   return {
     sales: sales.map((sale) => {
-      const { subtotal, discount, tax, total, items, payment, customer, member, cashier, ...rest } = sale;
+      const { subtotal, discount, tax, total, items, combos, payment, customer, member, cashier, ...rest } = sale;
       return {
         ...rest,
         // FIX: customerName dipakai tabel (ringkas), customer/nonMemberCustomer dipakai dialog detail (lengkap)
@@ -64,6 +65,7 @@ async function getSales(storeId: string, cashierId: string, params: {
         paymentStatus: payment?.status ?? 'PAID',
         subtotal: Number(subtotal), discount: Number(discount),
         tax: Number(tax), ongkir: Number(sale.ongkir), total: Number(total),
+        combos: combos.map((c) => ({ id: c.id, name: c.name, packagePrice: Number(c.packagePrice), itemsTotal: Number(c.itemsTotal), discount: Number(c.discount) })),
         items: (items as any[]).map((item) => {
           const { price: vp, cost: vc, ...vr } = item.variant;
           return { ...item, price: Number(item.price), subtotal: Number(item.subtotal), variant: { ...vr, price: Number(vp), cost: Number(vc) } };

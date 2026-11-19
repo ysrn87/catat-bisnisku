@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db';
 import { getStoreContext } from '@/lib/store-context';
 import { PosPanel } from '@/components/pos/pos-panel';
+import { getCombosForPos } from '@/actions/combos';
 import { getPointsConversionRate } from '@/actions/settings';
 
 async function getPosData(storeId: string) {
@@ -58,7 +59,7 @@ export default async function CashierPage({ params }: { params: Promise<{ slug: 
   ]);
 
   return (
-    <PosPanel
+    <PosPanel combos={await getCombosForPos()}
       variants={posVariants}
       members={members}
       walkInCustomers={nonMembers}

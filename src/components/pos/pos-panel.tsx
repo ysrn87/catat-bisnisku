@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { PaymentStatus } from '@prisma/client';
-import { ShoppingCart, Search, User, ChevronDown, X, Plus, Minus, Trash2, CheckCircle, UserPlus, Receipt, Printer } from 'lucide-react';
+import { ShoppingCart, Search, User, ChevronDown, X, Plus, Minus, Trash2, CheckCircle, UserPlus, Receipt, Printer, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { createSaleAction } from '@/actions/sales';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { ComboPickerDialog, type ComboCartLine } from './combo-picker-dialog';
+import type { ComboInfo } from '@/lib/combo-pricing';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,6 +57,26 @@ interface CartItem {
   emoji: string;
 }
 
+interface ReceiptCombo {
+  name: string;
+  packagePrice: number;
+  itemsTotal: number;
+  discount: number;
+  lines: Array<{ productName: string; variantName: string; price: number; quantity: number }>;
+}
+
+// Hasil createSaleAction yang sukses (nilai paket dihitung server)
+interface CreateSaleOk {
+  success: true;
+  saleId: string;
+  saleNumber: string;
+  createdAt: Date;
+  subtotal: number;
+  comboDiscount: number;
+  total: number;
+  combos: ReceiptCombo[];
+}
+
 interface ReceiptData {
   saleId: string;
   saleNumber: string;
@@ -70,6 +92,8 @@ interface ReceiptData {
   total: number;
   pointsEarned: number;
   paymentStatus: string;
+  combos: ReceiptCombo[];
+  comboDiscount: number;
 }
 
 interface PosPanelProps {
@@ -80,6 +104,7 @@ interface PosPanelProps {
   storeSlug: string;
   storeName: string;
   cashierName?: string;
+  combos?: ComboInfo[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -170,6 +195,30 @@ function ReceiptDialog({
                 <span>{formatCurrency(item.price * item.quantity)}</span>
               </div>
             ))}
+
+            {data.combos.map((c, ci) => (
+              <div key={ci} className="space-y-1 pt-1.5 first:pt-0">
+                <p className="text-sm font-semibold">{c.name}</p>
+                {c.lines.map((l, li) => (
+                  <div key={li} className="flex justify-between gap-2 pl-3 text-sm">
+                    <span className="truncate text-muted-foreground">
+                      {l.productName}{l.variantName !== l.productName ? ` – ${l.variantName}` : ''}
+                    </span>
+                    <span className="shrink-0">{l.quantity} × {formatCurrency(l.price)}</span>
+                  </div>
+                ))}
+                {c.discount > 0 && (
+                  <div className="flex justify-between pl-3 text-sm text-green-600">
+                    <span>Diskon paket</span>
+                    <span>− {formatCurrency(c.discount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between pl-3 text-sm font-medium">
+                  <span>Harga paket</span>
+                  <span>{formatCurrency(c.itemsTotal - c.discount)}</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Summary */}
@@ -178,6 +227,12 @@ function ReceiptDialog({
               <span className="text-muted-foreground">Subtotal</span>
               <span>{formatCurrency(data.subtotal)}</span>
             </div>
+            {data.comboDiscount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
+                <span>Diskon Paket</span>
+                <span>− {formatCurrency(data.comboDiscount)}</span>
+              </div>
+            )}
             {data.discount > 0 && (
               <div className="flex justify-between text-sm text-red-600">
                 <span>Diskon</span>
@@ -237,11 +292,14 @@ function ReceiptDialog({
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-export function PosPanel({ variants, members, walkInCustomers, conversionRate, storeSlug, storeName, cashierName }: PosPanelProps) {
+export function PosPanel({ variants, members, walkInCustomers, conversionRate, storeSlug, storeName, cashierName, combos = [] }: PosPanelProps) {
   const { toast } = useToast();
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [comboCart, setComboCart] = useState<ComboCartLine[]>([]);
+  const [viewMode, setViewMode] = useState<'products' | 'combos'>('products');
+  const [pickerCombo, setPickerCombo] = useState<ComboInfo | null>(null);
 
   // Product filtering
   const [search, setSearch] = useState('');
@@ -302,18 +360,54 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const availablePoints = selectedMember?.points ?? 0;
   const pointDiscount = pointsToRedeem * conversionRate;
 
-  const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const total = Math.max(0, subtotal - discount - pointDiscount + tax + ongkir);
+  const comboItemsTotal = comboCart.reduce((sum, l) => sum + l.itemsTotal, 0);
+  const comboDiscount   = comboCart.reduce((sum, l) => sum + l.discount, 0);
+  const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0) + comboItemsTotal;
+  const total = Math.max(0, subtotal - comboDiscount - discount - pointDiscount + tax + ongkir);
 
   const pointsEarned =
     customerType === 'member' && customerId && pointsToRedeem === 0 && paymentStatus === PaymentStatus.PAID
       ? cart.reduce((sum, item) => {
           const v = variants.find((x) => x.id === item.variantId);
           return sum + (v?.pointsPerUnit ?? 0) * item.quantity;
-        }, 0)
+        }, 0) + comboCart.reduce((sum, l) => sum + l.lines.reduce((s, x) => s + x.pointsPerUnit, 0), 0)
       : 0;
 
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0) + comboCart.length;
+  const hasItems  = cart.length > 0 || comboCart.length > 0;
+
+  // Pemakaian stok oleh isi paket di keranjang (digabung dengan item biasa saat cek stok)
+  const comboUsage = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of comboCart) for (const x of l.lines) m.set(x.variantId, (m.get(x.variantId) ?? 0) + 1);
+    return m;
+  }, [comboCart]);
+
+  const comboVariantMeta = useMemo(() => {
+    const m = new Map<string, { stock: number; type: string }>();
+    for (const c of combos) for (const sl of c.slots) for (const v of sl.variants) m.set(v.id, { stock: v.stock, type: v.type });
+    return m;
+  }, [combos]);
+
+  const remainingForCombo = (variantId: string): number => {
+    const meta = comboVariantMeta.get(variantId);
+    if (!meta) return 0;
+    if (meta.type === 'PREORDER') return Infinity;
+    const inCart = cart.find((i) => i.variantId === variantId)?.quantity ?? 0;
+    return meta.stock - inCart - (comboUsage.get(variantId) ?? 0);
+  };
+
+  // Paket bisa dijual bila setiap slot wajib punya minimal satu varian yang masih tersedia
+  const comboAvailable = (c: ComboInfo): boolean => {
+    const requiredOk = c.slots.every((sl) => !sl.isRequired || sl.variants.some((v) => remainingForCombo(v.id) >= 1));
+    const anyOk = c.slots.some((sl) => sl.variants.some((v) => remainingForCombo(v.id) >= 1));
+    return requiredOk && anyOk;
+  };
+
+  const filteredCombos = useMemo(() => {
+    const q = search.toLowerCase();
+    return combos.filter((c) => !q || c.name.toLowerCase().includes(q));
+  }, [combos, search]);
 
   const customerName = useMemo(() => {
     if (customerType === 'customer') return 'Pelanggan Umum';
@@ -334,14 +428,14 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const addToCart = useCallback(
     (variant: ProductVariant) => {
       const isPreorder = variant.type === 'PREORDER';
-      if (!isPreorder && variant.stock <= 0) {
+      if (!isPreorder && variant.stock - (comboUsage.get(variant.id) ?? 0) <= 0) {
         toast({ title: 'Stok Habis', description: `${variant.product.name} tidak tersedia.`, variant: 'destructive' });
         return;
       }
       setCart((prev) => {
         const existing = prev.find((i) => i.variantId === variant.id);
         if (existing) {
-          if (!isPreorder && existing.quantity >= variant.stock) {
+          if (!isPreorder && existing.quantity + (comboUsage.get(variant.id) ?? 0) >= variant.stock) {
             toast({ title: 'Stok Tidak Cukup', description: `Stok ${variant.product.name} hanya ${variant.stock}.`, variant: 'destructive' });
             return prev;
           }
@@ -362,7 +456,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         ];
       });
     },
-    [toast]
+    [toast, comboUsage]
   );
 
   const updateQty = useCallback((variantId: string, delta: number) => {
@@ -372,11 +466,15 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
           if (i.variantId !== variantId) return i;
           const next = i.quantity + delta;
           if (next <= 0) return null as unknown as CartItem;
-          if (!i.isPreorder && next > i.stock) return i;
+          if (!i.isPreorder && next + (comboUsage.get(variantId) ?? 0) > i.stock) return i;
           return { ...i, quantity: next };
         })
         .filter(Boolean)
     );
+  }, [comboUsage]);
+
+  const removeCombo = useCallback((key: string) => {
+    setComboCart((prev) => prev.filter((l) => l.key !== key));
   }, []);
 
   const removeFromCart = useCallback((variantId: string) => {
@@ -385,6 +483,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
   const resetAll = useCallback(() => {
     setCart([]);
+    setComboCart([]);
     setDiscount(0); setDiscountDisplay('');
     setTax(0); setTaxDisplay('');
     setOngkir(0); setOngkirDisplay('');
@@ -405,6 +504,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   // clearCart tetap ada untuk tombol "Kosongkan" di keranjang (tidak reset customer/payment)
   const clearCart = useCallback(() => {
     setCart([]);
+    setComboCart([]);
     setDiscount(0); setDiscountDisplay('');
     setTax(0); setTaxDisplay('');
     setOngkir(0); setOngkirDisplay('');
@@ -439,12 +539,12 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   // ─── Checkout ──────────────────────────────────────────────────────────────
 
   const canCheckout =
-    cart.length > 0 &&
+    hasItems &&
     !loading &&
     (customerType === 'customer' ||
       (customerType === 'member' && !!customerId) ||
       (customerType === 'walk-in' && !!walkInCustomerId)) &&
-    discount + pointDiscount <= subtotal &&
+    discount + comboDiscount + pointDiscount <= subtotal &&
     total >= 0;
 
   const handleCheckout = async () => {
@@ -453,6 +553,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     try {
       const result = await createSaleAction({
         items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.price })),
+        packages: comboCart.map((l) => ({ comboId: l.comboId, selections: l.selections })),
         customerId: customerType === 'walk-in' ? walkInCustomerId || null : null,
         memberId:   customerType === 'member'  ? customerId        || null : null,
 
@@ -468,19 +569,22 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
       if (result.success) {
         setShowCart(false); // tutup bottom sheet mobile sebelum receipt muncul
         const payLabel = PAYMENT_METHODS.find((p) => p.value === paymentMethod)?.label ?? paymentMethod;
+        const ok = result as unknown as CreateSaleOk;
         setReceipt({
-          saleId: (result as { success: true; saleId: string; saleNumber: string; createdAt: Date }).saleId,
-          saleNumber: (result as { success: true; saleId: string; saleNumber: string; createdAt: Date }).saleNumber,
-          createdAt: (result as { success: true; saleId: string; saleNumber: string; createdAt: Date }).createdAt,
+          saleId: ok.saleId,
+          saleNumber: ok.saleNumber,
+          createdAt: ok.createdAt,
           items: [...cart],
+          combos: ok.combos ?? [],
+          comboDiscount: ok.comboDiscount ?? 0,
           customerName,
           paymentMethod: payLabel,
-          subtotal,
+          subtotal: ok.subtotal ?? subtotal,
           discount,
           tax,
           ongkir,
           pointDiscount,
-          total,
+          total: ok.total ?? total,
           pointsEarned,
           paymentStatus,
         });
@@ -511,8 +615,20 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
       </div>
     `).join('');
 
+    const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const combosHTML = receipt.combos.map((c) => `
+      <div class="item">
+        <div class="item-name"><strong>${esc(c.name)}</strong></div>
+        ${c.lines.map((l) => `
+        <div class="item-line"><span>&nbsp;&nbsp;${esc(l.productName)}${l.variantName !== l.productName ? ` – ${esc(l.variantName)}` : ''}</span><span>${l.quantity} x ${formatCurrency(l.price)}</span></div>`).join('')}
+        ${c.discount > 0 ? `<div class="item-line"><span>&nbsp;&nbsp;Diskon paket</span><span>- ${formatCurrency(c.discount)}</span></div>` : ''}
+        <div class="item-line"><span>&nbsp;&nbsp;<strong>Harga paket</strong></span><span><strong>${formatCurrency(c.itemsTotal - c.discount)}</strong></span></div>
+      </div>
+    `).join('');
+
     const summaryRows = [
       ['Subtotal', formatCurrency(receipt.subtotal), false],
+      ...(receipt.comboDiscount > 0 ? [['Diskon Paket', `- ${formatCurrency(receipt.comboDiscount)}`, false]] : []),
       ...(receipt.discount > 0    ? [['Diskon',     `- ${formatCurrency(receipt.discount)}`,     false]] : []),
       ...(receipt.pointDiscount > 0 ? [['Tukar Poin', `- ${formatCurrency(receipt.pointDiscount)}`, false]] : []),
       ...(receipt.tax > 0         ? [['Pajak',      formatCurrency(receipt.tax),                 false]] : []),
@@ -579,6 +695,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   <div class="divider"></div>
 
   ${itemsHTML}
+  ${combosHTML}
 
   <div class="divider"></div>
 
@@ -605,14 +722,49 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     <div className="flex flex-col h-full">
       {/* Cart items */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 min-h-0">
-        {cart.length === 0 ? (
+        {!hasItems ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-8 gap-2">
             <ShoppingCart className="w-10 h-10 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">Keranjang kosong</p>
             <p className="text-xs text-muted-foreground/70">Klik produk untuk menambahkan</p>
           </div>
         ) : (
-          cart.map((item) => (
+          <>
+          {comboCart.map((line) => (
+            <div key={line.key} className="space-y-1 rounded-lg border border-[#028697]/30 bg-[#028697]/5 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex min-w-0 items-center gap-1 text-xs font-semibold">
+                  <Layers className="h-3 w-3 shrink-0 text-[#028697]" />
+                  <span className="truncate">{line.name}</span>
+                </p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-xs font-semibold">{formatCurrency(line.itemsTotal - line.discount)}</span>
+                  <button
+                    onClick={() => removeCombo(line.key)}
+                    className="text-muted-foreground/50 transition-colors hover:text-destructive"
+                    aria-label={`Hapus ${line.name}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              <ul className="space-y-0.5">
+                {line.lines.map((l) => (
+                  <li key={l.variantId} className="flex justify-between text-[11px] text-muted-foreground">
+                    <span className="truncate pr-2">{l.productName}{l.variantName !== l.productName ? ` – ${l.variantName}` : ''}</span>
+                    <span className="shrink-0">{formatCurrency(l.price)}</span>
+                  </li>
+                ))}
+                {line.discount > 0 && (
+                  <li className="flex justify-between text-[11px] text-green-600">
+                    <span>Diskon paket</span>
+                    <span>− {formatCurrency(line.discount)}</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          ))}
+          {cart.map((item) => (
             <div key={item.variantId} className="flex items-center gap-2 py-1.5 border-b border-border/50 last:border-0">
               {/* <span className="text-lg leading-none shrink-0">{item.emoji}</span> */}
               <div className="flex-1 min-w-0">
@@ -633,7 +785,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                 <span className="w-6 text-center text-xs font-medium">{item.quantity}</span>
                 <button
                   onClick={() => updateQty(item.variantId, 1)}
-                  disabled={!item.isPreorder && item.quantity >= item.stock}
+                  disabled={!item.isPreorder && item.quantity + (comboUsage.get(item.variantId) ?? 0) >= item.stock}
                   className="w-6 h-6 rounded-md border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors disabled:opacity-40"
                   aria-label="Tambah"
                 >
@@ -651,12 +803,13 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-          ))
+          ))}
+          </>
         )}
       </div>
 
       {/* Footer: Customer + Checkout */}
-      {cart.length > 0 && (
+      {hasItems && (
         <div className="border-t border-border px-3 py-3 space-y-3 shrink-0">
           {/* Customer type tabs */}
           <div>
@@ -816,6 +969,11 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span><span>{formatCurrency(subtotal)}</span>
             </div>
+            {comboDiscount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Diskon Paket</span><span>− {formatCurrency(comboDiscount)}</span>
+              </div>
+            )}
             {discount > 0 && (
               <div className="flex justify-between text-red-500">
                 <span>Diskon</span><span>− {formatCurrency(discount)}</span>
@@ -883,6 +1041,16 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
   return (
     <>
+      {pickerCombo && (
+        <ComboPickerDialog
+          key={pickerCombo.id}
+          combo={pickerCombo}
+          onClose={() => setPickerCombo(null)}
+          remaining={remainingForCombo}
+          onAdd={(line) => setComboCart((prev) => [...prev, line])}
+        />
+      )}
+
       {/* Receipt overlay */}
       {receipt && (
         <ReceiptDialog
@@ -897,6 +1065,23 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
       <div className="flex flex-col lg:flex-row gap-3 h-[calc(100vh-10rem)] lg:h-[calc(100vh-9rem)] min-h-[600px]">
         {/* ── Left: Product browser ── */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+          {combos.length > 0 && (
+            <div className="flex shrink-0 gap-1 rounded-xl bg-muted p-1">
+              {(['products', 'combos'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    'flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
+                    viewMode === mode ? 'bg-background text-[#028697] shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {mode === 'products' ? 'Produk' : `Paket (${combos.length})`}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -904,7 +1089,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari produk..."
+              placeholder={viewMode === 'combos' ? 'Cari paket...' : 'Cari produk...'}
               className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-[#028697]/50"
             />
             {search && (
@@ -918,7 +1103,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
           </div>
 
           {/* Category pills */}
-          {categories.length > 0 && (
+          {viewMode === 'products' && categories.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
               <button
                 onClick={() => setActiveCategory('all')}
@@ -950,7 +1135,53 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
           {/* Product grid */}
           <div className="flex-1 overflow-y-auto min-h-0">
-            {filteredVariants.length === 0 ? (
+            {viewMode === 'combos' ? (
+              filteredCombos.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-center">
+                  <Layers className="h-10 w-10 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">Paket tidak ditemukan</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5 pb-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {filteredCombos.map((c) => {
+                    const available = comboAvailable(c);
+                    const inCart = comboCart.filter((l) => l.comboId === c.id).length;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => available && setPickerCombo(c)}
+                        disabled={!available}
+                        className={cn(
+                          'relative space-y-1.5 rounded-xl border p-3 text-left transition-all',
+                          !available
+                            ? 'cursor-not-allowed border-border bg-muted opacity-50'
+                            : inCart
+                            ? 'border-[#028697] bg-[#028697]/5 shadow-sm hover:shadow-md'
+                            : 'border-border bg-card hover:border-[#028697]/60 hover:shadow-sm'
+                        )}
+                      >
+                        {inCart > 0 && (
+                          <span className="absolute -right-1.5 -top-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#028697] px-1 text-[10px] font-bold text-white">
+                            {inCart}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Layers className="h-4 w-4 shrink-0 text-[#028697]" />
+                          <p className="truncate text-sm font-semibold">{c.name}</p>
+                        </div>
+                        <p className="text-sm font-bold text-[#028697]">{formatCurrency(c.price)}</p>
+                        <p className="line-clamp-2 text-[11px] text-muted-foreground">
+                          {c.slots.map((sl) => sl.productName + (sl.variants.length > 1 ? ' (pilih)' : '')).join(' · ')}
+                        </p>
+                        {!available && (
+                          <span className="inline-block rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600">Stok habis</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )
+            ) : filteredVariants.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-16">
                 <Search className="w-10 h-10 text-muted-foreground/30" />
                 <p className="text-sm text-muted-foreground">Produk tidak ditemukan</p>
@@ -1037,7 +1268,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
         {/* ── Mobile: floating cart button + bottom sheet ── */}
         <div className="lg:hidden">
-          {cart.length > 0 && !showCart && (
+          {hasItems && !showCart && (
             <div className="fixed bottom-20 right-4 z-40">
               <button
                 onClick={() => setShowCart(true)}

@@ -7,6 +7,8 @@ import { generateSaleNumber } from '@/lib/utils';
 import { getPointsConversionRate } from './settings';
 import { sanitizeText } from '@/lib/sanitize';
 import { generateSaleJournals } from '@/modules/accounting/lib/journal-engine';
+import { resolveComboSelection, round2, type ComboResolution, type ComboSelections } from '@/lib/combo-pricing';
+import { comboWithSlotsInclude, toComboInfo, type ComboWithSlots } from '@/lib/combo-db';
 
 interface SaleItemInput {
   variantId: string;
@@ -27,6 +29,8 @@ interface CreateSaleInput {
   ongkir?:         number;
   notes?:          string;
   pointsRedeemed?: number;
+  /** Paket: isi dipilih per slot; harga SELALU dihitung ulang di server. */
+  packages?:       Array<{ comboId: string; selections: ComboSelections }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +45,8 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     const {
-      items,
+      items: rawItems,
+      packages = [],
       customerId,   // Customer.id (walk-in lokal) — nullable
       memberId,     // StoreUser.id (member) — nullable
       paymentMethod,
@@ -50,7 +55,11 @@ export async function createSaleAction(input: CreateSaleInput) {
       notes, pointsRedeemed = 0,
     } = input;
 
-    if (!items?.length) return { success: false, error: 'Tidak ada item dalam penjualan' };
+    const items: SaleItemInput[] = rawItems ?? [];
+    if (items.length === 0 && packages.length === 0) return { success: false, error: 'Tidak ada item dalam penjualan' };
+    if (items.some((i) => !Number.isInteger(i.quantity) || i.quantity <= 0)) {
+      return { success: false, error: 'Kuantitas item tidak valid' };
+    }
 
     const notesSanitized = sanitizeText(notes, 500);
 
@@ -83,35 +92,63 @@ export async function createSaleAction(input: CreateSaleInput) {
       return { success: false, error: 'Penukaran poin hanya untuk member' };
     }
 
-    let pointsEarned = 0;
-    const variantTypeById = new Map<string, string>();
+    // ── Paket (combo): validasi pilihan & hitung harga di SERVER ───────────────
+    const resolvedPackages: Array<{ combo: ComboWithSlots; res: Extract<ComboResolution, { ok: true }> }> = [];
+    if (packages.length > 0) {
+      if (packages.length > 50) return { success: false, error: 'Terlalu banyak paket dalam satu transaksi' };
 
-    for (const item of items) {
-      const variant = await db.productVariant.findFirst({
-        where:  { id: item.variantId, storeId },
-        select: { id: true, name: true, stock: true, pointsPerUnit: true, type: true },
+      const comboIds = [...new Set(packages.map((p) => p.comboId))];
+      const combos = await db.combo.findMany({
+        where:   { id: { in: comboIds }, storeId, isActive: true },
+        include: comboWithSlotsInclude,
       });
+      const comboById = new Map(combos.map((c) => [c.id, c]));
 
-      if (!variant) return { success: false, error: 'Varian produk tidak ditemukan' };
-      if (variant.type !== 'PREORDER' && variant.stock < item.quantity) {
-        return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
-      }
-
-      variantTypeById.set(variant.id, variant.type);
-
-      if (memberId && pointsRedeemed === 0 && paymentStatus === 'PAID') {
-        pointsEarned += variant.pointsPerUnit * item.quantity;
+      for (const pkg of packages) {
+        const combo = comboById.get(pkg.comboId);
+        if (!combo) return { success: false, error: 'Paket tidak ditemukan atau sudah tidak aktif' };
+        const res = resolveComboSelection(toComboInfo(combo), pkg.selections ?? {});
+        if (!res.ok) return { success: false, error: `${combo.name}: ${res.error}` };
+        resolvedPackages.push({ combo, res });
       }
     }
 
-    const subtotal       = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const conversionRate = await getPointsConversionRate();
-    const pointDiscount  = pointsRedeemed * conversionRate;
-    const totalDiscount  = discount + pointDiscount;
+    // ── Kebutuhan stok gabungan (item biasa + isi paket) ───────────────────────
+    const demand = new Map<string, number>();
+    for (const i of items) demand.set(i.variantId, (demand.get(i.variantId) ?? 0) + i.quantity);
+    for (const p of resolvedPackages) {
+      for (const l of p.res.lines) demand.set(l.variantId, (demand.get(l.variantId) ?? 0) + 1);
+    }
+
+    const variantRows = await db.productVariant.findMany({
+      where:  { id: { in: [...demand.keys()] }, storeId },
+      select: { id: true, name: true, stock: true, pointsPerUnit: true, type: true, cost: true },
+    });
+    const variantById = new Map(variantRows.map((v) => [v.id, v]));
+
+    let pointsEarned = 0;
+    for (const [variantId, qty] of demand) {
+      const variant = variantById.get(variantId);
+      if (!variant) return { success: false, error: 'Varian produk tidak ditemukan' };
+      if (variant.type !== 'PREORDER' && variant.stock < qty) {
+        return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
+      }
+      if (memberId && pointsRedeemed === 0 && paymentStatus === 'PAID') {
+        pointsEarned += variant.pointsPerUnit * qty;
+      }
+    }
+
+    const itemsSubtotal   = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const comboItemsTotal = round2(resolvedPackages.reduce((sum, p) => sum + p.res.itemsTotal, 0));
+    const comboDiscount   = round2(resolvedPackages.reduce((sum, p) => sum + p.res.discount, 0));
+    const subtotal        = round2(itemsSubtotal + comboItemsTotal);
+    const conversionRate  = await getPointsConversionRate();
+    const pointDiscount   = pointsRedeemed * conversionRate;
+    const totalDiscount   = discount + comboDiscount + pointDiscount;
 
     if (totalDiscount > subtotal) return { success: false, error: 'Total diskon melebihi subtotal' };
 
-    const total = subtotal - discount - pointDiscount + tax + ongkir;
+    const total = round2(subtotal - discount - comboDiscount - pointDiscount + tax + ongkir);
     if (total < 0) return { success: false, error: 'Total pembayaran tidak boleh negatif' };
 
     const sale = await db.$transaction(async (tx) => {
@@ -122,7 +159,7 @@ export async function createSaleAction(input: CreateSaleInput) {
           cashierId:    cashierId,
           customerId:   customerId || null,
           memberId:     memberId   || null,
-          subtotal, discount, tax, ongkir, total,
+          subtotal, discount: round2(discount + comboDiscount), tax, ongkir, total,
           notes:        notesSanitized,
           pointsEarned: memberId && pointsRedeemed === 0 && paymentStatus === 'PAID' ? pointsEarned : 0,
           items: {
@@ -137,6 +174,32 @@ export async function createSaleAction(input: CreateSaleInput) {
         include: { items: true },
       });
 
+      // Isi paket → SaleItem biasa (harga satuan) dikelompokkan oleh SaleCombo
+      for (const p of resolvedPackages) {
+        const saleCombo = await tx.saleCombo.create({
+          data: {
+            storeId,
+            saleId:       newSale.id,
+            comboId:      p.combo.id,
+            name:         p.combo.name,
+            packagePrice: p.res.packagePrice,
+            itemsTotal:   p.res.itemsTotal,
+            discount:     p.res.discount,
+          },
+          select: { id: true },
+        });
+        await tx.saleItem.createMany({
+          data: p.res.lines.map((l) => ({
+            saleId:      newSale.id,
+            saleComboId: saleCombo.id,
+            variantId:   l.variantId,
+            quantity:    1,
+            price:       l.price,
+            subtotal:    l.price,
+          })),
+        });
+      }
+
       await tx.payment.create({
         data: {
           saleId:  newSale.id,
@@ -148,15 +211,15 @@ export async function createSaleAction(input: CreateSaleInput) {
         },
       });
 
-      for (const item of items) {
-        if (variantTypeById.get(item.variantId) === 'PREORDER') continue;
+      for (const [variantId, qty] of demand) {
+        if (variantById.get(variantId)?.type === 'PREORDER') continue;
         const updated = await tx.productVariant.updateMany({
-          where: { id: item.variantId, stock: { gte: item.quantity } },
-          data:  { stock: { decrement: item.quantity } },
+          where: { id: variantId, stock: { gte: qty } },
+          data:  { stock: { decrement: qty } },
         });
-        if (updated.count === 0) throw new Error(`Stok tidak mencukupi untuk varian ${item.variantId}`);
+        if (updated.count === 0) throw new Error(`Stok tidak mencukupi untuk varian ${variantId}`);
         await tx.stockMovement.create({
-          data: { storeId, variantId: item.variantId, type: 'SALE', quantity: -item.quantity, refSaleId: newSale.id },
+          data: { storeId, variantId, type: 'SALE', quantity: -qty, refSaleId: newSale.id },
         });
       }
 
@@ -196,12 +259,10 @@ export async function createSaleAction(input: CreateSaleInput) {
     // Generate jurnal akuntansi — non-blocking, pakai field 'cost' dari ProductVariant
     ;(async () => {
       try {
-        const variants = await db.productVariant.findMany({
-          where:  { id: { in: items.map((i) => i.variantId) } },
-          select: { id: true, cost: true },
-        });
-        const costMap  = new Map(variants.map((v) => [v.id, Number(v.cost ?? 0)]));
-        const hppTotal = items.reduce((sum, i) => sum + (costMap.get(i.variantId) ?? 0) * i.quantity, 0);
+        let hppTotal = 0;
+        for (const [variantId, qty] of demand) {
+          hppTotal += Number(variantById.get(variantId)?.cost ?? 0) * qty;
+        }
 
         await generateSaleJournals({
           storeId,
@@ -217,7 +278,27 @@ export async function createSaleAction(input: CreateSaleInput) {
       }
     })();
 
-    return { success: true, saleId: sale.id, saleNumber: sale.saleNumber, createdAt: sale.createdAt };
+    return {
+      success:       true,
+      saleId:        sale.id,
+      saleNumber:    sale.saleNumber,
+      createdAt:     sale.createdAt,
+      subtotal,
+      comboDiscount,
+      total,
+      combos: resolvedPackages.map((p) => ({
+        name:         p.combo.name,
+        packagePrice: p.res.packagePrice,
+        itemsTotal:   p.res.itemsTotal,
+        discount:     p.res.discount,
+        lines: p.res.lines.map((l) => ({
+          productName: l.productName,
+          variantName: l.variantName,
+          price:       l.price,
+          quantity:    1,
+        })),
+      })),
+    };
   } catch (error) {
     console.error('Create sale error:', error);
     return { success: false, error: 'Gagal membuat penjualan' };
@@ -254,6 +335,12 @@ export async function updateSaleAction(
       include: { items: true, payment: true },
     });
     if (!existingSale) return { success: false, error: 'Penjualan tidak ditemukan' };
+
+    // Transaksi berisi paket tidak bisa diedit: pengelompokan & diskon paket akan rusak.
+    const comboCount = await db.saleCombo.count({ where: { saleId, storeId } });
+    if (comboCount > 0) {
+      return { success: false, error: 'Transaksi yang berisi paket tidak dapat diedit. Hapus transaksi lalu buat ulang.' };
+    }
 
     const {
       items,
@@ -386,6 +473,7 @@ export async function getSales(limit = 50) {
       member:   { select: { user: { select: { name: true, email: true } } } },
       payment:  { select: { method: true, status: true } },
       items:    { include: { variant: { include: { product: true } } } },
+      combos:   true,
     },
   });
 }
@@ -400,6 +488,7 @@ export async function getSaleById(id: string) {
       cashier:  { include: { user: { select: { name: true, email: true } } } },
       payment:  true,
       items:    { include: { variant: { include: { product: true } } } },
+      combos:   true,
     },
   });
 }

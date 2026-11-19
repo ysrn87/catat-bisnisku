@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { getInventoryTotals } from '@/lib/inventory-totals';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsContent } from '@/components/ui/tabs';
@@ -44,18 +45,16 @@ async function getSalesReport(storeId: string, page = 1, limit = 10) {
 async function getInventoryReport(storeId: string, page = 1, limit = 10) {
   const skip = (page - 1) * limit;
 
-  const [inventory, totalProducts] = await Promise.all([
+  const [inventory, totalProducts, totals] = await Promise.all([
     db.productVariant.findMany({ where: { storeId }, skip, take: limit, include: { product: { select: { name: true } } }, orderBy: { stock: 'asc' } }),
     db.productVariant.count({ where: { storeId } }),
+    getInventoryTotals(storeId),
   ]);
 
   const serialized = inventory.map((i) => ({ ...i, price: Number(i.price), cost: Number(i.cost) }));
 
-  // FIX: lowStock → lowStockAt
-  const lowStockCount = serialized.filter((i) => i.stock <= i.lowStockAt).length;
-  const inventoryValue = serialized.reduce((sum, i) => sum + (i.type !== 'PREORDER' ? i.cost * i.stock : 0), 0);
-
-  return { inventory: serialized, totalProducts, lowStockCount, inventoryValue };
+  // Total seluruh varian (bukan hanya halaman ini) — sama dengan Laporan Inventori
+  return { inventory: serialized, totalProducts, lowStockCount: totals.lowStockCount, inventoryValue: totals.inventoryValue };
 }
 
 async function getFinancialReport(storeId: string) {
