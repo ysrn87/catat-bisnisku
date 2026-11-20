@@ -44,7 +44,7 @@ async function getSales(storeId: string, params: {
         customer: { select: { name: true, phone: true, address: true } },
         member:   { select: { points: true, user: { select: { name: true, email: true, phone: true } } } },
         cashier:  { include: { user: { select: { name: true } } } },
-        payment:  { select: { method: true, status: true } }, // FIX: include Payment
+        payment:  { select: { method: true, status: true, splits: { select: { method: true, amount: true, cashReceived: true, changeAmount: true }, orderBy: { createdAt: 'asc' } } } },
         items:    { include: { variant: { include: { product: true } } } },
         combos:   true,
       },
@@ -64,6 +64,7 @@ async function getSales(storeId: string, params: {
         nonMemberCustomer: customer ?? null,
         paymentMethod: payment?.method ?? 'CASH',
         paymentStatus: payment?.status ?? 'PAID',
+        paymentSplits: (payment?.splits ?? []).map((l) => ({ method: l.method, amount: Number(l.amount), cashReceived: l.cashReceived === null ? null : Number(l.cashReceived), changeAmount: l.changeAmount === null ? null : Number(l.changeAmount) })),
         subtotal: Number(subtotal), discount: Number(discount),
         tax: Number(tax), ongkir: Number(sale.ongkir), total: Number(total),
         combos: combos.map((c) => ({ id: c.id, comboId: c.comboId, name: c.name, packagePrice: Number(c.packagePrice), itemsTotal: Number(c.itemsTotal), discount: Number(c.discount) })),

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
+import { paymentMethodLabel } from '@/lib/payment';
 import { useToast } from '@/components/ui/use-toast';
 import { Printer, Pencil, Gift, Trash2, AlertTriangle } from 'lucide-react';
 import { EditSaleDialog } from './edit-sale-dialog';
@@ -23,6 +24,8 @@ interface SaleDetailsDialogProps {
     total: number;
     paymentMethod: string;
     paymentStatus: string;
+    /** Rincian per metode (kosong untuk transaksi lama). */
+    paymentSplits?: Array<{ method: string; amount: number; cashReceived: number | null; changeAmount: number | null }>;
     notes: string | null;
     pointsEarned: number;
     pointsRedeemed?: number;
@@ -774,6 +777,16 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   </span>
                   </h4>
                 <p className="text-[11px] sm:text-sm"><span className="text-gray-600">Metode:</span> {sale.paymentMethod}</p>
+                {(sale.paymentSplits ?? []).map((l) => (
+                  <div key={l.method} className="pl-2 text-[11px] sm:text-xs text-gray-600">
+                    <div className="flex justify-between"><span>{paymentMethodLabel(l.method)}</span><span>{formatCurrency(l.amount)}</span></div>
+                    {l.cashReceived !== null && l.changeAmount !== null && (
+                      <div className="flex justify-between text-gray-400">
+                        <span>Diterima {formatCurrency(l.cashReceived)}</span><span>Kembali {formatCurrency(l.changeAmount)}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
                 <p className="text-[11px] sm:text-sm"><span className="text-gray-600">Cashier:</span> {sale.cashierName ?? '-'}</p>
               </div>
             </div>

@@ -358,11 +358,31 @@ model Payment {
   paidAt          DateTime?
   createdAt       DateTime      @default(now())
 
-  sale  Sale  @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  store Store @relation(fields: [storeId], references: [id])
+  sale   Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  store  Store          @relation(fields: [storeId], references: [id])
+  splits PaymentSplit[]
 
   @@index([storeId])
   @@map("payments")
+}
+
+// Rincian pembayaran per metode. Transaksi lunas dari kasir selalu punya >= 1 baris;
+// method = 'SPLIT' di Payment berarti > 1 baris. Transaksi lama (sebelum fitur ini)
+// tidak punya baris → dibaca dari Payment.method/amount.
+// Tanpa storeId: terhapus lewat induknya (Payment) — lihat INDIRECT_MODELS di store-purge.ts.
+model PaymentSplit {
+  id           String   @id @default(cuid())
+  paymentId    String
+  method       String // CASH | TRANSFER | CARD | QRIS
+  amount       Decimal  @db.Decimal(10, 2) // nilai yang melunasi transaksi lewat metode ini
+  cashReceived Decimal? @db.Decimal(10, 2) // uang fisik diterima (hanya CASH)
+  changeAmount Decimal? @db.Decimal(10, 2) // kembalian = cashReceived - amount (hanya CASH)
+  createdAt    DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@map("payment_splits")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

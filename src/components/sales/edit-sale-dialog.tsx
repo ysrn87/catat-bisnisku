@@ -708,9 +708,11 @@ export function EditSaleDialog({
                 <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={loading}>
                   <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg"><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    {sale.paymentMethod === 'SPLIT' && <SelectItem value="SPLIT">🔀 Split (tidak diubah)</SelectItem>}
                     <SelectItem value="CASH">💵 Cash</SelectItem>
                     <SelectItem value="CARD">💳 Kartu</SelectItem>
                     <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
+                    <SelectItem value="QRIS">📱 QRIS</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

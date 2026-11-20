@@ -41,8 +41,8 @@ export async function createCashflowAction(formData: FormData) {
       },
     });
 
-    // Generate jurnal akuntansi — non-blocking
-    generateCashflowJournal({
+    // Generate jurnal akuntansi (di-await: proses tanpa await bisa terputus di serverless)
+    await generateCashflowJournal({
       storeId,
       cashflowId:    created.id,
       type,
@@ -93,7 +93,7 @@ export async function updateCashflowAction(id: string, formData: FormData) {
     });
 
     // Re-generate jurnal — non-blocking
-    generateCashflowJournal({
+    await generateCashflowJournal({
       storeId,
       cashflowId:    id,
       type,
@@ -128,7 +128,7 @@ export async function deleteCashflowAction(id: string) {
     await db.cashflow.delete({ where: { id } });
 
     // Hapus jurnal terkait — non-blocking
-    deleteJournalsBySource('CASHFLOW', id)
+    await deleteJournalsBySource('CASHFLOW', id)
       .catch((err) => console.warn('Journal deletion skipped:', err.message));
 
     revalidatePath(`/${storeSlug}/admin/finance/cashflow`);

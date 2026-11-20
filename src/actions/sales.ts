@@ -6,7 +6,14 @@ import { requireStoreAccess } from '@/lib/store-context';
 import { generateSaleNumber } from '@/lib/utils';
 import { getPointsConversionRate } from './settings';
 import { sanitizeText } from '@/lib/sanitize';
-import { generateSaleJournals } from '@/modules/accounting/lib/journal-engine';
+import { generateSaleJournals, deleteJournalsBySource } from '@/modules/accounting/lib/journal-engine';
+import {
+  normalizePaymentMethod,
+  validatePaidPayments,
+  SPLIT_METHOD,
+  type PaymentLineInput,
+  type NormalizedPaymentLine,
+} from '@/lib/payment';
 import { resolveComboSelection, round2, type ComboResolution, type ComboSelections } from '@/lib/combo-pricing';
 import { comboWithSlotsInclude, toComboInfo, type ComboWithSlots } from '@/lib/combo-db';
 
@@ -18,12 +25,23 @@ interface SaleItemInput {
 
 type PaymentStatusValue = 'PAID' | 'PENDING' | 'FAILED' | 'REFUNDED';
 
+/** Hanya dua status yang dihasilkan UI; status lain tidak punya perlakuan akuntansi yang jelas. */
+const isSettlableStatus = (s: string): s is 'PAID' | 'PENDING' => s === 'PAID' || s === 'PENDING';
+
+const isMoney = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+
 interface CreateSaleInput {
   items:           SaleItemInput[];
   customerId:      string | null; // Customer.id (walk-in) atau null
   memberId?:       string | null; // StoreUser.id (member) — opsional, untuk backward compat
   paymentMethod:   string;
   paymentStatus?:  PaymentStatusValue;
+  /**
+   * Rincian pembayaran LUNAS (satu baris = satu metode; >1 baris = split).
+   * Total semua `amount` harus = total transaksi (dihitung server). Tunai wajib menyertakan
+   * `cashReceived` agar kembalian tercatat. Bila kosong → satu baris dari `paymentMethod`.
+   */
+  payments?:       PaymentLineInput[];
   discount?:       number;
   tax?:            number;
   ongkir?:         number;
@@ -50,10 +68,17 @@ export async function createSaleAction(input: CreateSaleInput) {
       customerId,   // Customer.id (walk-in lokal) — nullable
       memberId,     // StoreUser.id (member) — nullable
       paymentMethod,
+      payments,
       paymentStatus = 'PAID',
       discount = 0, tax = 0, ongkir = 0,
       notes, pointsRedeemed = 0,
     } = input;
+
+    if (!isSettlableStatus(paymentStatus)) return { success: false, error: 'Status pembayaran tidak valid' };
+    if (!isMoney(discount) || !isMoney(tax) || !isMoney(ongkir)) {
+      return { success: false, error: 'Diskon, pajak, dan ongkir harus berupa angka ≥ 0' };
+    }
+    if (!Number.isInteger(pointsRedeemed) || pointsRedeemed < 0) return { success: false, error: 'Jumlah poin tidak valid' };
 
     const items: SaleItemInput[] = rawItems ?? [];
     if (items.length === 0 && packages.length === 0) return { success: false, error: 'Tidak ada item dalam penjualan' };
@@ -151,6 +176,36 @@ export async function createSaleAction(input: CreateSaleInput) {
     const total = round2(subtotal - discount - comboDiscount - pointDiscount + tax + ongkir);
     if (total < 0) return { success: false, error: 'Total pembayaran tidak boleh negatif' };
 
+    // ── Pembayaran: validasi di SERVER terhadap total yang dihitung server ─────
+    let paymentLines: NormalizedPaymentLine[] = [];
+    let paymentMethodFinal: string;
+    let cashReceived: number | null = null;
+    let changeAmount: number | null = null;
+
+    if (paymentStatus === 'PAID') {
+      const requested: PaymentLineInput[] =
+        payments && payments.length > 0 ? payments : [{ method: paymentMethod, amount: total }];
+      const check = validatePaidPayments(requested, total);
+      if (!check.ok) return { success: false, error: check.error };
+      paymentLines       = check.lines;
+      cashReceived       = check.cashReceived;
+      changeAmount       = check.changeAmount;
+      // Total 0 (100% diskon/poin) tidak punya baris → pakai metode yang dipilih bila valid
+      paymentMethodFinal = check.lines.length > 0 ? check.method : (normalizePaymentMethod(paymentMethod) ?? 'CASH');
+    } else {
+      // PENDING: belum ada uang masuk — hanya mencatat metode yang direncanakan
+      const planned = normalizePaymentMethod(paymentMethod);
+      if (!planned) return { success: false, error: 'Metode pembayaran tidak valid' };
+      paymentMethodFinal = planned;
+    }
+
+    // HPP dihitung dari kebutuhan stok gabungan (item biasa + isi paket)
+    let hppTotal = 0;
+    for (const [variantId, qty] of demand) {
+      hppTotal += Number(variantById.get(variantId)?.cost ?? 0) * qty;
+    }
+    hppTotal = round2(hppTotal);
+
     const sale = await db.$transaction(async (tx) => {
       const newSale = await tx.sale.create({
         data: {
@@ -204,10 +259,18 @@ export async function createSaleAction(input: CreateSaleInput) {
         data: {
           saleId:  newSale.id,
           storeId,
-          method:  paymentMethod,
+          method:  paymentMethodFinal,
           status:  paymentStatus,
           amount:  total,
           paidAt:  paymentStatus === 'PAID' ? new Date() : null,
+          splits: {
+            create: paymentLines.map((l) => ({
+              method:       l.method,
+              amount:       l.amount,
+              cashReceived: l.cashReceived,
+              changeAmount: l.changeAmount,
+            })),
+          },
         },
       });
 
@@ -247,6 +310,19 @@ export async function createSaleAction(input: CreateSaleInput) {
         data: { storeId, saleId: newSale.id, type: 'INCOME', category: 'Penjualan', amount: total, description: `Penjualan ${newSale.saleNumber}`, occurredAt: new Date() },
       });
 
+      // Jurnal akuntansi ikut ATOMIK dengan penjualan: bila gagal, seluruh transaksi dibatalkan
+      // sehingga buku besar tidak pernah selisih dari data penjualan.
+      await generateSaleJournals({
+        storeId,
+        saleId:     newSale.id,
+        total,
+        hpp:        hppTotal,
+        date:       newSale.createdAt,
+        saleNumber: newSale.saleNumber,
+        status:     paymentStatus,
+        payments:   paymentLines.map((l) => ({ method: l.method, amount: l.amount })),
+      }, tx);
+
       return newSale;
     }, { maxWait: 10000, timeout: 20000 });
 
@@ -256,28 +332,6 @@ export async function createSaleAction(input: CreateSaleInput) {
     revalidatePath(`/${storeSlug}/manager/inventory/stock`);
     revalidatePath(`/${storeSlug}/cashier`);
 
-    // Generate jurnal akuntansi — non-blocking, pakai field 'cost' dari ProductVariant
-    ;(async () => {
-      try {
-        let hppTotal = 0;
-        for (const [variantId, qty] of demand) {
-          hppTotal += Number(variantById.get(variantId)?.cost ?? 0) * qty;
-        }
-
-        await generateSaleJournals({
-          storeId,
-          saleId:        sale.id,
-          total,
-          hpp:           hppTotal,
-          paymentMethod,
-          date:          sale.createdAt,
-          saleNumber:    sale.saleNumber,
-        });
-      } catch (err: any) {
-        console.warn('Sale journal generation skipped (CoA not seeded?):', err.message);
-      }
-    })();
-
     return {
       success:       true,
       saleId:        sale.id,
@@ -286,6 +340,16 @@ export async function createSaleAction(input: CreateSaleInput) {
       subtotal,
       comboDiscount,
       total,
+      paymentMethod: paymentMethodFinal,
+      paymentStatus,
+      cashReceived,
+      changeAmount,
+      payments: paymentLines.map((l) => ({
+        method:       l.method,
+        amount:       l.amount,
+        cashReceived: l.cashReceived,
+        changeAmount: l.changeAmount,
+      })),
       combos: resolvedPackages.map((p) => ({
         name:         p.combo.name,
         packagePrice: p.res.packagePrice,
@@ -330,6 +394,8 @@ export async function updateSaleAction(
     memberId?:       string | null;
     paymentMethod?:  string;
     paymentStatus?:  PaymentStatusValue;
+    /** Rincian pembayaran lunas (lihat createSaleAction). Kosong → pertahankan/bentuk dari `paymentMethod`. */
+    payments?:       PaymentLineInput[];
     /** Diskon MANUAL saja. Diskon paket dihitung terpisah. */
     discount?:       number;
     tax?:            number;
@@ -347,7 +413,7 @@ export async function updateSaleAction(
 
     const existingSale = await db.sale.findFirst({
       where:   { id: saleId, storeId },
-      include: { items: true, payment: true, combos: true },
+      include: { items: true, payment: { include: { splits: true } }, combos: true },
     });
     if (!existingSale) return { success: false, error: 'Penjualan tidak ditemukan' };
 
@@ -359,6 +425,7 @@ export async function updateSaleAction(
       customerId     = existingSale.customerId,
       memberId       = existingSale.memberId,
       paymentMethod  = existingSale.payment?.method ?? 'CASH',
+      payments,
       paymentStatus  = (existingSale.payment?.status as PaymentStatusValue) ?? 'PAID',
       discount       = Math.max(0, Number(existingSale.discount) - existingPackageDiscount),
       tax            = Number(existingSale.tax),
@@ -366,6 +433,12 @@ export async function updateSaleAction(
       notes,
       pointsRedeemed = 0,
     } = input;
+
+    if (!isSettlableStatus(paymentStatus)) return { success: false, error: 'Status pembayaran tidak valid' };
+    if (!isMoney(discount) || !isMoney(tax) || !isMoney(ongkir)) {
+      return { success: false, error: 'Diskon, pajak, dan ongkir harus berupa angka ≥ 0' };
+    }
+    if (!Number.isInteger(pointsRedeemed) || pointsRedeemed < 0) return { success: false, error: 'Jumlah poin tidak valid' };
 
     // `packages` tidak dikirim → semua paket yang ada dipertahankan (tidak terhapus diam-diam).
     // Dikirim (termasuk array kosong) → daftar itu otoritatif.
@@ -445,7 +518,7 @@ export async function updateSaleAction(
     }
     const newVariants = await db.productVariant.findMany({
       where:  { id: { in: [...demand.keys()] }, storeId },
-      select: { id: true, stock: true, type: true, name: true },
+      select: { id: true, stock: true, type: true, name: true, cost: true },
     });
     const newVariantById = new Map(newVariants.map((v) => [v.id, v]));
 
@@ -458,6 +531,62 @@ export async function updateSaleAction(
         if (effectiveStock < qty) return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
       }
     }
+
+    // ── Pembayaran: pertahankan rincian lama bila tidak berubah, selain itu validasi ulang ──
+    const oldSplits    = existingSale.payment?.splits ?? [];
+    const oldWasPaid   = existingSale.payment?.status === 'PAID';
+    const oldTotalSame = Math.round(Number(existingSale.total) * 100) === Math.round(total * 100);
+    const toNormalized = (): NormalizedPaymentLine[] =>
+      oldSplits.map((l) => ({
+        method:       (normalizePaymentMethod(l.method) ?? 'CASH'),
+        amount:       Number(l.amount),
+        cashReceived: l.cashReceived === null ? null : Number(l.cashReceived),
+        changeAmount: l.changeAmount === null ? null : Number(l.changeAmount),
+      }));
+
+    let paymentLines: NormalizedPaymentLine[] = [];
+    let paymentMethodFinal: string;
+
+    if (paymentStatus === 'PAID') {
+      if (payments && payments.length > 0) {
+        const check = validatePaidPayments(payments, total);
+        if (!check.ok) return { success: false, error: check.error };
+        paymentLines       = check.lines;
+        paymentMethodFinal = check.lines.length > 0 ? check.method : (normalizePaymentMethod(paymentMethod) ?? 'CASH');
+      } else if (paymentMethod.toUpperCase() === SPLIT_METHOD) {
+        // Form edit tidak punya editor split: rincian hanya boleh dipertahankan bila nilainya tidak berubah
+        if (oldSplits.length > 0 && oldWasPaid && oldTotalSame) {
+          paymentLines       = toNormalized();
+          paymentMethodFinal = SPLIT_METHOD;
+        } else {
+          return { success: false, error: 'Total transaksi split berubah. Pilih satu metode pembayaran, atau buat ulang transaksi.' };
+        }
+      } else {
+        const method = normalizePaymentMethod(paymentMethod);
+        if (!method) return { success: false, error: 'Metode pembayaran tidak valid' };
+        const sameSingle = oldWasPaid && oldTotalSame && oldSplits.length === 1 && normalizePaymentMethod(oldSplits[0].method) === method;
+        if (sameSingle) {
+          paymentLines       = toNormalized(); // jaga uang diterima & kembalian asli
+          paymentMethodFinal = method;
+        } else {
+          const check = validatePaidPayments([{ method, amount: total }], total);
+          if (!check.ok) return { success: false, error: check.error };
+          paymentLines       = check.lines;
+          paymentMethodFinal = check.lines.length > 0 ? check.method : method;
+        }
+      }
+    } else {
+      // PENDING: tanpa rincian uang masuk
+      const planned = paymentMethod.toUpperCase() === SPLIT_METHOD ? 'CASH' : normalizePaymentMethod(paymentMethod);
+      if (!planned) return { success: false, error: 'Metode pembayaran tidak valid' };
+      paymentMethodFinal = planned;
+    }
+
+    let hppTotal = 0;
+    for (const [variantId, qty] of demand) {
+      hppTotal += Number(newVariantById.get(variantId)?.cost ?? 0) * qty;
+    }
+    hppTotal = round2(hppTotal);
 
     await db.$transaction(async (tx) => {
       for (const oldItem of existingSale.items) {
@@ -535,15 +664,23 @@ export async function updateSaleAction(
         },
       });
 
-      if (existingSale.payment) {
-        await tx.payment.update({
-          where: { saleId },
-          data: {
-            method: paymentMethod,
-            status: paymentStatus,
-            amount: total,
-            paidAt: paymentStatus === 'PAID' ? (existingSale.payment.paidAt ?? new Date()) : null,
-          },
+      const paidAt = paymentStatus === 'PAID' ? (existingSale.payment?.paidAt ?? new Date()) : null;
+      const payment = await tx.payment.upsert({
+        where:  { saleId },
+        create: { saleId, storeId, method: paymentMethodFinal, status: paymentStatus, amount: total, paidAt },
+        update: { method: paymentMethodFinal, status: paymentStatus, amount: total, paidAt },
+        select: { id: true },
+      });
+      await tx.paymentSplit.deleteMany({ where: { paymentId: payment.id } });
+      if (paymentLines.length > 0) {
+        await tx.paymentSplit.createMany({
+          data: paymentLines.map((l) => ({
+            paymentId:    payment.id,
+            method:       l.method,
+            amount:       l.amount,
+            cashReceived: l.cashReceived,
+            changeAmount: l.changeAmount,
+          })),
         });
       }
 
@@ -551,7 +688,19 @@ export async function updateSaleAction(
       if (existingCashflow) {
         await tx.cashflow.update({ where: { saleId }, data: { amount: total } });
       }
-    }, { maxWait: 10000, timeout: 15000 });
+
+      // Buku besar diselaraskan dengan hasil edit (sebelumnya jurnal tidak ikut berubah)
+      await generateSaleJournals({
+        storeId,
+        saleId,
+        total,
+        hpp:        hppTotal,
+        date:       existingSale.createdAt,
+        saleNumber: existingSale.saleNumber,
+        status:     paymentStatus,
+        payments:   paymentLines.map((l) => ({ method: l.method, amount: l.amount })),
+      }, tx);
+    }, { maxWait: 10000, timeout: 20000 });
 
     revalidatePath(`/${storeSlug}/admin/transactions/sales`);
     revalidatePath(`/${storeSlug}/manager/transactions/sales`);
@@ -590,7 +739,7 @@ export async function getSaleById(id: string) {
       customer: true,
       member:   { include: { user: true } },
       cashier:  { include: { user: { select: { name: true, email: true } } } },
-      payment:  true,
+      payment:  { include: { splits: true } },
       items:    { include: { variant: { include: { product: true } } } },
       combos:   true,
     },
@@ -640,6 +789,11 @@ export async function deleteSaleAction(id: string) {
           }
         }
       }
+
+      // Cashflow.saleId bersifat SetNull: tanpa penghapusan eksplisit, pemasukan penjualan yang
+      // sudah dihapus akan tertinggal sebagai transaksi "manual" dan tetap dihitung sebagai omzet.
+      await tx.cashflow.deleteMany({ where: { saleId: id, storeId } });
+      await deleteJournalsBySource('POS_SALE', id, tx);
 
       await tx.sale.delete({ where: { id, storeId } });
     });

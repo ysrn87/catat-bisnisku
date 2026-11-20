@@ -950,6 +950,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="CASH">💵 Cash</SelectItem>
+                        <SelectItem value="CARD">💳 Kartu</SelectItem>
                         <SelectItem value="QRIS">📱 QRIS</SelectItem>
                         <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
                       </SelectContent>

@@ -14,7 +14,7 @@ export const STORE_SCOPED_MODELS = [
 ] as const;
 
 /** Model tanpa storeId yang terhapus lewat induknya (dihapus eksplisit di bawah). */
-export const INDIRECT_MODELS = ['SaleItem', 'PointHistory'] as const;
+export const INDIRECT_MODELS = ['SaleItem', 'PointHistory', 'PaymentSplit'] as const;
 
 /**
  * Hapus SEMUA data satu toko di dalam transaksi yang dipanggil pemanggil.
@@ -40,6 +40,7 @@ export async function purgeStoreData(
   await tx.journalEntry.deleteMany({ where: { storeId } });
   await tx.cashflow.deleteMany({ where: { storeId } });
   await tx.stockMovement.deleteMany({ where: { storeId } });
+  await tx.paymentSplit.deleteMany({ where: { payment: { storeId } } });
   await tx.payment.deleteMany({ where: { storeId } });
   await tx.pointHistory.deleteMany({ where: { storeUser: { storeId } } });
   await tx.saleItem.deleteMany({ where: { sale: { storeId } } });

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { PaymentStatus } from '@prisma/client';
-import { ShoppingCart, Search, User, ChevronDown, X, Plus, Minus, Trash2, CheckCircle, UserPlus, Receipt, Printer, Layers } from 'lucide-react';
+import { ShoppingCart, Search, User, X, Plus, Minus, Trash2, CheckCircle, Receipt, Printer, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,8 @@ import { createSaleAction } from '@/actions/sales';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { ComboPickerDialog, type ComboCartLine } from './combo-picker-dialog';
+import { CheckoutDialog, type CheckoutPayload } from './checkout-dialog';
+import { paymentMethodLabel, roundMoney } from '@/lib/payment';
 import type { ComboInfo } from '@/lib/combo-pricing';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,7 +67,14 @@ interface ReceiptCombo {
   lines: Array<{ productName: string; variantName: string; price: number; quantity: number }>;
 }
 
-// Hasil createSaleAction yang sukses (nilai paket dihitung server)
+interface ReceiptPayment {
+  method: string;
+  amount: number;
+  cashReceived: number | null;
+  changeAmount: number | null;
+}
+
+// Hasil createSaleAction yang sukses (nilai paket & pembayaran dihitung/divalidasi server)
 interface CreateSaleOk {
   success: true;
   saleId: string;
@@ -74,6 +83,11 @@ interface CreateSaleOk {
   subtotal: number;
   comboDiscount: number;
   total: number;
+  paymentMethod: string;
+  paymentStatus: string;
+  cashReceived: number | null;
+  changeAmount: number | null;
+  payments: ReceiptPayment[];
   combos: ReceiptCombo[];
 }
 
@@ -84,6 +98,9 @@ interface ReceiptData {
   items: CartItem[];
   customerName: string;
   paymentMethod: string;
+  payments: ReceiptPayment[];
+  cashReceived: number | null;
+  changeAmount: number | null;
   subtotal: number;
   discount: number;
   tax: number;
@@ -109,22 +126,10 @@ interface PosPanelProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const PAYMENT_METHODS = [
-  { value: 'CASH',     label: 'Tunai' },
-  { value: 'TRANSFER', label: 'Transfer' },
-  { value: 'CARD',     label: 'Kartu' },
-  { value: 'QRIS',     label: 'QRIS' },
-];
-
 const DEFAULT_EMOJI = '📦';
 
 function getVariantEmoji(variant: ProductVariant): string {
   return variant.category?.icon || DEFAULT_EMOJI;
-}
-
-function parseNumber(val: string): number {
-  const cleaned = val.replace(/[^\d]/g, '');
-  return cleaned ? parseInt(cleaned, 10) : 0;
 }
 
 // ─── Receipt Dialog ────────────────────────────────────────────────────────────
@@ -151,7 +156,9 @@ function ReceiptDialog({
             <CheckCircle className="w-6 h-6" />
             <span className="text-lg font-bold">Transaksi Berhasil!</span>
           </div>
-          <p className="text-sm text-white/80">Pembayaran diterima</p>
+          <p className="text-sm text-white/80">
+            {data.paymentStatus === 'PENDING' ? 'Disimpan sebagai pending' : 'Pembayaran diterima'}
+          </p>
         </div>
 
         {/* Receipt body */}
@@ -172,10 +179,22 @@ function ReceiptDialog({
             <span className="text-muted-foreground">Pelanggan</span>
             <span className="font-medium">{data.customerName}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Pembayaran</span>
-            <span className="font-medium">{data.paymentMethod}</span>
-          </div>
+          {data.payments.length > 1 ? (
+            <div className="space-y-1">
+              <span className="text-sm text-muted-foreground">Pembayaran (Split)</span>
+              {data.payments.map((p) => (
+                <div key={p.method} className="flex justify-between pl-3 text-sm">
+                  <span className="text-muted-foreground">{paymentMethodLabel(p.method)}</span>
+                  <span className="font-medium">{formatCurrency(p.amount)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Pembayaran</span>
+              <span className="font-medium">{data.paymentMethod}</span>
+            </div>
+          )}
           {data.paymentStatus === 'PENDING' && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Status</span>
@@ -263,6 +282,20 @@ function ReceiptDialog({
             </div>
           </div>
 
+          {/* Uang tunai diterima & kembalian */}
+          {data.cashReceived !== null && data.changeAmount !== null && (
+            <div className="space-y-1 border-t border-dashed border-border pt-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Tunai diterima</span>
+                <span>{formatCurrency(data.cashReceived)}</span>
+              </div>
+              <div className="flex justify-between font-bold">
+                <span>Kembalian</span>
+                <span className="text-emerald-600">{formatCurrency(data.changeAmount)}</span>
+              </div>
+            </div>
+          )}
+
           {/* Points earned */}
           {data.pointsEarned > 0 && (
             <div className="bg-orange-50 dark:bg-orange-950/30 rounded-lg px-3 py-2 text-sm text-center text-orange-700 dark:text-orange-400">
@@ -313,18 +346,16 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
 
   // Checkout fields
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.PAID);
   const [discount, setDiscount] = useState(0);
-  const [discountDisplay, setDiscountDisplay] = useState('');
   const [tax, setTax] = useState(0);
-  const [taxDisplay, setTaxDisplay] = useState('');
   const [ongkir, setOngkir] = useState(0);
-  const [ongkirDisplay, setOngkirDisplay] = useState('');
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [pointsDisplay, setPointsDisplay] = useState('');
   const [notes, setNotes] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Modal "Opsi Lanjutan & Pembayaran" — muncul saat "Proses Transaksi" diklik
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [reopenCartSheet, setReopenCartSheet] = useState(false);
 
   // UI
   const [loading, setLoading] = useState(false);
@@ -363,7 +394,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const comboItemsTotal = comboCart.reduce((sum, l) => sum + l.itemsTotal, 0);
   const comboDiscount   = comboCart.reduce((sum, l) => sum + l.discount, 0);
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0) + comboItemsTotal;
-  const total = Math.max(0, subtotal - comboDiscount - discount - pointDiscount + tax + ongkir);
+  const total = roundMoney(Math.max(0, subtotal - comboDiscount - discount - pointDiscount + tax + ongkir));
 
   const pointsEarned =
     customerType === 'member' && customerId && pointsToRedeem === 0 && paymentStatus === PaymentStatus.PAID
@@ -484,9 +515,9 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const resetAll = useCallback(() => {
     setCart([]);
     setComboCart([]);
-    setDiscount(0); setDiscountDisplay('');
-    setTax(0); setTaxDisplay('');
-    setOngkir(0); setOngkirDisplay('');
+    setDiscount(0);
+    setTax(0);
+    setOngkir(0);
     setPointsToRedeem(0); setPointsDisplay('');
     setNotes('');
     setCustomerType('customer');
@@ -494,9 +525,9 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     setWalkInCustomerId('');
     setCustomerSearch('');
     setShowCustomerDropdown(false);
-    setPaymentMethod('CASH');
     setPaymentStatus(PaymentStatus.PAID);
-    setShowAdvanced(false);
+    setShowCheckout(false);
+    setReopenCartSheet(false);
     setShowCart(false);
     setReceipt(null);
   }, []);
@@ -505,9 +536,9 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const clearCart = useCallback(() => {
     setCart([]);
     setComboCart([]);
-    setDiscount(0); setDiscountDisplay('');
-    setTax(0); setTaxDisplay('');
-    setOngkir(0); setOngkirDisplay('');
+    setDiscount(0);
+    setTax(0);
+    setOngkir(0);
     setPointsToRedeem(0); setPointsDisplay('');
     setNotes('');
   }, []);
@@ -538,17 +569,32 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
   // ─── Checkout ──────────────────────────────────────────────────────────────
 
-  const canCheckout =
+  // Syarat membuka modal pembayaran: ada item & pelanggan valid.
+  // Validasi diskon/pembayaran dilakukan di dalam modal.
+  const canProceed =
     hasItems &&
     !loading &&
     (customerType === 'customer' ||
       (customerType === 'member' && !!customerId) ||
-      (customerType === 'walk-in' && !!walkInCustomerId)) &&
-    discount + comboDiscount + pointDiscount <= subtotal &&
-    total >= 0;
+      (customerType === 'walk-in' && !!walkInCustomerId));
 
-  const handleCheckout = async () => {
-    if (!canCheckout) return;
+  const openCheckout = () => {
+    if (!canProceed) return;
+    // Bottom sheet keranjang (mobile) menutupi dialog (z-index lebih tinggi) → tutup sementara
+    setReopenCartSheet(showCart);
+    setShowCart(false);
+    setShowCheckout(true);
+  };
+
+  const closeCheckout = (open: boolean) => {
+    if (open) return;
+    setShowCheckout(false);
+    if (reopenCartSheet) setShowCart(true);
+    setReopenCartSheet(false);
+  };
+
+  const handleCheckout = async (payload: CheckoutPayload) => {
+    if (!canProceed) return;
     setLoading(true);
     try {
       const result = await createSaleAction({
@@ -557,7 +603,8 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         customerId: customerType === 'walk-in' ? walkInCustomerId || null : null,
         memberId:   customerType === 'member'  ? customerId        || null : null,
 
-        paymentMethod,
+        paymentMethod: payload.paymentMethod,
+        payments: payload.payments,
         paymentStatus,
         discount,
         tax,
@@ -567,9 +614,11 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
       });
 
       if (result.success) {
+        setShowCheckout(false);
+        setReopenCartSheet(false);
         setShowCart(false); // tutup bottom sheet mobile sebelum receipt muncul
-        const payLabel = PAYMENT_METHODS.find((p) => p.value === paymentMethod)?.label ?? paymentMethod;
         const ok = result as unknown as CreateSaleOk;
+        const payLabel = paymentMethodLabel(ok.paymentMethod);
         setReceipt({
           saleId: ok.saleId,
           saleNumber: ok.saleNumber,
@@ -579,6 +628,9 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
           comboDiscount: ok.comboDiscount ?? 0,
           customerName,
           paymentMethod: payLabel,
+          payments: ok.payments ?? [],
+          cashReceived: ok.cashReceived ?? null,
+          changeAmount: ok.changeAmount ?? null,
           subtotal: ok.subtotal ?? subtotal,
           discount,
           tax,
@@ -605,9 +657,12 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     const printWindow = window.open('', '_blank', 'width=420,height=600');
     if (!printWindow) return;
 
+    // Semua teks buatan pengguna (nama produk/toko/pelanggan) di-escape: jendela cetak
+    // memakai document.write, jadi HTML mentah di nama produk bisa menjalankan skrip.
+    const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const itemsHTML = receipt.items.map((item) => `
       <div class="item">
-        <div class="item-name">${item.productName}${item.variantName !== item.productName ? ` – ${item.variantName}` : ''}</div>
+        <div class="item-name">${esc(item.productName)}${item.variantName !== item.productName ? ` – ${esc(item.variantName)}` : ''}</div>
         <div class="item-line">
           <span>${item.quantity} x ${formatCurrency(item.price)}</span>
           <span>${formatCurrency(item.price * item.quantity)}</span>
@@ -615,7 +670,6 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
       </div>
     `).join('');
 
-    const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const combosHTML = receipt.combos.map((c) => `
       <div class="item">
         <div class="item-name"><strong>${esc(c.name)}</strong></div>
@@ -637,12 +691,24 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
       <div class="summary-row"><span>${label}</span><span>${value}</span></div>
     `).join('');
 
+    const paymentsHTML = [
+      ...(receipt.payments.length > 1
+        ? receipt.payments.map((p) => `<div class="summary-row"><span>${esc(paymentMethodLabel(p.method))}</span><span>${formatCurrency(p.amount)}</span></div>`)
+        : []),
+      ...(receipt.cashReceived !== null && receipt.changeAmount !== null
+        ? [
+            `<div class="summary-row"><span>Tunai diterima</span><span>${formatCurrency(receipt.cashReceived)}</span></div>`,
+            `<div class="summary-row"><strong>Kembalian</strong><strong>${formatCurrency(receipt.changeAmount)}</strong></div>`,
+          ]
+        : []),
+    ].join('');
+
     const receiptHTML = `
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8" />
-<title>Struk ${receipt.saleNumber}</title>
+<title>Struk ${esc(receipt.saleNumber)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -681,16 +747,16 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 </head>
 <body>
   <div class="center">
-    <div class="store-name">${storeName}</div>
-    <div class="meta">${receipt.saleNumber}</div>
+    <div class="store-name">${esc(storeName)}</div>
+    <div class="meta">${esc(receipt.saleNumber)}</div>
     <div class="meta">${formatDateTime(receipt.createdAt)}</div>
-    ${cashierName ? `<div class="meta">Kasir: ${cashierName}</div>` : ''}
+    ${cashierName ? `<div class="meta">Kasir: ${esc(cashierName)}</div>` : ''}
   </div>
 
   <div class="divider"></div>
 
-  <div class="meta">Pelanggan: ${receipt.customerName}</div>
-  <div class="meta">Bayar: ${receipt.paymentMethod}${receipt.paymentStatus === 'PENDING' ? ' (Pending)' : ''}</div>
+  <div class="meta">Pelanggan: ${esc(receipt.customerName)}</div>
+  <div class="meta">Bayar: ${esc(receipt.paymentMethod)}${receipt.paymentStatus === 'PENDING' ? ' (Pending)' : ''}</div>
 
   <div class="divider"></div>
 
@@ -701,6 +767,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
   ${summaryRows}
   <div class="total-row"><span>TOTAL</span><span>${formatCurrency(receipt.total)}</span></div>
+  ${paymentsHTML}
 
   ${receipt.pointsEarned > 0 ? `<div class="footer">Poin didapat: ${receipt.pointsEarned}</div>` : ''}
 
@@ -897,73 +964,6 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
             )}
           </div>
 
-          {/* Advanced: Diskon / Pajak / Ongkir / Catatan */}
-          <div>
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors w-full"
-            >
-              <ChevronDown className={cn('w-3 h-3 transition-transform', showAdvanced && 'rotate-180')} />
-              Opsi Lanjutan (Diskon, Pajak, Ongkir)
-            </button>
-            {showAdvanced && (
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
-                {[
-                  { label: 'Diskon (Rp)', val: discountDisplay, set: setDiscountDisplay, setState: setDiscount },
-                  { label: 'Pajak (Rp)', val: taxDisplay, set: setTaxDisplay, setState: setTax },
-                  { label: 'Ongkir (Rp)', val: ongkirDisplay, set: setOngkirDisplay, setState: setOngkir },
-                ].map(({ label, val, set, setState }) => (
-                  <div key={label}>
-                    <Label className="text-[10px] text-muted-foreground">{label}</Label>
-                    <Input
-                      value={val}
-                      onChange={(e) => {
-                        const raw = e.target.value.replace(/\D/g, '');
-                        set(raw);
-                        setState(parseNumber(raw));
-                      }}
-                      placeholder="0"
-                      className="h-7 text-xs mt-0.5"
-                    />
-                  </div>
-                ))}
-                <div className="col-span-3">
-                  <Label className="text-[10px] text-muted-foreground">Metode Bayar</Label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full mt-0.5 h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-[#028697]"
-                  >
-                    {PAYMENT_METHODS.map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-3">
-                  <Label className="text-[10px] text-muted-foreground">Status Bayar</Label>
-                  <select
-                    value={paymentStatus}
-                    onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
-                    className="w-full mt-0.5 h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-[#028697]"
-                  >
-                    <option value="PAID">Lunas</option>
-                    <option value="PENDING">Pending</option>
-                  </select>
-                </div>
-                <div className="col-span-3">
-                  <Label className="text-[10px] text-muted-foreground">Catatan</Label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Catatan tambahan..."
-                    rows={2}
-                    className="w-full mt-0.5 text-xs border border-input rounded-md bg-background p-2 focus:outline-none focus:ring-1 focus:ring-[#028697] resize-none"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Summary */}
           <div className="space-y-1 text-xs pt-1 border-t border-border">
             <div className="flex justify-between text-muted-foreground">
@@ -1016,20 +1016,13 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
             </Button>
             <Button
               className="flex-1 h-9 bg-[#028697] hover:bg-[#017585] text-white font-semibold disabled:opacity-50 transition-colors"
-              onClick={handleCheckout}
-              disabled={!canCheckout}
+              onClick={openCheckout}
+              disabled={!canProceed}
             >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Memproses...
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4" />
-                  Proses Transaksi
-                </span>
-              )}
+              <span className="flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4" />
+                Proses Transaksi
+              </span>
             </Button>
           </div>
         </div>
@@ -1050,6 +1043,29 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
           onAdd={(line) => setComboCart((prev) => [...prev, line])}
         />
       )}
+
+      <CheckoutDialog
+        open={showCheckout}
+        onOpenChange={closeCheckout}
+        loading={loading}
+        customerName={customerName}
+        subtotal={subtotal}
+        comboDiscount={comboDiscount}
+        pointDiscount={pointDiscount}
+        pointsEarned={pointsEarned}
+        total={total}
+        discount={discount}
+        tax={tax}
+        ongkir={ongkir}
+        notes={notes}
+        onDiscountChange={setDiscount}
+        onTaxChange={setTax}
+        onOngkirChange={setOngkir}
+        onNotesChange={setNotes}
+        paymentStatus={paymentStatus === PaymentStatus.PENDING ? 'PENDING' : 'PAID'}
+        onPaymentStatusChange={(st) => setPaymentStatus(st === 'PENDING' ? PaymentStatus.PENDING : PaymentStatus.PAID)}
+        onConfirm={handleCheckout}
+      />
 
       {/* Receipt overlay */}
       {receipt && (

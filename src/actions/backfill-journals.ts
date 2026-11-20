@@ -33,7 +33,7 @@ export async function backfillJournalsAction() {
       where:   { storeId },
       include: {
         items:   { include: { variant: { select: { id: true, cost: true } } } },
-        payment: { select: { method: true } },
+        payment: { select: { method: true, status: true, splits: { select: { method: true, amount: true } } } },
       },
     });
 
@@ -50,14 +50,21 @@ export async function backfillJournalsAction() {
           0,
         );
 
+        // Rincian pembayaran: baris split bila ada; transaksi lama → satu baris dari Payment.method
+        const splits = sale.payment?.splits ?? [];
+        const payments = splits.length > 0
+          ? splits.map((l) => ({ method: l.method, amount: Number(l.amount) }))
+          : [{ method: sale.payment?.method ?? 'CASH', amount: Number(sale.total) }];
+
         await generateSaleJournals({
           storeId,
-          saleId:        sale.id,
-          total:         Number(sale.total),
-          hpp:           hppTotal,
-          paymentMethod: sale.payment?.method ?? 'CASH',
-          date:          sale.createdAt,
-          saleNumber:    sale.saleNumber,
+          saleId:     sale.id,
+          total:      Number(sale.total),
+          hpp:        hppTotal,
+          date:       sale.createdAt,
+          saleNumber: sale.saleNumber,
+          status:     sale.payment?.status === 'PENDING' ? 'PENDING' : 'PAID',
+          payments,
         });
 
         salesCount++;

@@ -12,6 +12,12 @@ export interface DefaultAccount {
   isSystem: boolean; // system accounts tidak boleh dihapus
 }
 
+// Kode akun sistem yang dipakai mesin jurnal penjualan
+export const ACCOUNT_RECEIVABLE    = '1003'; // Piutang Dagang
+export const ACCOUNT_INVENTORY     = '1004'; // Persediaan Barang
+export const ACCOUNT_SALES_REVENUE = '4001'; // Pendapatan Penjualan
+export const ACCOUNT_COGS          = '5001'; // HPP
+
 export const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
   // ── ASET (1xxx) ──────────────────────────────────────────────────────────
   { code: '1001', name: 'Kas',                    type: 'ASSET',     isSystem: true  },
@@ -55,6 +61,7 @@ export const PAYMENT_METHOD_TO_ACCOUNT: Record<string, string> = {
   TRANSFER:    '1002', // Bank
   BANK:        '1002',
   QRIS:        '1002',
+  CARD:        '1002', // Kartu (kode yang dipakai POS & form edit) — sebelumnya salah masuk ke Kas
   DEBIT:       '1002',
   KREDIT:      '1002',
 };

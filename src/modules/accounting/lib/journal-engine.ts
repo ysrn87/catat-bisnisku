@@ -4,13 +4,22 @@
 // double-entry journal entries secara otomatis.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
+import { paymentMethodLabel } from '@/lib/payment';
 import {
   resolvePaymentAccount,
   resolveExpenseAccount,
   resolveIncomeAccount,
   DEFAULT_CHART_OF_ACCOUNTS,
+  ACCOUNT_RECEIVABLE,
+  ACCOUNT_SALES_REVENUE,
+  ACCOUNT_COGS,
+  ACCOUNT_INVENTORY,
 } from './accounts';
+
+/** Client Prisma biasa ATAU client transaksi (tx) — agar jurnal bisa ikut atomik dengan penjualan. */
+type JournalClient = Prisma.TransactionClient;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SEED DEFAULT CoA untuk toko baru
@@ -32,87 +41,145 @@ export async function seedDefaultAccounts(storeId: string): Promise<void> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER — Resolve account ID dari code
+//
+// Akun yang belum ada (toko lama belum seed CoA, atau akun non-sistem terhapus)
+// dibuat otomatis dari DEFAULT_CHART_OF_ACCOUNTS. Aman dipanggil berulang
+// (skipDuplicates) sehingga kasir tidak pernah terblokir karena CoA belum siap.
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function getAccountId(storeId: string, code: string): Promise<string> {
-  const account = await db.account.findUnique({
-    where: { storeId_code: { storeId, code } },
-    select: { id: true },
-  });
+async function resolveAccountIds(
+  client: JournalClient,
+  storeId: string,
+  codes: string[],
+): Promise<Map<string, string>> {
+  const wanted = [...new Set(codes)];
 
-  if (!account) {
-    throw new Error(`Account code ${code} tidak ditemukan untuk store ${storeId}. Pastikan CoA sudah di-seed.`);
+  const load = async () => {
+    const rows = await client.account.findMany({
+      where:  { storeId, code: { in: wanted } },
+      select: { id: true, code: true },
+    });
+    return new Map(rows.map((r) => [r.code, r.id]));
+  };
+
+  let ids = await load();
+  if (ids.size < wanted.length) {
+    const missing = DEFAULT_CHART_OF_ACCOUNTS.filter((a) => wanted.includes(a.code) && !ids.has(a.code));
+    if (missing.length > 0) {
+      await client.account.createMany({
+        data: missing.map((a) => ({ storeId, code: a.code, name: a.name, type: a.type, isSystem: a.isSystem })),
+        skipDuplicates: true,
+      });
+      ids = await load();
+    }
   }
 
-  return account.id;
+  const stillMissing = wanted.filter((c) => !ids.has(c));
+  if (stillMissing.length > 0) {
+    throw new Error(`Akun ${stillMissing.join(', ')} tidak ditemukan untuk store ${storeId}.`);
+  }
+  return ids;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GENERATE JOURNAL DARI POS SALE
 //
-// Setiap penjualan menghasilkan 2 jurnal:
-// 1. Kas/Bank (D) vs Pendapatan Penjualan (K) — uang masuk
-// 2. HPP (D)      vs Persediaan Barang (K)     — stok keluar
+// LUNAS — satu jurnal per metode pembayaran (split = beberapa baris):
+//   Kas/Bank (D)  vs  Pendapatan Penjualan (K)    sebesar nominal tiap metode
+//   Catatan: kembalian TIDAK dijurnal — yang masuk kas hanya nominal yang
+//   melunasi transaksi (uang diterima − kembalian).
+// PENDING — belum ada uang masuk:
+//   Piutang Dagang (D) vs Pendapatan Penjualan (K) sebesar total
+// Selalu (bila HPP > 0):
+//   HPP (D) vs Persediaan Barang (K)
+//
+// Idempoten: jurnal lama sale ini dihapus dulu, jadi aman dipanggil ulang
+// saat transaksi diedit.
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface SaleJournalInput {
-  storeId:       string;
-  saleId:        string;
-  total:         number; // total penjualan
-  hpp:           number; // total harga pokok (cost * qty)
-  paymentMethod: string;
-  date:          Date;
-  saleNumber:    string;
+export interface SaleJournalPayment {
+  method: string;
+  amount: number;
 }
 
-export async function generateSaleJournals(input: SaleJournalInput): Promise<void> {
-  const { storeId, saleId, total, hpp, paymentMethod, date, saleNumber } = input;
+interface SaleJournalInput {
+  storeId:    string;
+  saleId:     string;
+  total:      number; // total penjualan
+  hpp:        number; // total harga pokok (cost * qty)
+  date:       Date;
+  saleNumber: string;
+  /** PAID → jurnal ke Kas/Bank sesuai `payments`; PENDING → Piutang Dagang. */
+  status:     'PAID' | 'PENDING';
+  /** Rincian pembayaran (hanya dipakai bila PAID). Kosong → dianggap Tunai senilai total. */
+  payments:   SaleJournalPayment[];
+}
+
+const toCents = (n: number) => Math.round(n * 100);
+
+export async function generateSaleJournals(
+  input: SaleJournalInput,
+  client: JournalClient = db,
+): Promise<void> {
+  const { storeId, saleId, total, hpp, date, saleNumber, status } = input;
 
   // Hapus jurnal lama jika ada (untuk re-generate saat sale di-edit)
-  await db.journalEntry.deleteMany({
+  await client.journalEntry.deleteMany({
     where: { sourceType: 'POS_SALE', sourceId: saleId },
   });
 
   if (total <= 0) return;
 
-  const cashAccountCode = resolvePaymentAccount(paymentMethod);
+  // Sisi debit: dari mana "uang" penjualan ini berasal
+  const debits: Array<{ code: string; amount: number; label: string }> =
+    status === 'PENDING'
+      ? [{ code: ACCOUNT_RECEIVABLE, amount: total, label: 'Piutang' }]
+      : (input.payments.length > 0 ? input.payments : [{ method: 'CASH', amount: total }]).map((p) => ({
+          code:   resolvePaymentAccount(p.method),
+          amount: p.amount,
+          label:  paymentMethodLabel(p.method),
+        }));
 
-  const [cashId, revenueId, hppId, inventoryId] = await Promise.all([
-    getAccountId(storeId, cashAccountCode),
-    getAccountId(storeId, '4001'), // Pendapatan Penjualan
-    getAccountId(storeId, '5001'), // HPP
-    getAccountId(storeId, '1004'), // Persediaan Barang
+  // Jaga buku tetap seimbang: total debit harus sama dengan pendapatan yang diakui
+  const debitSum = debits.reduce((sum, d) => sum + toCents(d.amount), 0);
+  if (debitSum !== toCents(total)) {
+    throw new Error(`Jurnal penjualan ${saleNumber} tidak seimbang: pembayaran ${debitSum / 100} ≠ total ${total}`);
+  }
+
+  const ids = await resolveAccountIds(client, storeId, [
+    ...debits.map((d) => d.code),
+    ACCOUNT_SALES_REVENUE,
+    ...(hpp > 0 ? [ACCOUNT_COGS, ACCOUNT_INVENTORY] : []),
   ]);
 
-  const entries = [];
-
-  // Jurnal 1: Kas/Bank bertambah, Pendapatan bertambah
-  entries.push({
+  const entries: Prisma.JournalEntryCreateManyInput[] = debits.map((d) => ({
     storeId,
     date,
-    debitId:     cashId,
-    creditId:    revenueId,
-    amount:      total,
-    description: `Penjualan #${saleNumber}`,
-    sourceType:  'POS_SALE' as const,
+    debitId:     ids.get(d.code)!,
+    creditId:    ids.get(ACCOUNT_SALES_REVENUE)!,
+    amount:      d.amount,
+    description: debits.length > 1 || status === 'PENDING'
+      ? `Penjualan #${saleNumber} (${d.label})`
+      : `Penjualan #${saleNumber}`,
+    sourceType:  'POS_SALE',
     sourceId:    saleId,
-  });
+  }));
 
-  // Jurnal 2: HPP bertambah, Persediaan berkurang (hanya jika hpp > 0)
+  // HPP bertambah, Persediaan berkurang (hanya jika hpp > 0)
   if (hpp > 0) {
     entries.push({
       storeId,
       date,
-      debitId:     hppId,
-      creditId:    inventoryId,
+      debitId:     ids.get(ACCOUNT_COGS)!,
+      creditId:    ids.get(ACCOUNT_INVENTORY)!,
       amount:      hpp,
       description: `HPP Penjualan #${saleNumber}`,
-      sourceType:  'POS_SALE' as const,
+      sourceType:  'POS_SALE',
       sourceId:    saleId,
     });
   }
 
-  await db.journalEntry.createMany({ data: entries });
+  await client.journalEntry.createMany({ data: entries });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -162,10 +229,9 @@ export async function generateCashflowJournal(input: CashflowJournalInput): Prom
     creditCode = resolveIncomeAccount(category);    // Pendapatan/Modal bertambah
   }
 
-  const [debitId, creditId] = await Promise.all([
-    getAccountId(storeId, debitCode),
-    getAccountId(storeId, creditCode),
-  ]);
+  const ids      = await resolveAccountIds(db, storeId, [debitCode, creditCode]);
+  const debitId  = ids.get(debitCode)!;
+  const creditId = ids.get(creditCode)!;
 
   await db.journalEntry.create({
     data: {
@@ -189,6 +255,7 @@ export async function generateCashflowJournal(input: CashflowJournalInput): Prom
 export async function deleteJournalsBySource(
   sourceType: 'POS_SALE' | 'CASHFLOW',
   sourceId: string,
+  client: JournalClient = db,
 ): Promise<void> {
-  await db.journalEntry.deleteMany({ where: { sourceType, sourceId } });
+  await client.journalEntry.deleteMany({ where: { sourceType, sourceId } });
 }
