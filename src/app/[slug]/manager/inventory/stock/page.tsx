@@ -39,7 +39,11 @@ async function getAllStock(storeId: string, params: { page?: number; limit?: num
   if (stockLevel === 'normal') {
     where.AND = [{ OR: [{ type: 'PREORDER' }, { stock: { gt: db.productVariant.fields.lowStockAt } }] }];
   }
-  if (stockLevel === 'out')    where.stock = { equals: 0 };
+  // 'out' = habis (stok 0) untuk produk ber-stok; PREORDER tidak punya stok fisik sehingga tidak ikut.
+  if (stockLevel === 'out') {
+    where.type  = { not: 'PREORDER' };
+    where.stock = { equals: 0 };
+  }
 
   const orderBy: any = [];
   if (sort === 'stock_desc')     orderBy.push({ stock: 'desc' });

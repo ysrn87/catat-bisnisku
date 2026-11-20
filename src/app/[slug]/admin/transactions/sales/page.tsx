@@ -1,5 +1,6 @@
 import { auth } from '@/auth';
 import { db } from '@/lib/db';
+import { getCombosForPos } from '@/actions/combos';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SalesTable } from '@/components/sales/sales-table';
@@ -65,7 +66,7 @@ async function getSales(storeId: string, params: {
         paymentStatus: payment?.status ?? 'PAID',
         subtotal: Number(subtotal), discount: Number(discount),
         tax: Number(tax), ongkir: Number(sale.ongkir), total: Number(total),
-        combos: combos.map((c) => ({ id: c.id, name: c.name, packagePrice: Number(c.packagePrice), itemsTotal: Number(c.itemsTotal), discount: Number(c.discount) })),
+        combos: combos.map((c) => ({ id: c.id, comboId: c.comboId, name: c.name, packagePrice: Number(c.packagePrice), itemsTotal: Number(c.itemsTotal), discount: Number(c.discount) })),
         items: (items as any[]).map((item) => {
           const { price: vp, cost: vc, ...vr } = item.variant;
           return { ...item, price: Number(item.price), subtotal: Number(item.subtotal), variant: { ...vr, price: Number(vp), cost: Number(vc) } };
@@ -158,7 +159,7 @@ export default async function SalesPage({ searchParams }: {
             ]}
             defaultSort="date_desc"
           />
-          <SalesTable sales={sales} currentPage={page} pageSize={limit} totalItems={total} conversionRate={conversionRate} userRole={userRole} variants={variants} />
+          <SalesTable sales={sales} currentPage={page} pageSize={limit} totalItems={total} conversionRate={conversionRate} userRole={userRole} variants={variants} combos={await getCombosForPos()} />
         </CardContent>
       </Card>
     </div>

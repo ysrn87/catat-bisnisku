@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Printer, Pencil, Gift, Trash2, AlertTriangle } from 'lucide-react';
 import { EditSaleDialog } from './edit-sale-dialog';
 import { deleteSaleAction } from '@/actions/sales';
+import type { ComboInfo } from '@/lib/combo-pricing';
 
 interface SaleDetailsDialogProps {
   sale: {
@@ -43,6 +44,7 @@ interface SaleDetailsDialogProps {
     } | null;
     combos?: Array<{
       id: string;
+      comboId?: string | null;
       name: string;
       packagePrice: number;
       itemsTotal: number;
@@ -67,6 +69,8 @@ interface SaleDetailsDialogProps {
   };
   conversionRate?: number;
   userRole?: string;
+  /** Paket aktif — untuk mengubah isi/menambah paket saat edit. */
+  combos?: ComboInfo[];
   variants?: Array<{
     id: string;
     name: string;
@@ -80,7 +84,7 @@ interface SaleDetailsDialogProps {
   onUpdate?: () => void;
 }
 
-export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, variants = [], open, onOpenChange, onUpdate }: SaleDetailsDialogProps) {
+export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, variants = [], combos: comboOptions = [], open, onOpenChange, onUpdate }: SaleDetailsDialogProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -673,11 +677,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   <Printer className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Print Invoice</span>
                 </Button>
-                <Button
-                  variant="outline" size="sm" onClick={() => setShowEditDialog(true)} className="flex-1 sm:flex-initial"
-                  disabled={hasCombos}
-                  title={hasCombos ? 'Transaksi berisi paket tidak dapat diedit. Hapus lalu buat ulang.' : undefined}
-                >
+                <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} className="flex-1 sm:flex-initial">
                   <Pencil className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Edit</span>
                 </Button>
@@ -881,6 +881,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
         <EditSaleDialog
           sale={sale}
           variants={variants}
+          combos={comboOptions}
           userRole={userRole}
           conversionRate={conversionRate}
           open={showEditDialog}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PaymentStatus } from '@prisma/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { updateSaleAction } from '@/actions/sales';
+import { updateSaleAction, type UpdateSalePackageInput } from '@/actions/sales';
+import { ComboPickerDialog } from '@/components/pos/combo-picker-dialog';
+import type { ComboInfo, ComboSelections } from '@/lib/combo-pricing';
 import {
   Trash2, Gift, Plus, Minus, Search, X, Package,
-  ShoppingCart, CreditCard, FileText, Pencil, Check,
+  ShoppingCart, CreditCard, FileText, Pencil, Check, Layers,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -31,8 +33,17 @@ interface EditSaleDialogProps {
     pointsRedeemed?: number;
     customer?: { name: string } | null;
     nonMemberCustomer?: { name: string } | null;
+    combos?: Array<{
+      id: string;
+      comboId?: string | null;
+      name: string;
+      packagePrice: number;
+      itemsTotal: number;
+      discount: number;
+    }>;
     items: Array<{
       id: string;
+      saleComboId?: string | null;
       quantity: number;
       price: number;
       variant: {
@@ -53,11 +64,26 @@ interface EditSaleDialogProps {
     type?: string;
     product: { name: string };
   }>;
+  /** Paket aktif (untuk mengubah isi / menambah paket). */
+  combos?: ComboInfo[];
   conversionRate?: number;
   userRole?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+}
+
+/** Paket di dalam transaksi yang sedang diedit. keep = tidak diubah (snapshot dipertahankan). */
+interface EditPackage {
+  key:         string;
+  saleComboId?: string;
+  comboId:     string | null;
+  name:        string;
+  keep:        boolean;
+  selections?: ComboSelections;
+  lines:       Array<{ variantId: string; productName: string; variantName: string; price: number }>;
+  itemsTotal:  number;
+  discount:    number;
 }
 
 interface SaleItem {
@@ -74,21 +100,27 @@ interface SaleItem {
 export function EditSaleDialog({
   sale,
   variants = [],
+  combos = [],
   conversionRate = 1000,
   userRole,
   open,
   onOpenChange,
   onSuccess,
 }: EditSaleDialogProps) {
+  // Sale.discount = diskon manual + diskon paket; form hanya mengedit bagian MANUAL
+  const manualDiscountInit = Math.max(0, sale.discount - (sale.combos ?? []).reduce((s, c) => s + c.discount, 0));
+
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<SaleItem[]>([]);
+  const [packages, setPackages] = useState<EditPackage[]>([]);
+  const [picker, setPicker] = useState<{ combo: ComboInfo; editKey?: string; initial?: ComboSelections } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>(sale.paymentMethod);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
     (sale.paymentStatus as PaymentStatus) || PaymentStatus.PAID,
   );
-  const [discount, setDiscount] = useState<number>(sale.discount);
+  const [discount, setDiscount] = useState<number>(manualDiscountInit);
   const [discountDisplay, setDiscountDisplay] = useState(
-    sale.discount > 0 ? sale.discount.toLocaleString('en-US') : '',
+    manualDiscountInit > 0 ? manualDiscountInit.toLocaleString('en-US') : '',
   );
   const [tax, setTax] = useState<number>(sale.tax);
   const [taxDisplay, setTaxDisplay] = useState(
@@ -114,8 +146,22 @@ export function EditSaleDialog({
   const customerName = sale.customer?.name ?? sale.nonMemberCustomer?.name ?? 'Pelanggan Umum';
 
   useEffect(() => {
+    setPackages(
+      (sale.combos ?? []).map((c) => ({
+        key: c.id,
+        saleComboId: c.id,
+        comboId: c.comboId ?? null,
+        name: c.name,
+        keep: true,
+        lines: sale.items
+          .filter((i) => i.saleComboId === c.id)
+          .map((i) => ({ variantId: i.variant.id, productName: i.variant.product.name, variantName: i.variant.name, price: i.price })),
+        itemsTotal: c.itemsTotal,
+        discount: c.discount,
+      })),
+    );
     setItems(
-      sale.items.map((item) => ({
+      sale.items.filter((item) => !item.saleComboId).map((item) => ({
         variantId: item.variant.id,
         variantName: item.variant.name,
         productName: item.variant.product.name,
@@ -128,13 +174,52 @@ export function EditSaleDialog({
     );
   }, [sale]);
 
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const total = subtotal - discount - pointDiscount + tax + ongkir;
+  const itemsSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const packagesItemsTotal = packages.reduce((sum, p) => sum + p.itemsTotal, 0);
+  const packagesDiscount = packages.reduce((sum, p) => sum + p.discount, 0);
+  const subtotal = itemsSubtotal + packagesItemsTotal;
+  const total = subtotal - discount - packagesDiscount - pointDiscount + tax + ongkir;
+
+  // ── Paket: ketersediaan stok untuk pemilih (stok sekarang + qty transaksi ini yang akan dikembalikan)
+  const comboVariantMeta = useMemo(() => {
+    const m = new Map<string, { stock: number; type: string }>();
+    for (const c of combos) for (const sl of c.slots) for (const v of sl.variants) m.set(v.id, { stock: v.stock, type: v.type });
+    return m;
+  }, [combos]);
+
+  const packageUsage = (variantId: string, excludeKey?: string) =>
+    packages.filter((p) => p.key !== excludeKey).reduce((s, p) => s + p.lines.filter((l) => l.variantId === variantId).length, 0);
+
+  const remainingForCombo = (variantId: string, excludeKey?: string): number => {
+    const meta = comboVariantMeta.get(variantId);
+    if (!meta) return 0;
+    if (meta.type === 'PREORDER') return Infinity;
+    const oldQty = sale.items.filter((i) => i.variant.id === variantId).reduce((s, i) => s + i.quantity, 0);
+    const usedInItems = items.filter((i) => i.variantId === variantId).reduce((s, i) => s + i.quantity, 0);
+    return meta.stock + oldQty - usedInItems - packageUsage(variantId, excludeKey);
+  };
+
+  const removePackage = (key: string) => setPackages((prev) => prev.filter((p) => p.key !== key));
+
+  const openEditPackage = (pkg: EditPackage) => {
+    const combo = combos.find((c) => c.id === pkg.comboId);
+    if (!combo) {
+      toast({ title: 'Paket tidak tersedia', description: 'Paket ini sudah dihapus atau dinonaktifkan. Hapus dari transaksi lalu tambah paket lain jika perlu.', variant: 'destructive' });
+      return;
+    }
+    const initial: ComboSelections = pkg.selections ?? Object.fromEntries(
+      combo.slots.flatMap((slot) => {
+        const line = pkg.lines.find((l) => slot.variants.some((v) => v.id === l.variantId));
+        return line ? [[slot.id, line.variantId]] : [];
+      }),
+    );
+    setPicker({ combo, editKey: pkg.key, initial });
+  };
 
   const updateQuantity = (index: number, newQty: number) => {
     if (newQty < 1) return;
     const newItems = [...items];
-    if (newItems[index].type === 'PREORDER' || newQty <= newItems[index].currentStock) {
+    if (newItems[index].type === 'PREORDER' || newQty + packageUsage(newItems[index].variantId) <= newItems[index].currentStock) {
       newItems[index].quantity = newQty;
       setItems(newItems);
     }
@@ -202,7 +287,7 @@ export function EditSaleDialog({
   };
 
   const handleSubmit = async () => {
-    if (items.length === 0) {
+    if (items.length === 0 && packages.length === 0) {
       toast({ title: 'Error', description: 'Penjualan harus ada min. 1 item.', variant: 'destructive' });
       return;
     }
@@ -214,6 +299,11 @@ export function EditSaleDialog({
           quantity: item.quantity,
           price: item.price,
         })),
+        packages: packages.map<UpdateSalePackageInput>((p) =>
+          p.keep && p.saleComboId
+            ? { saleComboId: p.saleComboId, keep: true }
+            : { comboId: p.comboId as string, selections: p.selections ?? {}, ...(p.saleComboId ? { saleComboId: p.saleComboId } : {}) },
+        ),
         customerId: sale.customerId || null,
         paymentMethod,
         paymentStatus,
@@ -290,19 +380,21 @@ export function EditSaleDialog({
                 <ShoppingCart className="w-3.5 h-3.5 text-gray-400" />
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Keranjang</span>
               </div>
-              {items.length > 0 && (
+              {items.length + packages.length > 0 && (
                 <span className="text-[11px] font-bold text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-100">
-                  {items.length} item · {items.reduce((s, i) => s + i.quantity, 0)} pcs
+                  {items.length + packages.length} item · {items.reduce((s, i) => s + i.quantity, 0) + packages.length} pcs
                 </span>
               )}
             </div>
 
-            {items.length === 0 ? (
+            {items.length === 0 && packages.length === 0 ? (
               <div className="border-2 border-dashed border-gray-200 rounded-xl py-7 flex flex-col items-center gap-1.5 bg-gray-50/40">
                 <ShoppingCart className="w-6 h-6 text-gray-300" />
                 <p className="text-sm font-medium text-gray-400">Keranjang kosong</p>
               </div>
             ) : (
+              <div className="space-y-2">
+              {items.length > 0 && (
               <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                 {/* Table header */}
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
@@ -323,7 +415,7 @@ export function EditSaleDialog({
                         <button
                           type="button"
                           onClick={() => removeItem(index)}
-                          disabled={loading || items.length === 1}
+                          disabled={loading || items.length + packages.length === 1}
                           className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 disabled:opacity-30"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -390,6 +482,59 @@ export function EditSaleDialog({
                     </div>
                   ))}
                 </div>
+              </div>
+              )}
+
+              {/* Paket di transaksi */}
+              {packages.map((pkg) => (
+                <div key={pkg.key} className="border border-amber-200 bg-amber-50/40 rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 min-w-0">
+                      <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="truncate">{pkg.name}</span>
+                      {!pkg.keep && (
+                        <span className="text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">diubah</span>
+                      )}
+                    </p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-sm font-bold tabular-nums text-gray-900">{formatCurrency(pkg.itemsTotal - pkg.discount)}</span>
+                      <button
+                        type="button"
+                        onClick={() => removePackage(pkg.key)}
+                        disabled={loading || items.length + packages.length === 1}
+                        aria-label={`Hapus ${pkg.name}`}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-30"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {pkg.lines.map((l) => (
+                      <li key={l.variantId} className="flex justify-between gap-2 text-xs text-gray-500">
+                        <span className="truncate">{l.productName}{l.variantName !== l.productName ? ` – ${l.variantName}` : ''}</span>
+                        <span className="shrink-0 tabular-nums">{formatCurrency(l.price)}</span>
+                      </li>
+                    ))}
+                    {pkg.discount > 0 && (
+                      <li className="flex justify-between text-xs text-emerald-600">
+                        <span>Diskon paket</span>
+                        <span className="tabular-nums">−{formatCurrency(pkg.discount)}</span>
+                      </li>
+                    )}
+                  </ul>
+                  {canManageProducts && (
+                    <button
+                      type="button"
+                      onClick={() => openEditPackage(pkg)}
+                      disabled={loading}
+                      className="text-xs font-medium text-amber-700 hover:text-amber-800 disabled:opacity-50"
+                    >
+                      Ubah isi paket
+                    </button>
+                  )}
+                </div>
+              ))}
               </div>
             )}
           </section>
@@ -527,6 +672,30 @@ export function EditSaleDialog({
             </section>
           )}
 
+          {/* 3b. TAMBAH PAKET */}
+          {canManageProducts && combos.length > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Tambah Paket</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {combos.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setPicker({ combo: c })}
+                    disabled={loading}
+                    className="min-h-[40px] rounded-lg border-2 border-gray-100 bg-gray-50/60 px-3 py-1.5 text-left text-xs hover:border-amber-300 transition-colors disabled:opacity-50"
+                  >
+                    <span className="font-semibold text-gray-800">{c.name}</span>
+                    <span className="ml-1.5 text-gray-500">{formatCurrency(c.price)}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* 4. PEMBAYARAN */}
           <section className="space-y-2.5">
             <div className="flex items-center gap-1.5">
@@ -540,7 +709,7 @@ export function EditSaleDialog({
                   <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CASH">💵 Cash</SelectItem>
-                    <SelectItem value="QRIS">📱 QRIS</SelectItem>
+                    <SelectItem value="CARD">💳 Kartu</SelectItem>
                     <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
                   </SelectContent>
                 </Select>
@@ -621,7 +790,7 @@ export function EditSaleDialog({
           )}
 
           {/* 7. RINGKASAN */}
-          {items.length > 0 && (
+          {(items.length > 0 || packages.length > 0) && (
             <section className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
               <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Ringkasan</span>
@@ -631,6 +800,12 @@ export function EditSaleDialog({
                   <span>Subtotal</span>
                   <span className="font-semibold text-gray-700 tabular-nums">{formatCurrency(subtotal)}</span>
                 </div>
+                {packagesDiscount > 0 && (
+                  <div className="flex justify-between items-center text-sm text-emerald-600">
+                    <span>Diskon Paket</span>
+                    <span className="font-semibold tabular-nums">−{formatCurrency(packagesDiscount)}</span>
+                  </div>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between items-center text-sm text-emerald-600">
                     <span>Diskon</span>
@@ -671,7 +846,7 @@ export function EditSaleDialog({
             className="flex-1 sm:flex-none h-10 border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl font-medium">
             Batal
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={loading || items.length === 0}
+          <Button type="button" onClick={handleSubmit} disabled={loading || (items.length === 0 && packages.length === 0)}
             className="flex-1 h-10 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl font-bold gap-2 transition-colors">
             {loading ? (
               <>
@@ -689,6 +864,31 @@ export function EditSaleDialog({
             )}
           </Button>
         </DialogFooter>
+
+        {picker && (
+          <ComboPickerDialog
+            key={`${picker.combo.id}-${picker.editKey ?? 'new'}`}
+            combo={picker.combo}
+            initialSelections={picker.initial}
+            submitLabel={picker.editKey ? 'Terapkan Perubahan' : 'Tambah ke Transaksi'}
+            onClose={() => setPicker(null)}
+            remaining={(variantId) => remainingForCombo(variantId, picker.editKey)}
+            onAdd={(line) => {
+              const next: EditPackage = {
+                key: picker.editKey ?? line.key,
+                saleComboId: picker.editKey ? packages.find((p) => p.key === picker.editKey)?.saleComboId : undefined,
+                comboId: line.comboId,
+                name: line.name,
+                keep: false,
+                selections: line.selections,
+                lines: line.lines.map((l) => ({ variantId: l.variantId, productName: l.productName, variantName: l.variantName, price: l.price })),
+                itemsTotal: line.itemsTotal,
+                discount: line.discount,
+              };
+              setPackages((prev) => (picker.editKey ? prev.map((p) => (p.key === picker.editKey ? next : p)) : [...prev, next]));
+            }}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -308,14 +308,29 @@ export async function createSaleAction(input: CreateSaleInput) {
 // ─────────────────────────────────────────────────────────────────────────────
 // UPDATE SALE
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Paket pada saat edit:
+ *  - { saleComboId, keep: true }  → paket yang sudah ada TIDAK diubah; dipertahankan persis
+ *    (nama, harga paket, harga satuan, diskon = snapshot saat dijual).
+ *  - { comboId, selections }      → paket baru atau paket yang isinya diubah. Harga & aturan
+ *    dihitung ulang di SERVER dari definisi paket saat ini. Jika membawa saleComboId, paket lama
+ *    itu digantikan.
+ * Daftar `packages` adalah seluruh paket yang diinginkan; paket lama yang tidak disebut akan dihapus.
+ */
+export type UpdateSalePackageInput =
+  | { saleComboId: string; keep: true }
+  | { comboId: string; selections: ComboSelections; saleComboId?: string; keep?: false };
+
 export async function updateSaleAction(
   saleId: string,
   input: {
     items:           SaleItemInput[];
+    packages?:       UpdateSalePackageInput[];
     customerId?:     string | null;
     memberId?:       string | null;
     paymentMethod?:  string;
     paymentStatus?:  PaymentStatusValue;
+    /** Diskon MANUAL saja. Diskon paket dihitung terpisah. */
     discount?:       number;
     tax?:            number;
     ongkir?:         number;
@@ -332,35 +347,89 @@ export async function updateSaleAction(
 
     const existingSale = await db.sale.findFirst({
       where:   { id: saleId, storeId },
-      include: { items: true, payment: true },
+      include: { items: true, payment: true, combos: true },
     });
     if (!existingSale) return { success: false, error: 'Penjualan tidak ditemukan' };
 
-    // Transaksi berisi paket tidak bisa diedit: pengelompokan & diskon paket akan rusak.
-    const comboCount = await db.saleCombo.count({ where: { saleId, storeId } });
-    if (comboCount > 0) {
-      return { success: false, error: 'Transaksi yang berisi paket tidak dapat diedit. Hapus transaksi lalu buat ulang.' };
-    }
+    // Sale.discount menyimpan diskon manual + diskon semua paket
+    const existingPackageDiscount = existingSale.combos.reduce((sum, c) => sum + Number(c.discount), 0);
 
     const {
-      items,
+      items: rawItems,
       customerId     = existingSale.customerId,
       memberId       = existingSale.memberId,
       paymentMethod  = existingSale.payment?.method ?? 'CASH',
       paymentStatus  = (existingSale.payment?.status as PaymentStatusValue) ?? 'PAID',
-      discount       = Number(existingSale.discount),
+      discount       = Math.max(0, Number(existingSale.discount) - existingPackageDiscount),
       tax            = Number(existingSale.tax),
       ongkir         = Number(existingSale.ongkir),
       notes,
       pointsRedeemed = 0,
     } = input;
 
-    if (!items?.length) return { success: false, error: 'Tidak ada item dalam penjualan' };
+    // `packages` tidak dikirim → semua paket yang ada dipertahankan (tidak terhapus diam-diam).
+    // Dikirim (termasuk array kosong) → daftar itu otoritatif.
+    const packages: UpdateSalePackageInput[] =
+      input.packages ?? existingSale.combos.map((c) => ({ saleComboId: c.id, keep: true as const }));
 
-    const subtotal       = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const conversionRate = await getPointsConversionRate();
-    const pointDiscount  = pointsRedeemed * conversionRate;
-    const total          = subtotal - discount - pointDiscount + tax + ongkir;
+    const items: SaleItemInput[] = rawItems ?? [];
+    if (items.length === 0 && packages.length === 0) return { success: false, error: 'Tidak ada item dalam penjualan' };
+    if (items.some((i) => !Number.isInteger(i.quantity) || i.quantity <= 0)) {
+      return { success: false, error: 'Kuantitas item tidak valid' };
+    }
+    if (packages.length > 50) return { success: false, error: 'Terlalu banyak paket dalam satu transaksi' };
+
+    // ── Paket: pertahankan yang tidak diubah, hitung ulang yang baru/diubah ────
+    const existingComboById = new Map(existingSale.combos.map((c) => [c.id, c]));
+    const keptIds = new Set<string>();
+    const kept: Array<{ id: string; itemsTotal: number; discount: number; lines: Array<{ variantId: string; quantity: number }> }> = [];
+    const fresh: Array<{ combo: ComboWithSlots; res: Extract<ComboResolution, { ok: true }> }> = [];
+
+    const resolveInputs = packages.flatMap((p) => (p.keep === true ? [] : 'comboId' in p ? [p] : []));
+    const comboById = new Map<string, ComboWithSlots>();
+    if (resolveInputs.length > 0) {
+      const combos = await db.combo.findMany({
+        where:   { id: { in: [...new Set(resolveInputs.map((p) => p.comboId))] }, storeId, isActive: true },
+        include: comboWithSlotsInclude,
+      });
+      combos.forEach((c) => comboById.set(c.id, c));
+    }
+
+    for (const p of packages) {
+      if (p.keep === true) {
+        const c = existingComboById.get(p.saleComboId);
+        if (!c || keptIds.has(c.id)) return { success: false, error: 'Paket pada transaksi tidak valid' };
+        keptIds.add(c.id);
+        kept.push({
+          id:         c.id,
+          itemsTotal: Number(c.itemsTotal),
+          discount:   Number(c.discount),
+          lines:      existingSale.items.filter((i) => i.saleComboId === c.id).map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+        });
+      } else {
+        if (!('comboId' in p)) return { success: false, error: 'Paket tidak valid' };
+        const combo = comboById.get(p.comboId);
+        if (!combo) return { success: false, error: 'Paket tidak ditemukan atau sudah tidak aktif' };
+        const res = resolveComboSelection(toComboInfo(combo), p.selections ?? {});
+        if (!res.ok) return { success: false, error: `${combo.name}: ${res.error}` };
+        fresh.push({ combo, res });
+      }
+    }
+
+    // ── Kebutuhan stok gabungan: item biasa + paket dipertahankan + paket baru ──
+    const demand = new Map<string, number>();
+    const addDemand = (variantId: string, qty: number) => demand.set(variantId, (demand.get(variantId) ?? 0) + qty);
+    items.forEach((i) => addDemand(i.variantId, i.quantity));
+    kept.forEach((k) => k.lines.forEach((l) => addDemand(l.variantId, l.quantity)));
+    fresh.forEach((f) => f.res.lines.forEach((l) => addDemand(l.variantId, 1)));
+
+    const itemsSubtotal      = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const packagesItemsTotal = round2(kept.reduce((s, k) => s + k.itemsTotal, 0) + fresh.reduce((s, f) => s + f.res.itemsTotal, 0));
+    const packagesDiscount   = round2(kept.reduce((s, k) => s + k.discount, 0) + fresh.reduce((s, f) => s + f.res.discount, 0));
+    const subtotal           = round2(itemsSubtotal + packagesItemsTotal);
+    const conversionRate     = await getPointsConversionRate();
+    const pointDiscount      = pointsRedeemed * conversionRate;
+    const total              = round2(subtotal - discount - packagesDiscount - pointDiscount + tax + ongkir);
     if (total < 0) return { success: false, error: 'Total pembayaran tidak boleh negatif' };
 
     const oldVariantIds = [...new Set(existingSale.items.map((i) => i.variantId))];
@@ -374,21 +443,19 @@ export async function updateSaleAction(
     for (const oldItem of existingSale.items) {
       oldQtyByVariant.set(oldItem.variantId, (oldQtyByVariant.get(oldItem.variantId) ?? 0) + oldItem.quantity);
     }
-    const newVariantIds = [...new Set(items.map((i) => i.variantId))];
     const newVariants = await db.productVariant.findMany({
-      where:  { id: { in: newVariantIds }, storeId },
+      where:  { id: { in: [...demand.keys()] }, storeId },
       select: { id: true, stock: true, type: true, name: true },
     });
     const newVariantById = new Map(newVariants.map((v) => [v.id, v]));
 
-    for (const item of items) {
-      const variant = newVariantById.get(item.variantId);
+    for (const [variantId, qty] of demand) {
+      const variant = newVariantById.get(variantId);
       if (!variant) return { success: false, error: 'Varian tidak ditemukan' };
       if (variant.type !== 'PREORDER') {
-        const effectiveStock = variant.stock + (oldQtyByVariant.get(item.variantId) ?? 0);
-        if (effectiveStock < item.quantity) {
-          return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
-        }
+        // stok lama dikembalikan dulu (semua item transaksi ini), baru dikurangi sesuai kebutuhan baru
+        const effectiveStock = variant.stock + (oldQtyByVariant.get(variantId) ?? 0);
+        if (effectiveStock < qty) return { success: false, error: `Stok tidak mencukupi untuk ${variant.name}` };
       }
     }
 
@@ -401,15 +468,59 @@ export async function updateSaleAction(
         });
       }
 
-      for (const item of items) {
-        const variant = newVariantById.get(item.variantId)!;
+      for (const [variantId, qty] of demand) {
+        const variant = newVariantById.get(variantId)!;
         if (variant.type !== 'PREORDER') {
           const updated = await tx.productVariant.updateMany({
-            where: { id: item.variantId, stock: { gte: item.quantity } },
-            data:  { stock: { decrement: item.quantity } },
+            where: { id: variantId, stock: { gte: qty } },
+            data:  { stock: { decrement: qty } },
           });
           if (updated.count === 0) throw new Error(`Stok tidak mencukupi untuk ${variant.name}`);
         }
+      }
+
+      // Hapus item & paket lama KECUALI paket yang dipertahankan (barisnya tetap utuh)
+      const keptList = [...keptIds];
+      await tx.saleItem.deleteMany({
+        where: { saleId, OR: [{ saleComboId: null }, { saleComboId: { notIn: keptList } }] },
+      });
+      await tx.saleCombo.deleteMany({ where: { saleId, id: { notIn: keptList } } });
+
+      if (items.length > 0) {
+        await tx.saleItem.createMany({
+          data: items.map((i) => ({
+            saleId,
+            variantId: i.variantId,
+            quantity:  i.quantity,
+            price:     i.price,
+            subtotal:  i.price * i.quantity,
+          })),
+        });
+      }
+
+      for (const f of fresh) {
+        const saleCombo = await tx.saleCombo.create({
+          data: {
+            storeId,
+            saleId,
+            comboId:      f.combo.id,
+            name:         f.combo.name,
+            packagePrice: f.res.packagePrice,
+            itemsTotal:   f.res.itemsTotal,
+            discount:     f.res.discount,
+          },
+          select: { id: true },
+        });
+        await tx.saleItem.createMany({
+          data: f.res.lines.map((l) => ({
+            saleId,
+            saleComboId: saleCombo.id,
+            variantId:   l.variantId,
+            quantity:    1,
+            price:       l.price,
+            subtotal:    l.price,
+          })),
+        });
       }
 
       await tx.sale.update({
@@ -417,17 +528,10 @@ export async function updateSaleAction(
         data: {
           customerId,
           memberId,
-          subtotal, discount, tax, ongkir, total,
+          subtotal,
+          discount: round2(discount + packagesDiscount),
+          tax, ongkir, total,
           notes: notes !== undefined ? sanitizeText(notes, 500) : existingSale.notes,
-          items: {
-            deleteMany: {},
-            create: items.map((i) => ({
-              variantId: i.variantId,
-              quantity:  i.quantity,
-              price:     i.price,
-              subtotal:  i.price * i.quantity,
-            })),
-          },
         },
       });
 

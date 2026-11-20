@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { SaleDetailsDialog } from './sale-details-dialog';
 import { Pagination } from '@/components/ui/pagination';
+import type { ComboInfo } from '@/lib/combo-pricing';
 
 interface SalesTableProps {
   sales: any[];
@@ -14,6 +15,7 @@ interface SalesTableProps {
   totalItems: number;
   conversionRate?: number;
   userRole?: string;
+  combos?: ComboInfo[];
   variants?: Array<{
     id: string;
     name: string;
@@ -30,7 +32,7 @@ const paymentStatusConfig: Record<string, { label: string; className: string }> 
   UNPAID:  { label: 'Belum Lunas', className: 'bg-red-100 text-red-800' },
 };
 
-export function SalesTable({ sales, currentPage, pageSize, totalItems, conversionRate = 1000, userRole, variants = [] }: SalesTableProps) {
+export function SalesTable({ sales, currentPage, pageSize, totalItems, conversionRate = 1000, userRole, variants = [], combos = [] }: SalesTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedSale, setSelectedSale] = useState<any>(null);
@@ -196,6 +198,7 @@ export function SalesTable({ sales, currentPage, pageSize, totalItems, conversio
           conversionRate={conversionRate}
           userRole={userRole}
           variants={variants}
+          combos={combos}
           open={showDetailsDialog}
           onOpenChange={setShowDetailsDialog}
           onUpdate={() => window.location.reload()}

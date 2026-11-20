@@ -30,12 +30,15 @@ interface Props {
   /** Sisa stok varian setelah dikurangi isi keranjang (Infinity untuk pre-order). */
   remaining: (variantId: string) => number;
   onAdd:     (line: ComboCartLine) => void;
+  /** Pilihan awal (mis. saat mengubah isi paket yang sudah ada). */
+  initialSelections?: ComboSelections;
+  submitLabel?: string;
 }
 
 const newKey = () => `combo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-export function ComboPickerDialog({ combo, onClose, remaining, onAdd }: Props) {
-  const [selections, setSelections] = useState<ComboSelections>({});
+export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSelections, submitLabel }: Props) {
+  const [selections, setSelections] = useState<ComboSelections>(initialSelections ?? {});
 
   const resolution = resolveComboSelection(combo, selections);
 
@@ -175,7 +178,7 @@ export function ComboPickerDialog({ combo, onClose, remaining, onAdd }: Props) {
               Batal
             </button>
             <Button onClick={handleAdd} disabled={!canAdd} className="min-w-[160px] bg-[#028697] text-white hover:bg-[#017585]">
-              Tambah ke Keranjang
+              {submitLabel ?? 'Tambah ke Keranjang'}
             </Button>
           </div>
         </div>
