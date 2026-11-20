@@ -13,6 +13,7 @@ interface InventoryReportTableProps {
     sku: string;
     stock: number;
     lowStockAt: number;
+    type?: string;
     cost: number;
     price: number;
     product: {
@@ -73,8 +74,9 @@ export function InventoryReportTable({
               </TableRow>
             ) : (
               inventory.map((item) => {
-                const isLowStock = item.stock <= item.lowStockAt;
-                const stockValue = Number(item.cost) * item.stock;
+                const isPreorder = item.type === 'PREORDER';
+                const isLowStock = !isPreorder && item.stock <= item.lowStockAt;
+                const stockValue = isPreorder ? 0 : Number(item.cost) * item.stock;
                 
                 return (
                   <TableRow key={item.id} className={isLowStock ? 'bg-red-50 text-[11px] sm:text-sm' : ' text-[11px] sm:text-sm'}>
@@ -89,13 +91,17 @@ export function InventoryReportTable({
                     <TableCell>{formatCurrency(Number(item.cost))}</TableCell>
                     <TableCell>{formatCurrency(Number(item.price))}</TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(stockValue)}
+                      {isPreorder ? '—' : formatCurrency(stockValue)}
                     </TableCell>
                     <TableCell>
                       {isLowStock ? (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                           <AlertTriangle className="w-3 h-3 mr-1" />
                           Stok Menipis
+                        </span>
+                      ) : isPreorder ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          Pre-order
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">

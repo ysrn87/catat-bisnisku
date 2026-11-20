@@ -176,10 +176,12 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       icon: <Package className="w-4 h-4" />,
       matchPaths: [
         `${base}/manager/inventory/products`,
+        `${base}/manager/inventory/combos`,
         `${base}/manager/inventory/stock`,
       ],
       subItems: [
         { href: `${base}/manager/inventory/products`, label: 'Produk' },
+        { href: `${base}/manager/inventory/combos`,   label: 'Paket' },
         { href: `${base}/manager/inventory/stock`,    label: 'Kelola Stok' },
       ],
     },

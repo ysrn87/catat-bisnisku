@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { lowStockWhere } from '@/lib/inventory-totals';
 import { getStoreContext, PLAN_LIMITS } from '@/lib/store-context';
 import { PlanGate } from '@/components/plan/plan-gate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +11,7 @@ import { SearchFilterBar } from '@/components/filters/search-filter-bar';
 async function getStockData(storeId: string) {
   const [totalVariants, lowStockCount, stockValue] = await Promise.all([
     db.productVariant.count({ where: { storeId } }),
-    // FIX: lowStock → lowStockAt
-    db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } } }),
+    db.productVariant.count({ where: lowStockWhere(storeId) }),
     db.productVariant.aggregate({ where: { storeId }, _sum: { stock: true } }),
   ]);
   return { totalVariants, lowStockCount, totalStock: stockValue._sum.stock || 0 };
@@ -30,9 +30,15 @@ async function getAllStock(storeId: string, params: { page?: number; limit?: num
     ];
   }
 
-  // FIX: lowStock → lowStockAt
-  if (stockLevel === 'low')    where.stock = { lte: db.productVariant.fields.lowStockAt };
-  if (stockLevel === 'normal') where.stock = { gt:  db.productVariant.fields.lowStockAt };
+  // 'low' = lowStockWhere (tanpa PREORDER); 'normal' = kebalikannya, jadi PREORDER ikut 'normal'
+  // (AND agar tidak bentrok dengan where.OR milik pencarian).
+  if (stockLevel === 'low') {
+    where.type  = { not: 'PREORDER' };
+    where.stock = { lte: db.productVariant.fields.lowStockAt };
+  }
+  if (stockLevel === 'normal') {
+    where.AND = [{ OR: [{ type: 'PREORDER' }, { stock: { gt: db.productVariant.fields.lowStockAt } }] }];
+  }
   if (stockLevel === 'out')    where.stock = { equals: 0 };
 
   const orderBy: any = [];

@@ -8,7 +8,8 @@ import { sanitizeText } from '@/lib/sanitize';
 import type { ComboInfo } from '@/lib/combo-pricing';
 import { comboWithSlotsInclude, toComboInfo } from '@/lib/combo-db';
 
-const MANAGE_ROLES = ['OWNER', 'ADMINISTRATOR'];
+// Sama seperti pengelolaan produk: admin dan manager boleh mengelola paket.
+const MANAGE_ROLES = ['OWNER', 'ADMINISTRATOR', 'MANAGER'];
 const MAX_PRICE    = 99_999_999;
 
 export interface ComboInput {

@@ -1,4 +1,13 @@
+import type { Prisma } from '@prisma/client';
 import { db } from './db';
+
+/**
+ * Filter "stok menipis" yang SAMA untuk semua halaman (dashboard, stok, laporan):
+ * bukan PREORDER (tidak punya stok fisik) dan stock <= batas minimum varian (lowStockAt).
+ */
+export function lowStockWhere(storeId: string): Prisma.ProductVariantWhereInput {
+  return { storeId, type: { not: 'PREORDER' }, stock: { lte: db.productVariant.fields.lowStockAt } };
+}
 
 /**
  * Total inventori SELURUH varian toko (bukan hanya baris di halaman yang tampil).
@@ -7,7 +16,7 @@ import { db } from './db';
  * - Varian PREORDER tidak dihitung: tidak ada stok fisik. Aturan yang sama dipakai
  *   di Laporan Inventori dan Laporan Keuangan supaya angkanya selalu sama.
  * - Dihitung di database (SUM) agar tidak memuat semua varian ke memori.
- * - lowStockCount: varian dengan stock <= lowStockAt (batas per varian).
+ * - lowStockCount: lihat lowStockWhere() (PREORDER tidak dihitung).
  */
 export async function getInventoryTotals(storeId: string): Promise<{
   inventoryValue: number;
@@ -21,9 +30,7 @@ export async function getInventoryTotals(storeId: string): Promise<{
       FROM "product_variants"
       WHERE "storeId" = ${storeId} AND "type" <> 'PREORDER'
     `,
-    db.productVariant.count({
-      where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } },
-    }),
+    db.productVariant.count({ where: lowStockWhere(storeId) }),
   ]);
 
   return {

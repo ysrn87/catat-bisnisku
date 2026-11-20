@@ -12,9 +12,10 @@ export default async function ManagerInventoryLayout({
   return (
     <TabLayout
       title="Manajemen Inventori"
-      description="Lihat produk dan kelola stok"
+      description="Lihat produk, kelola paket dan stok"
       tabs={[
         { value: 'products', label: 'Produk',      href: `/${slug}/manager/inventory/products` },
+        { value: 'combos',   label: 'Paket',       href: `/${slug}/manager/inventory/combos` },
         { value: 'stock',    label: 'Kelola Stok', href: `/${slug}/manager/inventory/stock` },
       ]}
     >

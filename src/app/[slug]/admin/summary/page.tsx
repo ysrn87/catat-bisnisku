@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { lowStockWhere } from '@/lib/inventory-totals';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
@@ -42,8 +43,7 @@ async function getDashboardStats(storeId: string) {
       db.productVariant.count({ where: { storeId } }),
       db.sale.count({ where: { storeId } }),
       db.storeUser.count({ where: { storeId } }),
-      // FIX: lowStock → lowStockAt
-      db.productVariant.count({ where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } } }),
+      db.productVariant.count({ where: lowStockWhere(storeId) }),
       db.sale.aggregate({ where: { storeId }, _sum: { total: true } }),
       db.cashflow.aggregate({ where: { storeId, type: 'INCOME' }, _sum: { amount: true } }),
     ]);
@@ -61,9 +61,8 @@ async function getRecentActivity(storeId: string) {
       where: { storeId }, take: 5, orderBy: { createdAt: 'desc' },
       include: { customer: { select: { name: true } } },
     }),
-    // FIX: lowStock → lowStockAt
     db.productVariant.findMany({
-      where: { storeId, stock: { lte: db.productVariant.fields.lowStockAt } },
+      where: lowStockWhere(storeId),
       include: { product: true }, take: 5,
     }),
   ]);
