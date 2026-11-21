@@ -1,17 +1,22 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { PaymentStatus } from '@prisma/client';
-import { ShoppingCart, Search, User, X, Plus, Minus, Trash2, CheckCircle, Receipt, Printer, Layers } from 'lucide-react';
+import { ShoppingCart, Search, User, X, Plus, Minus, Trash2, CheckCircle, Receipt, Printer, Layers, ScanBarcode, Pause, Play, Share2, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { createSaleAction } from '@/actions/sales';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { ComboPickerDialog, type ComboCartLine } from './combo-picker-dialog';
 import { CheckoutDialog, type CheckoutPayload } from './checkout-dialog';
+import { ScannerDialog } from './scanner-dialog';
+import { posFeedback, readStorage, writeStorage } from './pos-feedback';
+import { useKeyboardBarcode } from '@/hooks/use-keyboard-barcode';
 import { paymentMethodLabel, roundMoney } from '@/lib/payment';
 import type { ComboInfo } from '@/lib/combo-pricing';
 
@@ -58,6 +63,27 @@ interface CartItem {
   isPreorder: boolean;
   emoji: string;
 }
+
+/** Keranjang yang ditahan (disimpan di perangkat kasir, per toko). */
+interface HeldCart {
+  id: string;
+  heldAt: number;
+  label: string;
+  total: number;
+  count: number;
+  cart: CartItem[];
+  comboCart: ComboCartLine[];
+  customerType: 'customer' | 'member' | 'walk-in';
+  customerId: string;
+  walkInCustomerId: string;
+  discount: number;
+  tax: number;
+  ongkir: number;
+  notes: string;
+  pointsToRedeem: number;
+}
+
+const MAX_HELD = 10;
 
 interface ReceiptCombo {
   name: string;
@@ -134,18 +160,40 @@ function getVariantEmoji(variant: ProductVariant): string {
 
 // ─── Receipt Dialog ────────────────────────────────────────────────────────────
 
+function buildReceiptText(data: ReceiptData, storeName: string): string {
+  const lines: string[] = [`*${storeName}*`, data.saleNumber, formatDateTime(data.createdAt), ''];
+  for (const i of data.items) {
+    const name = i.variantName !== i.productName ? `${i.productName} – ${i.variantName}` : i.productName;
+    lines.push(`• ${name} ×${i.quantity}  ${formatCurrency(i.price * i.quantity)}`);
+  }
+  for (const c of data.combos) lines.push(`• Paket ${c.name}  ${formatCurrency(c.packagePrice)}`);
+  lines.push('', `*Total: ${formatCurrency(data.total)}*`);
+  if (data.payments.length > 1) {
+    for (const p of data.payments) lines.push(`${paymentMethodLabel(p.method)}: ${formatCurrency(p.amount)}`);
+  } else {
+    lines.push(`Bayar: ${data.paymentMethod}${data.paymentStatus === 'PENDING' ? ' (Pending)' : ''}`);
+  }
+  if (data.cashReceived !== null && data.changeAmount !== null) {
+    lines.push(`Tunai diterima: ${formatCurrency(data.cashReceived)}`, `Kembalian: ${formatCurrency(data.changeAmount)}`);
+  }
+  lines.push('', 'Terima kasih 🙏');
+  return lines.join('\n');
+}
+
 function ReceiptDialog({
   data,
   storeName,
   cashierName,
   onClose,
   onPrint,
+  onShare,
 }: {
   data: ReceiptData;
   storeName: string;
   cashierName?: string;
   onClose: () => void;
   onPrint: () => void;
+  onShare: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
@@ -305,17 +353,24 @@ function ReceiptDialog({
         </div>
 
         {/* Actions */}
-        <div className="px-5 pb-5 flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={onClose}>
-            <Receipt className="w-4 h-4 mr-1.5" />
-            Selesai
-          </Button>
+        <div className="px-5 pb-5 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={onPrint}>
+              <Printer className="w-4 h-4 mr-1.5" />
+              Cetak Struk
+            </Button>
+            <Button variant="outline" onClick={onShare}>
+              <Share2 className="w-4 h-4 mr-1.5" />
+              Bagikan
+            </Button>
+          </div>
           <Button
-            className="flex-1 bg-[#028697] hover:bg-[#017585] text-white"
-            onClick={onPrint}
+            autoFocus
+            className="w-full h-11 bg-[#028697] hover:bg-[#017585] text-white font-semibold"
+            onClick={onClose}
           >
-            <Printer className="w-4 h-4 mr-1.5" />
-            Cetak Struk
+            <Receipt className="w-4 h-4 mr-1.5" />
+            Transaksi Baru
           </Button>
         </div>
       </div>
@@ -361,6 +416,16 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const [loading, setLoading] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [showCart, setShowCart] = useState(false); // mobile cart toggle
+
+  // Kecepatan & kenyamanan kasir
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [soundOn, setSoundOn] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
+  const [held, setHeld] = useState<HeldCart[]>([]);
+  const [heldLoaded, setHeldLoaded] = useState(false);
+  const [showHeld, setShowHeld] = useState(false);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const flashTimer = useRef<number | undefined>(undefined);
 
   // ─── Derived data ─────────────────────────────────────────────────────────
 
@@ -456,13 +521,21 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
   // ─── Cart actions ──────────────────────────────────────────────────────────
 
+  const flash = useCallback((id: string) => {
+    setFlashId(id);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlashId(null), 700);
+  }, []);
+
   const addToCart = useCallback(
-    (variant: ProductVariant) => {
+    (variant: ProductVariant, quiet = false) => {
       const isPreorder = variant.type === 'PREORDER';
       if (!isPreorder && variant.stock - (comboUsage.get(variant.id) ?? 0) <= 0) {
         toast({ title: 'Stok Habis', description: `${variant.product.name} tidak tersedia.`, variant: 'destructive' });
         return;
       }
+      flash(variant.id);
+      if (!quiet) posFeedback('add', soundOn);
       setCart((prev) => {
         const existing = prev.find((i) => i.variantId === variant.id);
         if (existing) {
@@ -487,7 +560,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         ];
       });
     },
-    [toast, comboUsage]
+    [toast, comboUsage, flash, soundOn]
   );
 
   const updateQty = useCallback((variantId: string, delta: number) => {
@@ -505,12 +578,34 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   }, [comboUsage]);
 
   const removeCombo = useCallback((key: string) => {
+    const removed = comboCart.find((l) => l.key === key);
     setComboCart((prev) => prev.filter((l) => l.key !== key));
-  }, []);
+    if (!removed) return;
+    toast({
+      title: `Paket ${removed.name} dihapus`,
+      duration: 5000,
+      action: (
+        <ToastAction altText="Batalkan penghapusan" onClick={() => setComboCart((prev) => (prev.some((l) => l.key === removed.key) ? prev : [...prev, removed]))}>
+          Batalkan
+        </ToastAction>
+      ),
+    });
+  }, [comboCart, toast]);
 
   const removeFromCart = useCallback((variantId: string) => {
+    const removed = cart.find((i) => i.variantId === variantId);
     setCart((prev) => prev.filter((i) => i.variantId !== variantId));
-  }, []);
+    if (!removed) return;
+    toast({
+      title: `${removed.productName} dihapus`,
+      duration: 5000,
+      action: (
+        <ToastAction altText="Batalkan penghapusan" onClick={() => setCart((prev) => (prev.some((i) => i.variantId === removed.variantId) ? prev : [...prev, removed]))}>
+          Batalkan
+        </ToastAction>
+      ),
+    });
+  }, [cart, toast]);
 
   const resetAll = useCallback(() => {
     setCart([]);
@@ -534,6 +629,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
   // clearCart tetap ada untuk tombol "Kosongkan" di keranjang (tidak reset customer/payment)
   const clearCart = useCallback(() => {
+    const snap = { cart, comboCart, discount, tax, ongkir, notes, pointsToRedeem };
     setCart([]);
     setComboCart([]);
     setDiscount(0);
@@ -541,7 +637,24 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     setOngkir(0);
     setPointsToRedeem(0); setPointsDisplay('');
     setNotes('');
-  }, []);
+    if (snap.cart.length === 0 && snap.comboCart.length === 0) return;
+    toast({
+      title: 'Keranjang dikosongkan',
+      duration: 6000,
+      action: (
+        <ToastAction
+          altText="Batalkan pengosongan keranjang"
+          onClick={() => {
+            setCart(snap.cart); setComboCart(snap.comboCart);
+            setDiscount(snap.discount); setTax(snap.tax); setOngkir(snap.ongkir); setNotes(snap.notes);
+            setPointsToRedeem(snap.pointsToRedeem); setPointsDisplay(snap.pointsToRedeem ? String(snap.pointsToRedeem) : '');
+          }}
+        >
+          Batalkan
+        </ToastAction>
+      ),
+    });
+  }, [cart, comboCart, discount, tax, ongkir, notes, pointsToRedeem, toast]);
 
   // ─── Customer selection ────────────────────────────────────────────────────
 
@@ -650,7 +763,10 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     }
   };
 
-  const handleCloseReceipt = () => resetAll();
+  const handleCloseReceipt = () => {
+    resetAll();
+    window.setTimeout(() => searchRef.current?.focus(), 50); // siap transaksi berikutnya
+  };
 
   const handlePrintReceipt = () => {
     if (!receipt) return;
@@ -739,6 +855,8 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     background: #028697; color: #fff; border: none;
     padding: 8px 20px; border-radius: 6px; font-size: 13px; cursor: pointer;
   }
+  .btn.alt { background: #e5e7eb; color: #111; margin-left: 6px; }
+  @page { margin: 4mm; }
   @media print {
     .btn-wrap { display: none; }
     body { padding: 0; }
@@ -775,6 +893,8 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
   <div class="btn-wrap">
     <button class="btn" onclick="window.print()">Cetak Struk</button>
+    <button class="btn alt" onclick="document.body.style.maxWidth='219px'">58mm</button>
+    <button class="btn alt" onclick="document.body.style.maxWidth='302px'">80mm</button>
   </div>
 </body>
 </html>`;
@@ -784,6 +904,157 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   };
 
   // ─── Cart panel (reused in desktop right column & mobile bottom sheet) ────
+
+  // ─── Barcode, tahan transaksi, shortcut ────────────────────────────────────
+
+  /** Tambahkan produk berdasarkan barcode. Mengembalikan teks hasil, atau null bila gagal. */
+  const handleBarcode = useCallback((raw: string, toastErrors = true): string | null => {
+    const code = raw.trim();
+    const v = variants.find((x) => x.barcode && x.barcode === code);
+    if (!v) {
+      posFeedback('error', soundOn);
+      if (toastErrors) toast({ title: 'Barcode tidak terdaftar', description: `"${code}" belum ada di katalog produk.`, variant: 'destructive' });
+      return null;
+    }
+    if (v.type !== 'PREORDER' && v.stock - (comboUsage.get(v.id) ?? 0) <= 0) {
+      posFeedback('error', soundOn);
+      if (toastErrors) toast({ title: 'Stok Habis', description: `${v.product.name} tidak tersedia.`, variant: 'destructive' });
+      return null;
+    }
+    addToCart(v, true);
+    posFeedback('scan', soundOn);
+    return `${v.product.name}${v.name !== v.product.name ? ` – ${v.name}` : ''} +1`;
+  }, [variants, comboUsage, addToCart, toast, soundOn]);
+
+  // Scanner USB/Bluetooth (mengetik cepat + Enter). Nonaktif saat ada dialog terbuka.
+  const dialogOpen = showCheckout || !!receipt || !!pickerCombo || showHeld || showScanner;
+  const onKeyboardScan = useCallback((code: string) => {
+    handleBarcode(code);
+    setSearch('');
+  }, [handleBarcode]);
+  useKeyboardBarcode(onKeyboardScan, !dialogOpen);
+
+  // Enter di kolom pencarian: barcode persis → tambah; hasil tinggal satu → tambah
+  const handleSearchEnter = () => {
+    const q = search.trim();
+    if (!q) return;
+    if (variants.some((v) => v.barcode === q)) { handleBarcode(q); setSearch(''); return; }
+    if (viewMode === 'products' && filteredVariants.length === 1) {
+      addToCart(filteredVariants[0]);
+      setSearch('');
+    }
+  };
+
+  // Tahan transaksi — tersimpan di perangkat ini, per toko
+  const heldKey = `pos-held:${storeSlug}`;
+  useEffect(() => {
+    setHeld(readStorage<HeldCart[]>(heldKey, []));
+    setSoundOn(readStorage<boolean>('pos-sound', true));
+    setHeldLoaded(true);
+  }, [heldKey]);
+  useEffect(() => { if (heldLoaded) writeStorage(heldKey, held); }, [held, heldLoaded, heldKey]);
+
+  const toggleSound = () => {
+    setSoundOn((on) => { writeStorage('pos-sound', !on); return !on; });
+  };
+
+  const snapshotHeld = (): HeldCart => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    heldAt: Date.now(),
+    label: customerName,
+    total,
+    count: cartCount,
+    cart,
+    comboCart,
+    customerType,
+    customerId,
+    walkInCustomerId,
+    discount,
+    tax,
+    ongkir,
+    notes,
+    pointsToRedeem,
+  });
+
+  const holdCurrent = () => {
+    if (!hasItems) return;
+    if (held.length >= MAX_HELD) {
+      toast({ title: 'Tahanan penuh', description: `Maksimal ${MAX_HELD} transaksi ditahan. Lanjutkan atau hapus salah satu dulu.`, variant: 'destructive' });
+      return;
+    }
+    const h = snapshotHeld();
+    setHeld((prev) => [h, ...prev]);
+    resetAll();
+    toast({ title: 'Transaksi ditahan', description: `${h.label} · ${formatCurrency(h.total)}` });
+  };
+
+  const resumeHeld = (h: HeldCart) => {
+    // Harga & stok diselaraskan dengan katalog terkini (bisa berubah sejak ditahan)
+    const byId = new Map(variants.map((v) => [v.id, v]));
+    let adjusted = 0;
+    const restored: CartItem[] = [];
+    for (const it of h.cart) {
+      const v = byId.get(it.variantId);
+      if (!v) { adjusted++; continue; }
+      const isPre = v.type === 'PREORDER';
+      const qty = isPre ? it.quantity : Math.min(it.quantity, Math.max(v.stock, 0));
+      if (qty <= 0) { adjusted++; continue; }
+      if (qty !== it.quantity || v.price !== it.price) adjusted++;
+      restored.push({ ...it, price: v.price, stock: v.stock, quantity: qty, isPreorder: isPre });
+    }
+
+    // Keranjang yang sedang berisi tidak hilang: otomatis ditahan menggantikan yang dilanjutkan
+    const swapOut = hasItems ? snapshotHeld() : null;
+    setHeld((prev) => [...(swapOut ? [swapOut] : []), ...prev.filter((x) => x.id !== h.id)].slice(0, MAX_HELD));
+
+    const member = members.find((m) => m.id === h.customerId);
+    const walkIn = walkInCustomers.find((m) => m.id === h.walkInCustomerId);
+    const redeem = h.customerType === 'member' ? Math.min(h.pointsToRedeem, member?.points ?? 0) : 0;
+
+    setCart(restored);
+    setComboCart(h.comboCart);
+    setCustomerType(h.customerType);
+    setCustomerId(h.customerId);
+    setWalkInCustomerId(h.walkInCustomerId);
+    setCustomerSearch(member?.name ?? walkIn?.name ?? '');
+    setShowCustomerDropdown(false);
+    setDiscount(h.discount);
+    setTax(h.tax);
+    setOngkir(h.ongkir);
+    setNotes(h.notes);
+    setPointsToRedeem(redeem);
+    setPointsDisplay(redeem ? String(redeem) : '');
+    setShowHeld(false);
+    toast({
+      title: 'Transaksi dilanjutkan',
+      description: adjusted > 0 ? `${adjusted} item disesuaikan dengan stok/harga terbaru.` : h.label,
+    });
+  };
+
+  const discardHeld = (id: string) => setHeld((prev) => prev.filter((x) => x.id !== id));
+
+  const handleShareReceipt = () => {
+    if (!receipt) return;
+    const text = buildReceiptText(receipt, storeName);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  // Shortcut keyboard (desktop): "/" atau F2 → pencarian, F9 → Proses Transaksi
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (dialogOpen) return;
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      if (e.key === 'F9') { e.preventDefault(); openCheckout(); return; }
+      if (e.key === 'F2' || (e.key === '/' && !typing)) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const CartContent = (
     <div className="flex flex-col h-full">
@@ -808,10 +1079,10 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                   <span className="text-xs font-semibold">{formatCurrency(line.itemsTotal - line.discount)}</span>
                   <button
                     onClick={() => removeCombo(line.key)}
-                    className="text-muted-foreground/50 transition-colors hover:text-destructive"
+                    className="p-1.5 -mr-1.5 text-muted-foreground/50 transition-colors hover:text-destructive"
                     aria-label={`Hapus ${line.name}`}
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -832,7 +1103,13 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
             </div>
           ))}
           {cart.map((item) => (
-            <div key={item.variantId} className="flex items-center gap-2 py-1.5 border-b border-border/50 last:border-0">
+            <div
+              key={item.variantId}
+              className={cn(
+                'flex items-center gap-2 py-2 px-1 -mx-1 rounded-lg border-b border-border/50 last:border-0 transition-colors duration-300',
+                flashId === item.variantId && 'bg-[#028697]/10'
+              )}
+            >
               {/* <span className="text-lg leading-none shrink-0">{item.emoji}</span> */}
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-muted-foreground truncate">{item.productName}</p>
@@ -843,20 +1120,20 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => updateQty(item.variantId, -1)}
-                  className="w-6 h-6 rounded-md border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors"
+                  onClick={() => (item.quantity <= 1 ? removeFromCart(item.variantId) : updateQty(item.variantId, -1))}
+                  className="w-9 h-9 lg:w-7 lg:h-7 rounded-lg border border-border bg-background hover:bg-muted active:scale-95 flex items-center justify-center transition-all"
                   aria-label="Kurangi"
                 >
-                  <Minus className="w-3 h-3" />
+                  <Minus className="w-3.5 h-3.5" />
                 </button>
-                <span className="w-6 text-center text-xs font-medium">{item.quantity}</span>
+                <span className="w-7 text-center text-sm lg:text-xs font-semibold tabular-nums">{item.quantity}</span>
                 <button
                   onClick={() => updateQty(item.variantId, 1)}
                   disabled={!item.isPreorder && item.quantity + (comboUsage.get(item.variantId) ?? 0) >= item.stock}
-                  className="w-6 h-6 rounded-md border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors disabled:opacity-40"
+                  className="w-9 h-9 lg:w-7 lg:h-7 rounded-lg border border-border bg-background hover:bg-muted active:scale-95 flex items-center justify-center transition-all disabled:opacity-40"
                   aria-label="Tambah"
                 >
-                  <Plus className="w-3 h-3" />
+                  <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
               <div className="text-right shrink-0 min-w-[60px]">
@@ -864,10 +1141,10 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
               </div>
               <button
                 onClick={() => removeFromCart(item.variantId)}
-                className="text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
+                className="p-2 -mr-1 text-muted-foreground/50 hover:text-destructive transition-colors shrink-0"
                 aria-label="Hapus"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           ))}
@@ -1015,6 +1292,16 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
               <Trash2 className="w-4 h-4" />
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={holdCurrent}
+              className="shrink-0 h-9 px-2.5"
+              aria-label="Tahan transaksi"
+              title="Tahan transaksi (simpan, layani pelanggan lain dulu)"
+            >
+              <Pause className="w-4 h-4" />
+            </Button>
+            <Button
               className="flex-1 h-9 bg-[#028697] hover:bg-[#017585] text-white font-semibold disabled:opacity-50 transition-colors"
               onClick={openCheckout}
               disabled={!canProceed}
@@ -1022,6 +1309,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
               <span className="flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4" />
                 Proses Transaksi
+                <kbd className="ml-1 hidden rounded bg-white/20 px-1 text-[10px] font-medium lg:inline">F9</kbd>
               </span>
             </Button>
           </div>
@@ -1075,8 +1363,53 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
           cashierName={cashierName}
           onClose={handleCloseReceipt}
           onPrint={handlePrintReceipt}
+          onShare={handleShareReceipt}
         />
       )}
+
+      <ScannerDialog
+        open={showScanner}
+        onClose={() => { setShowScanner(false); window.setTimeout(() => searchRef.current?.focus(), 50); }}
+        onDetected={(code) => handleBarcode(code, false)}
+      />
+
+      {/* Transaksi yang ditahan */}
+      <Dialog open={showHeld} onOpenChange={setShowHeld}>
+        <DialogContent aria-describedby={undefined} className="sm:max-w-[460px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0 bg-gradient-to-br from-[#028697] to-[#015561] px-5 py-4 pr-12 text-left space-y-0.5">
+            <DialogTitle className="text-base font-semibold text-white">Transaksi Ditahan</DialogTitle>
+            <p className="text-xs text-white/70">Tersimpan di perangkat ini · {held.length} dari {MAX_HELD}</p>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+            {held.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Tidak ada transaksi yang ditahan.</p>
+            ) : (
+              held.map((h) => (
+                <div key={h.id} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{h.label}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {h.count} item · {new Date(h.heldAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-bold text-[#028697]">{formatCurrency(h.total)}</span>
+                  <Button size="sm" className="h-9 shrink-0 bg-[#028697] text-white hover:bg-[#017585]" onClick={() => resumeHeld(h)}>
+                    <Play className="mr-1 h-3.5 w-3.5" /> Lanjutkan
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => discardHeld(h.id)}
+                    className="shrink-0 p-2 text-muted-foreground/60 transition-colors hover:text-destructive"
+                    aria-label={`Hapus transaksi tertahan ${h.label}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col lg:flex-row gap-3 h-[calc(100vh-10rem)] lg:h-[calc(100vh-9rem)] min-h-[600px]">
         {/* ── Left: Product browser ── */}
@@ -1098,24 +1431,61 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
             </div>
           )}
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={viewMode === 'combos' ? 'Cari paket...' : 'Cari produk...'}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-[#028697]/50"
-            />
-            {search && (
+          {/* Search + scan + tertahan */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <input
+                ref={searchRef}
+                data-barcode-ok
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchEnter(); } }}
+                placeholder={viewMode === 'combos' ? 'Cari paket...' : 'Cari produk atau scan barcode...'}
+                className="w-full h-10 pl-9 pr-9 text-sm border border-input rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-[#028697]/50"
+              />
+              {search ? (
+                <button
+                  onClick={() => { setSearch(''); searchRef.current?.focus(); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Hapus pencarian"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : (
+                <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 text-[10px] text-muted-foreground lg:block">/</kbd>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowScanner(true)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-input bg-background text-[#028697] transition-colors hover:bg-[#028697]/5 active:scale-95"
+              aria-label="Scan barcode dengan kamera"
+              title="Scan barcode dengan kamera"
+            >
+              <ScanBarcode className="h-5 w-5" />
+            </button>
+            {held.length > 0 && (
               <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                type="button"
+                onClick={() => setShowHeld(true)}
+                className="relative flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-orange-300 bg-orange-50 px-3 text-xs font-semibold text-orange-700 transition-colors hover:bg-orange-100 active:scale-95 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-400"
+                aria-label={`${held.length} transaksi ditahan`}
               >
-                <X className="w-4 h-4" />
+                <Pause className="h-4 w-4" />
+                <span>{held.length}</span>
               </button>
             )}
+            <button
+              type="button"
+              onClick={toggleSound}
+              className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-input bg-background text-muted-foreground transition-colors hover:text-foreground sm:flex"
+              aria-label={soundOn ? 'Matikan bunyi scan' : 'Nyalakan bunyi scan'}
+              title={soundOn ? 'Bunyi scan: nyala' : 'Bunyi scan: mati'}
+            >
+              {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
           </div>
 
           {/* Category pills */}
@@ -1203,7 +1573,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                 <p className="text-sm text-muted-foreground">Produk tidak ditemukan</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 pb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 pb-24 lg:pb-4">
                 {filteredVariants.map((variant) => {
                   const inCart = cart.find((i) => i.variantId === variant.id);
                   const isOutOfStock = variant.type !== 'PREORDER' && variant.stock <= 0;
@@ -1215,7 +1585,8 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                       onClick={() => !isOutOfStock && addToCart(variant)}
                       disabled={isOutOfStock}
                       className={cn(
-                        'relative flex flex-col items-center gap-1.5 p-3 rounded-xl border text-left transition-all',
+                        'relative flex flex-col items-center gap-1.5 p-3 rounded-xl border text-left transition-all active:scale-[0.97]',
+                        flashId === variant.id && 'ring-2 ring-[#028697]/50 scale-[0.97]',
                         isOutOfStock
                           ? 'opacity-50 cursor-not-allowed bg-muted border-border'
                           : inCart
@@ -1267,7 +1638,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         </div>
 
         {/* ── Right: Cart (desktop) ── */}
-        <div className="hidden lg:flex lg:flex-col w-72 xl:w-80 shrink-0 border border-border rounded-2xl bg-card overflow-hidden">
+        <div className="hidden lg:flex lg:flex-col w-80 xl:w-96 shrink-0 border border-border rounded-2xl bg-card overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
             <div className="flex items-center gap-2 font-semibold text-sm">
               <ShoppingCart className="w-4 h-4 text-[#028697]" />
@@ -1285,16 +1656,27 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         {/* ── Mobile: floating cart button + bottom sheet ── */}
         <div className="lg:hidden">
           {hasItems && !showCart && (
-            <div className="fixed bottom-20 right-4 z-40">
+            <div className="fixed inset-x-3 bottom-20 z-40 flex gap-2">
               <button
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-2 bg-[#028697] text-white px-4 py-3 rounded-2xl shadow-lg font-semibold text-sm active:scale-95 transition-transform"
+                className="flex flex-1 items-center justify-between gap-3 rounded-2xl bg-[#028697] px-4 py-3 text-left text-white shadow-lg transition-transform active:scale-[0.98]"
+                aria-label="Buka keranjang"
               >
-                <ShoppingCart className="w-5 h-5" />
-                <span>{cartCount} item · {formatCurrency(total)}</span>
-                <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                  {cartCount}
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="relative">
+                    <ShoppingCart className="h-5 w-5" />
+                    <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold">{cartCount}</span>
+                  </span>
+                  <span className="ml-1">{cartCount} item</span>
                 </span>
+                <span className="text-sm font-bold tabular-nums">{formatCurrency(total)}</span>
+              </button>
+              <button
+                onClick={openCheckout}
+                disabled={!canProceed}
+                className="shrink-0 rounded-2xl bg-orange-500 px-5 text-sm font-bold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-50"
+              >
+                Bayar
               </button>
             </div>
           )}

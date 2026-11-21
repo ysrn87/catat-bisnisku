@@ -337,7 +337,7 @@ function CheckoutBody({
             <SlidersHorizontal className="h-5 w-5 text-white" />
           </div>
           <DialogHeader className="min-w-0 space-y-0.5 p-0 text-left">
-            <DialogTitle className="truncate text-lg font-semibold leading-tight text-white">Pembayaran &amp; Opsi Lanjutan</DialogTitle>
+            <DialogTitle className="truncate text-lg font-semibold leading-tight text-white">Opsi Lanjutan &amp; Pembayaran</DialogTitle>
             <p className="truncate text-xs font-normal text-white/70">Pelanggan: {customerName}</p>
           </DialogHeader>
         </div>
