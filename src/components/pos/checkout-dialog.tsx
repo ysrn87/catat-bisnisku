@@ -3,7 +3,7 @@
 import { useId, useState } from 'react';
 import {
   Banknote, Landmark, CreditCard, QrCode, SlidersHorizontal, Plus, X,
-  CheckCircle, Split, Clock, AlertCircle,
+  CheckCircle, Split, Clock, AlertCircle, ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -237,7 +237,7 @@ export function CheckoutDialog(props: CheckoutDialogProps) {
     <Dialog open={props.open} onOpenChange={(v) => !props.loading && props.onOpenChange(v)}>
       <DialogContent
         aria-describedby={undefined}
-        className="sm:max-w-[520px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[92vh] flex flex-col"
+        className="sm:max-w-[520px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[92dvh] flex flex-col"
       >
         {/* Body di-mount ulang tiap dialog dibuka → pilihan metode/uang diterima selalu mulai bersih */}
         <CheckoutBody {...props} />
@@ -254,6 +254,12 @@ function CheckoutBody({
   paymentStatus, onPaymentStatusChange, onConfirm,
 }: CheckoutDialogProps) {
   const isPending = paymentStatus === 'PENDING';
+
+  // Opsi lanjutan: di HP tertutup bila kosong (pembayaran langsung terlihat); di layar lebar terbuka.
+  const hasAdvancedValues = discount > 0 || tax > 0 || ongkir > 0 || notes.trim().length > 0;
+  const [advancedOpen, setAdvancedOpen] = useState(
+    () => hasAdvancedValues || (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 640px)').matches)
+  );
 
   const [mode, setMode]               = useState<'single' | 'split'>('single');
   const [method, setMethod]           = useState<PaymentMethodCode>('CASH');
@@ -290,6 +296,7 @@ function CheckoutBody({
     }
   }
 
+  const advancedVisible = advancedOpen || discountTooBig; // pesan error diskon tidak boleh tersembunyi
   const blocked   = discountTooBig || loading;
   const canSubmit = !blocked && payload !== null;
 
@@ -331,52 +338,73 @@ function CheckoutBody({
   return (
     <>
       {/* Header */}
-      <div className="shrink-0 bg-gradient-to-br from-[#028697] to-[#015561] px-5 pb-5 pt-5 sm:px-6 sm:pt-6">
-        <div className="flex items-center gap-3 pr-6">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+      <div className="shrink-0 bg-gradient-to-br from-[#028697] to-[#015561] px-4 pb-4 pt-4 sm:px-6 sm:pb-5 sm:pt-6">
+        <div className="flex items-center gap-3 pr-8">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 sm:h-10 sm:w-10">
             <SlidersHorizontal className="h-5 w-5 text-white" />
           </div>
-          <DialogHeader className="min-w-0 space-y-0.5 p-0 text-left">
-            <DialogTitle className="truncate text-lg font-semibold leading-tight text-white">Opsi Lanjutan &amp; Pembayaran</DialogTitle>
+          <DialogHeader className="min-w-0 flex-1 space-y-0.5 p-0 text-left">
+            <DialogTitle className="text-base font-semibold leading-tight text-white sm:text-lg">Opsi Lanjutan &amp; Pembayaran</DialogTitle>
             <p className="truncate text-xs font-normal text-white/70">Pelanggan: {customerName}</p>
           </DialogHeader>
         </div>
-        <div className="mt-4 flex items-end justify-between rounded-xl bg-white/10 px-4 py-3">
-          <span className="text-xs text-white/70">Total yang harus dibayar</span>
-          <span className="text-2xl font-bold tabular-nums text-white">{formatCurrency(grand)}</span>
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-2.5 sm:mt-4 sm:py-3">
+          <span className="text-xs text-white/70">Total dibayar</span>
+          <span className="text-xl font-bold tabular-nums text-white sm:text-2xl">{formatCurrency(grand)}</span>
         </div>
       </div>
 
       {/* Body */}
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 pb-4 pt-5 sm:px-6">
-        {/* ── Opsi lanjutan ── */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-4 sm:space-y-5 sm:px-6 sm:pt-5">
+        {/* ── Opsi lanjutan (bisa dilipat) ── */}
         <section className="space-y-3">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Opsi Lanjutan</p>
-          <div className="grid grid-cols-3 gap-2">
-            <MoneyField id="co-discount" label="Diskon" value={discount} onChange={onDiscountChange} />
-            <MoneyField id="co-tax"      label="Pajak"  value={tax}      onChange={onTaxChange} />
-            <MoneyField id="co-ongkir"   label="Ongkir" value={ongkir}   onChange={onOngkirChange} />
-          </div>
-          {discountTooBig && (
-            <p className="flex items-center gap-1.5 text-xs text-red-600">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Total diskon melebihi subtotal belanja.
-            </p>
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((o) => !o)}
+            aria-expanded={advancedVisible}
+            aria-controls="co-advanced"
+            className="flex w-full items-center justify-between gap-2 text-left"
+          >
+            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">
+              Opsi Lanjutan
+              {hasAdvancedValues && <span className="rounded-full bg-[#028697]/10 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-[#028697]">Terisi</span>}
+            </span>
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              {advancedVisible ? 'Sembunyikan' : 'Diskon, pajak, ongkir, catatan'}
+              <ChevronDown className={cn('h-4 w-4 transition-transform', advancedVisible && 'rotate-180')} />
+            </span>
+          </button>
+
+          {advancedVisible && (
+            <div id="co-advanced" className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <MoneyField id="co-discount" label="Diskon" value={discount} onChange={onDiscountChange} />
+                <MoneyField id="co-tax"      label="Pajak"  value={tax}      onChange={onTaxChange} />
+                <MoneyField id="co-ongkir"   label="Ongkir" value={ongkir}   onChange={onOngkirChange} />
+              </div>
+              {discountTooBig && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600" role="alert">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" /> Total diskon melebihi subtotal belanja.
+                </p>
+              )}
+              <div>
+                <Label htmlFor="co-notes" className="text-[11px] text-muted-foreground">Catatan</Label>
+                <textarea
+                  id="co-notes"
+                  value={notes}
+                  onChange={(e) => onNotesChange(e.target.value)}
+                  placeholder="Catatan tambahan..."
+                  rows={2}
+                  maxLength={500}
+                  className="mt-1 w-full resize-none rounded-md border border-input bg-background p-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#028697]"
+                />
+              </div>
+            </div>
           )}
-          <div>
-            <Label htmlFor="co-notes" className="text-[11px] text-muted-foreground">Catatan</Label>
-            <textarea
-              id="co-notes"
-              value={notes}
-              onChange={(e) => onNotesChange(e.target.value)}
-              placeholder="Catatan tambahan..."
-              rows={2}
-              maxLength={500}
-              className="mt-1 w-full resize-none rounded-md border border-input bg-background p-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#028697]"
-            />
-          </div>
         </section>
 
         {/* ── Ringkasan ── */}
+        {(summary.length > 1 || (pointsEarned > 0 && !isPending)) && (
         <section className="space-y-1 rounded-xl border border-border bg-muted/30 p-3 text-xs">
           {summary.map((r) => (
             <div key={r.label} className={cn('flex justify-between', r.tone ?? 'text-muted-foreground')}>
@@ -391,6 +419,7 @@ function CheckoutBody({
             <p className="text-right text-[11px] text-orange-500">+{pointsEarned} poin diperoleh</p>
           )}
         </section>
+        )}
 
         {/* ── Status bayar ── */}
         <section className="space-y-2">
@@ -534,25 +563,26 @@ function CheckoutBody({
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 space-y-2 border-t border-gray-100 bg-gray-50/50 px-5 py-4 sm:px-6">
+      <div className="shrink-0 space-y-2 border-t border-gray-100 bg-gray-50/60 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-4">
         {payError && !discountTooBig && (
           <p className="flex items-center gap-1.5 text-xs text-red-600" role="alert">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {payError}
           </p>
         )}
-        <div className="flex items-center justify-between gap-3">
-          <button
+        <div className="flex items-center gap-2">
+          <Button
             type="button"
+            variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
-            className="py-2 pr-2 text-sm text-gray-400 transition-colors hover:text-gray-600 disabled:opacity-50"
+            className="h-11 shrink-0 px-5"
           >
             Batal
-          </button>
+          </Button>
           <Button
             onClick={submit}
             disabled={!canSubmit}
-            className="min-w-[190px] bg-[#028697] font-semibold text-white transition-colors hover:bg-[#017585] disabled:opacity-50"
+            className="h-11 min-w-0 flex-1 bg-[#028697] font-semibold text-white transition-colors hover:bg-[#017585] disabled:opacity-50"
           >
             {loading ? (
               <span className="flex items-center gap-2">
@@ -561,8 +591,8 @@ function CheckoutBody({
               </span>
             ) : (
               <span className="flex items-center gap-1.5">
-                <CheckCircle className="h-4 w-4" />
-                {isPending ? 'Simpan sebagai Pending' : 'Bayar & Selesaikan'}
+                <CheckCircle className="h-4 w-4 shrink-0" />
+                <span className="truncate">{isPending ? 'Simpan sebagai Pending' : 'Bayar & Selesaikan'}</span>
               </span>
             )}
           </Button>

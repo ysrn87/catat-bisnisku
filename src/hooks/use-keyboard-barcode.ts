@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Scanner barcode USB/Bluetooth bekerja seperti keyboard: mengetik kode sangat cepat lalu Enter.
- * Hook ini mengenali pola itu (jeda antar-karakter < 50 ms) sehingga ketikan manusia
+ * Hook ini mengenali pola itu (jeda antar-karakter < 80 ms; scanner USB ±5 ms, Bluetooth bisa berjitter) sehingga ketikan manusia
  * tidak pernah dianggap scan. Tidak aktif saat fokus ada di kolom isian lain
  * (kecuali kolom bertanda data-barcode-ok, mis. pencarian produk).
  */
@@ -23,8 +23,9 @@ export function useKeyboardBarcode(onScan: (code: string) => void, enabled: bool
       const isField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable;
       if (isField && !el?.hasAttribute('data-barcode-ok')) return;
 
-      const now = performance.now();
-      if (now - lastKey.current > 50) buffer.current = ''; // jeda panjang → ketikan manusia
+      // e.timeStamp = waktu event sebenarnya (bukan waktu handler berjalan) → tetap akurat saat main thread sibuk
+      const now = e.timeStamp;
+      if (now - lastKey.current > 80) buffer.current = ''; // jeda panjang → ketikan manusia
       lastKey.current = now;
 
       if (e.key === 'Enter') {
