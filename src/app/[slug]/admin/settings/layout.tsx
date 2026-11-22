@@ -12,11 +12,12 @@ export default async function SettingsLayout({
   return (
     <TabLayout
       title="Pengaturan"
-      description="Kelola sistem poin, kategori produk, profil admin, dan langganan"
+      description="Kelola sistem poin, kategori produk, profil admin, rekening pembayaran, dan langganan"
       tabs={[
         { value: 'points',        label: 'Poin',  href: `/${slug}/admin/settings/points` },
         { value: 'categories',    label: 'Kategori',     href: `/${slug}/admin/settings/categories` },
         { value: 'profile',       label: 'Profil', href: `/${slug}/admin/settings/profile` },
+        { value: 'payment',       label: 'Pembayaran',   href: `/${slug}/admin/settings/payment` },
         { value: 'subscription',  label: 'Langganan',    href: `/${slug}/admin/settings/subscription` },
         { value: 'danger',        label: 'Hapus Toko',   href: `/${slug}/admin/settings/danger` },
       ]}

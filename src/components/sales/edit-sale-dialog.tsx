@@ -712,6 +712,7 @@ export function EditSaleDialog({
                     <SelectItem value="CASH">💵 Cash</SelectItem>
                     <SelectItem value="CARD">💳 Kartu</SelectItem>
                     <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
+                    <SelectItem value="EWALLET">👛 E-Wallet</SelectItem>
                     <SelectItem value="QRIS">📱 QRIS</SelectItem>
                   </SelectContent>
                 </Select>

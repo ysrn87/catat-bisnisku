@@ -43,18 +43,21 @@ export async function createDeleteStoreChallengeAction(storeId: string): Promise
   return { success: true, phrase, token };
 }
 
-/** Hapus file Vercel Blob milik toko (logo). Best-effort: gagal tidak membatalkan penghapusan. */
+/** Hapus file Vercel Blob milik toko (logo, gambar QRIS). Best-effort: gagal tidak membatalkan penghapusan. */
 async function deleteStoreBlobs(storeId: string, logoUrl: string | null) {
   try {
     const urls = new Set<string>();
     if (logoUrl && logoUrl.includes('.public.blob.vercel-storage.com')) urls.add(logoUrl);
 
-    let cursor: string | undefined;
-    do {
-      const res = await list({ prefix: `store-logos/${storeId}-`, cursor });
-      res.blobs.forEach((b) => urls.add(b.url));
-      cursor = res.hasMore ? res.cursor : undefined;
-    } while (cursor);
+    // Logo toko + gambar QRIS (lihat api/store/branding/upload & api/store/payment-accounts/qris)
+    for (const prefix of [`store-logos/${storeId}-`, `store-qris/${storeId}-`]) {
+      let cursor: string | undefined;
+      do {
+        const res = await list({ prefix, cursor });
+        res.blobs.forEach((b) => urls.add(b.url));
+        cursor = res.hasMore ? res.cursor : undefined;
+      } while (cursor);
+    }
 
     if (urls.size > 0) await del([...urls]);
   } catch (error) {

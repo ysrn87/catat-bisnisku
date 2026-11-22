@@ -61,6 +61,7 @@ export const PAYMENT_METHOD_TO_ACCOUNT: Record<string, string> = {
   TRANSFER:    '1002', // Bank
   BANK:        '1002',
   QRIS:        '1002',
+  EWALLET:     '1002', // E-Wallet (DANA, OVO, GoPay, ...) — masuk akun Bank seperti QRIS
   CARD:        '1002', // Kartu (kode yang dipakai POS & form edit) — sebelumnya salah masuk ke Kas
   DEBIT:       '1002',
   KREDIT:      '1002',

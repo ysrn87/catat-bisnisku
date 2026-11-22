@@ -11,6 +11,7 @@ export const STORE_SCOPED_MODELS = [
   'StoreUser', 'StoreStaff', 'StaffInvitation', 'StoreSetting',
   'UpgradePayment', 'StoreLimitOverride',
   'Combo', 'ComboItem', 'ComboItemVariant', 'SaleCombo',
+  'StorePaymentAccount',
 ] as const;
 
 /** Model tanpa storeId yang terhapus lewat induknya (dihapus eksplisit di bawah). */
@@ -57,6 +58,7 @@ export async function purgeStoreData(
   await tx.storeSetting.deleteMany({ where: { storeId } });
   await tx.upgradePayment.deleteMany({ where: { storeId } });
   await tx.storeLimitOverride.deleteMany({ where: { storeId } });
+  await tx.storePaymentAccount.deleteMany({ where: { storeId } });
 
   // Tahan slug agar tidak langsung dipakai toko lain
   await tx.deletedStoreSlug.upsert({
@@ -90,6 +92,7 @@ export async function purgeStoreData(
     ComboItem:          await tx.comboItem.count({ where: { storeId } }),
     ComboItemVariant:   await tx.comboItemVariant.count({ where: { storeId } }),
     SaleCombo:          await tx.saleCombo.count({ where: { storeId } }),
+    StorePaymentAccount: await tx.storePaymentAccount.count({ where: { storeId } }),
   };
   const leftovers = Object.entries(residue).filter(([, n]) => n > 0);
   if (leftovers.length > 0 || (await tx.store.count({ where: { id: storeId } })) > 0) {

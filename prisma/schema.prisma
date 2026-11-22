@@ -111,6 +111,7 @@ model Store {
   accounts        Account[]
   journalEntries  JournalEntry[]
   limitOverride   StoreLimitOverride?
+  paymentAccounts StorePaymentAccount[]
 
   combos            Combo[]
   comboItems        ComboItem[]
@@ -373,7 +374,7 @@ model Payment {
 model PaymentSplit {
   id           String   @id @default(cuid())
   paymentId    String
-  method       String // CASH | TRANSFER | CARD | QRIS
+  method       String // CASH | TRANSFER | EWALLET | CARD | QRIS
   amount       Decimal  @db.Decimal(10, 2) // nilai yang melunasi transaksi lewat metode ini
   cashReceived Decimal? @db.Decimal(10, 2) // uang fisik diterima (hanya CASH)
   changeAmount Decimal? @db.Decimal(10, 2) // kembalian = cashReceived - amount (hanya CASH)
@@ -383,6 +384,40 @@ model PaymentSplit {
 
   @@index([paymentId])
   @@map("payment_splits")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STORE PAYMENT ACCOUNT
+// Rekening bank, e-wallet, dan QRIS milik toko — diisi admin lewat
+// Pengaturan > Pembayaran. Ditampilkan di invoice dan di dialog pembayaran kasir.
+//   BANK    → provider = nama bank,    accountNumber = no. rekening, accountName = atas nama
+//   EWALLET → provider = nama e-wallet, accountNumber = no. HP/akun,  accountName = atas nama
+//   QRIS    → provider = label (opsional), qrisImageUrl = gambar QR di Vercel Blob
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum PaymentAccountType {
+  BANK
+  EWALLET
+  QRIS
+}
+
+model StorePaymentAccount {
+  id            String             @id @default(cuid())
+  storeId       String
+  type          PaymentAccountType
+  provider      String
+  accountNumber String?
+  accountName   String?
+  qrisImageUrl  String?
+  isActive      Boolean            @default(true)
+  sortOrder     Int                @default(0)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, type, isActive])
+  @@map("store_payment_accounts")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

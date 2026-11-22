@@ -9,6 +9,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Printer, Pencil, Gift, Trash2, AlertTriangle } from 'lucide-react';
 import { EditSaleDialog } from './edit-sale-dialog';
 import { deleteSaleAction } from '@/actions/sales';
+import { getActivePaymentAccounts } from '@/actions/payment-accounts';
+import { buildInvoicePaymentInfoHtml, INVOICE_PAYMENT_CSS } from '@/lib/invoice-payment-html';
 import type { ComboInfo } from '@/lib/combo-pricing';
 
 interface SaleDetailsDialogProps {
@@ -124,9 +126,16 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
   const itemsOfCombo      = (comboId: string) => sale.items.filter((i) => i.saleComboId === comboId);
   const escHtml           = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    // window.open harus dipanggil langsung dari klik (sebelum await) agar tidak diblokir popup blocker.
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
+    printWindow.document.write('<!doctype html><title>Invoice</title><body style="font-family:sans-serif;padding:24px;color:#6b7280">Menyiapkan invoice…</body>');
+
+    // Rekening/e-wallet/QRIS diambil segar dari pengaturan toko (bukan hard code).
+    const paymentAccounts = await getActivePaymentAccounts();
+    if (printWindow.closed) return;
+    const paymentInfoHtml = buildInvoicePaymentInfoHtml(paymentAccounts);
 
     const statusLabel = sale.paymentStatus === 'PAID' ? 'Lunas' : sale.paymentStatus === 'PENDING' ? 'Pending' : 'Belum Lunas';
     const statusColor = sale.paymentStatus === 'PAID' ? '#16a34a' : sale.paymentStatus === 'PENDING' ? '#d97706' : '#dc2626';
@@ -395,10 +404,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
             min-width: 44px;
             text-align: center;
           }
-          .badge-dana  { background: #108de0; color: #fff; }
-          .badge-gopay { background: #00aed6; color: #fff; }
-          .badge-ovo   { background: #4c3494; color: #fff; }
-          .badge-shopeepay { background: #ee4d2d; color: #fff; }
+          ${INVOICE_PAYMENT_CSS}
           .ewallet-number { font-weight: 600; color: var(--ink); }
           .ewallet-name   { color: var(--muted); font-size: 10px; margin-left: 2px; }
 
@@ -584,52 +590,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
           </div>
         </div>
 
-        <!-- Payment Info: full width, bank + e-wallet -->
-        <div class="payment-info">
-          <div class="payment-info-label">Informasi Pembayaran</div>
-          <div class="payment-grid">
-            <!-- Bank Transfer -->
-            <div>
-              <div class="payment-col-title">Transfer Bank</div>
-              <div class="bank-row">
-                <span class="label">Bank</span>
-                <span class="value">Bank Rakyat Indonesia (BRI)</span>
-              </div>
-              <div class="bank-row">
-                <span class="label">No. Rekening</span>
-                <span class="value">5082 0101 7374 508</span>
-              </div>
-              <div class="bank-row">
-                <span class="label">Atas Nama</span>
-                <span class="value">Muh Yusran Ash Shidiq M</span>
-              </div>
-            </div>
-            <!-- E-Wallet -->
-            <div>
-              <div class="payment-col-title">E-Wallet</div>
-              <div class="ewallet-row">
-                <span class="ewallet-badge badge-dana">DANA</span>
-                <span class="ewallet-number">0823-3131-2555</span>
-                <span class="ewallet-name">Muh Yusran Ash Shiddiq</span>
-              </div>
-              <!-- <div class="ewallet-row"> -->
-                <!-- <span class="ewallet-badge badge-gopay">GoPay</span> -->
-                <!-- <span class="ewallet-number">0823-3131-2555</span> -->
-                <!-- <span class="ewallet-name">Muh Yusran Ash Shiddiq</span> -->
-              <!-- </div> -->
-              <!-- <div class="ewallet-row"> -->
-                <!-- <span class="ewallet-badge badge-ovo">OVO</span> -->
-                <!-- <span class="ewallet-number">0823-3131-2555</span> -->
-                <!-- <span class="ewallet-name">Muh Yusran Ash Shiddiq</span> -->
-              <!-- </div> -->
-              <!-- <div class="ewallet-row"> -->
-                <!-- <span class="ewallet-badge badge-shopeepay">ShopeePay</span> -->
-                <!-- <span class="ewallet-number">0823-3131-2555</span> -->
-                <!-- <span class="ewallet-name">Muh Yusran Ash Shiddiq</span> -->
-              <!-- </div> -->
-            </div>
-          </div>
-        </div>
+        ${paymentInfoHtml}
 
         <!-- Footer -->
         <div class="footer">
@@ -652,6 +613,7 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
       </html>
     `;
 
+    printWindow.document.open();
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
   };

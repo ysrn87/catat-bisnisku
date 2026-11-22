@@ -13,6 +13,7 @@ import { createSaleAction } from '@/actions/sales';
 import { Plus, Trash2, Gift, X, User, Search, ChevronDown, UserPlus, ShoppingCart, CreditCard, Package, FileText, Minus, Loader2, ScanLine, CameraOff } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { QuickAddCustomerForm } from '@/components/customers/quick-add-customer-form';
+import { PaymentAccountPanel, useActivePaymentAccounts } from '@/components/payments/payment-account-info';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
 
 interface SaleItem {
@@ -51,6 +52,8 @@ interface NewSaleDialogProps {
 
 export function NewSaleDialog({ variants, customers, walkInCustomers = [], conversionRate = 1000, trigger }: NewSaleDialogProps) {
   const [open, setOpen] = useState(false);
+  // Info rekening/e-wallet/QRIS sesuai metode yang dipilih (diambil tiap dialog dibuka)
+  const { accounts: paymentAccounts, loaded: accountsLoaded } = useActivePaymentAccounts(open);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<SaleItem[]>([]);
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
@@ -953,6 +956,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                         <SelectItem value="CARD">💳 Kartu</SelectItem>
                         <SelectItem value="QRIS">📱 QRIS</SelectItem>
                         <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
+                        <SelectItem value="EWALLET">👛 E-Wallet</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -969,6 +973,8 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                     </Select>
                   </div>
                 </div>
+
+                <PaymentAccountPanel method={paymentMethod} accounts={paymentAccounts} loaded={accountsLoaded} />
 
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1.5">

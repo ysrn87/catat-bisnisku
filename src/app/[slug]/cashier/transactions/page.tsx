@@ -147,7 +147,7 @@ export default async function CashierTransactionsPage({ searchParams }: {
             filters={[
               { key: 'payment', label: 'Metode Pembayaran', defaultValue: 'all', options: [
                 { value: 'all', label: 'Semua Metode' }, { value: 'CASH', label: 'Cash' },
-                { value: 'QRIS', label: 'QRIS' }, { value: 'TRANSFER', label: 'Transfer Bank' },
+                { value: 'QRIS', label: 'QRIS' }, { value: 'TRANSFER', label: 'Transfer Bank' }, { value: 'EWALLET', label: 'E-Wallet' },
               ]},
               { key: 'paymentStatus', label: 'Status Pembayaran', defaultValue: 'all', options: [
                 { value: 'all', label: 'Semua Status' }, { value: 'PAID', label: 'Lunas' },

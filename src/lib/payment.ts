@@ -8,6 +8,7 @@
 export const PAYMENT_METHODS = [
   { value: 'CASH',     label: 'Tunai'    },
   { value: 'TRANSFER', label: 'Transfer' },
+  { value: 'EWALLET',  label: 'E-Wallet' },
   { value: 'CARD',     label: 'Kartu'    },
   { value: 'QRIS',     label: 'QRIS'     },
 ] as const;

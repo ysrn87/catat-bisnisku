@@ -146,7 +146,7 @@ export default async function SalesPage({ searchParams }: {
             filters={[
               { key: 'payment', label: 'Metode Pembayaran', defaultValue: 'all', options: [
                 { value: 'all', label: 'Semua Metode' }, { value: 'CASH', label: 'Cash' },
-                { value: 'QRIS', label: 'QRIS' }, { value: 'TRANSFER', label: 'Transfer Bank' },
+                { value: 'QRIS', label: 'QRIS' }, { value: 'TRANSFER', label: 'Transfer Bank' }, { value: 'EWALLET', label: 'E-Wallet' },
                 { value: 'MIDTRANS', label: 'Midtrans' },
               ]},
               { key: 'paymentStatus', label: 'Status Pembayaran', defaultValue: 'all', options: [

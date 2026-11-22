@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import {
-  Banknote, Landmark, CreditCard, QrCode, SlidersHorizontal, Plus, X,
+  Banknote, Landmark, CreditCard, QrCode, Wallet, SlidersHorizontal, Plus, X,
   CheckCircle, Split, Clock, AlertCircle, ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn, formatCurrency } from '@/lib/utils';
+import { PaymentAccountPanel, useActivePaymentAccounts } from '@/components/payments/payment-account-info';
+import type { PaymentAccountInfo } from '@/lib/payment-accounts';
 import {
   PAYMENT_METHODS,
   MAX_PAYMENT_AMOUNT,
@@ -70,6 +72,7 @@ interface SplitRow {
 const METHOD_ICON: Record<PaymentMethodCode, typeof Banknote> = {
   CASH:     Banknote,
   TRANSFER: Landmark,
+  EWALLET:  Wallet,
   CARD:     CreditCard,
   QRIS:     QrCode,
 };
@@ -203,7 +206,7 @@ function MethodButtons({
   disabledMethods?: PaymentMethodCode[];
 }) {
   return (
-    <div className="grid grid-cols-4 gap-1.5">
+    <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
       {PAYMENT_METHODS.map((m) => {
         const Icon = METHOD_ICON[m.value];
         const active = value === m.value;
@@ -232,7 +235,15 @@ function MethodButtons({
 
 // ─── Dialog ───────────────────────────────────────────────────────────────────
 
+type CheckoutBodyProps = CheckoutDialogProps & {
+  paymentAccounts: PaymentAccountInfo[];
+  accountsLoaded:  boolean;
+};
+
 export function CheckoutDialog(props: CheckoutDialogProps) {
+  // Info rekening/e-wallet/QRIS diambil tiap dialog dibuka, jadi perubahan admin langsung terlihat.
+  const { accounts, loaded } = useActivePaymentAccounts(props.open);
+
   return (
     <Dialog open={props.open} onOpenChange={(v) => !props.loading && props.onOpenChange(v)}>
       <DialogContent
@@ -240,7 +251,7 @@ export function CheckoutDialog(props: CheckoutDialogProps) {
         className="sm:max-w-[520px] p-0 gap-0 overflow-hidden border-0 shadow-2xl max-h-[92dvh] flex flex-col"
       >
         {/* Body di-mount ulang tiap dialog dibuka → pilihan metode/uang diterima selalu mulai bersih */}
-        <CheckoutBody {...props} />
+        <CheckoutBody {...props} paymentAccounts={accounts} accountsLoaded={loaded} />
       </DialogContent>
     </Dialog>
   );
@@ -252,7 +263,8 @@ function CheckoutBody({
   discount, tax, ongkir, notes,
   onDiscountChange, onTaxChange, onOngkirChange, onNotesChange,
   paymentStatus, onPaymentStatusChange, onConfirm,
-}: CheckoutDialogProps) {
+  paymentAccounts, accountsLoaded,
+}: CheckoutBodyProps) {
   const isPending = paymentStatus === 'PENDING';
 
   // Opsi lanjutan: di HP tertutup bila kosong (pembayaran langsung terlihat); di layar lebar terbuka.
@@ -482,6 +494,7 @@ function CheckoutBody({
           {effectiveMode === 'single' && grand > 0 && (
             <div className="space-y-3">
               <MethodButtons value={method} onChange={setMethod} />
+              <PaymentAccountPanel method={method} accounts={paymentAccounts} loaded={accountsLoaded} />
               {!isPending && method === 'CASH' && (
                 <CashTender amount={grand} received={cashReceived} onChange={setCashReceived} onEnter={submit} />
               )}
@@ -511,6 +524,7 @@ function CheckoutBody({
                     onChange={(m) => updateRow(row.id, { method: m })}
                     disabledMethods={usedMethods.filter((m) => m !== row.method)}
                   />
+                  <PaymentAccountPanel method={row.method} accounts={paymentAccounts} loaded={accountsLoaded} />
                   <div className="flex items-end gap-2">
                     <MoneyField
                       className="flex-1"
