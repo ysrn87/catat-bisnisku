@@ -593,15 +593,15 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
               <div class="payment-col-title">Transfer Bank</div>
               <div class="bank-row">
                 <span class="label">Bank</span>
-                <span class="value">Bank Syariah Indonesia (BSI)</span>
+                <span class="value">Bank Rakyat Indonesia (BRI)</span>
               </div>
               <div class="bank-row">
                 <span class="label">No. Rekening</span>
-                <span class="value">7244 2022 46</span>
+                <span class="value">5082 0101 7374 508</span>
               </div>
               <div class="bank-row">
                 <span class="label">Atas Nama</span>
-                <span class="value">Lisharyati</span>
+                <span class="value">Muh Yusran Ash Shidiq M</span>
               </div>
             </div>
             <!-- E-Wallet -->
