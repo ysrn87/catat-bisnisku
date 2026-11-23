@@ -16,6 +16,7 @@ import { CheckoutDialog, type CheckoutPayload } from './checkout-dialog';
 import { ScannerDialog } from './scanner-dialog';
 import { posFeedback, readStorage, writeStorage } from './pos-feedback';
 import { useKeyboardBarcode } from '@/hooks/use-keyboard-barcode';
+import { useFillViewportHeight } from '@/hooks/use-fill-viewport-height';
 import { paymentMethodLabel, roundMoney } from '@/lib/payment';
 import type { ComboInfo } from '@/lib/combo-pricing';
 
@@ -383,6 +384,10 @@ function ReceiptDialog({
 
 export function PosPanel({ variants, members, walkInCustomers, conversionRate, storeSlug, storeName, cashierName, combos = [] }: PosPanelProps) {
   // Notifikasi POS (satu aktif; yang baru menggantikan yang lama)
+  // Desktop: tinggi POS = sisa layar di bawah header halaman, supaya halaman tidak scroll
+  const posRootRef = useRef<HTMLDivElement>(null);
+  const posHeight  = useFillViewportHeight(posRootRef, { minWidth: 1024, bottomGap: 32, minHeight: 320 });
+
   const [notice, setNotice] = useState<PosNoticeData | null>(null);
   const noticeTimer = useRef<number | undefined>(undefined);
   const dismissNotice = useCallback(() => { window.clearTimeout(noticeTimer.current); setNotice(null); }, []);
@@ -1161,11 +1166,11 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
       {/* Footer: Customer + Checkout */}
       {hasItems && (
-        <div className="shrink-0 space-y-2.5 border-t border-border bg-card px-3 py-3">
+        <div className="shrink-0 space-y-2 border-t border-border bg-card px-3 py-2.5 [@media(max-height:800px)]:space-y-1.5 [@media(max-height:800px)]:py-2">
           {/* Customer type tabs */}
           <div>
             <p className="sr-only">Jenis pelanggan</p>
-            <div className="mb-2 flex gap-1 rounded-xl bg-muted p-1" role="group" aria-label="Jenis pelanggan">
+            <div className="mb-1.5 flex gap-1 rounded-xl bg-muted p-1" role="group" aria-label="Jenis pelanggan">
               {(['customer', 'member', 'walk-in'] as const).map((t) => (
                 <button
                   key={t}
@@ -1280,7 +1285,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                 )}
               </div>
             )}
-            <div className="flex items-center justify-between gap-3 rounded-xl bg-[#028697]/10 px-3 py-2">
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-[#028697]/10 px-3 py-1.5">
               <span className="text-sm font-semibold">Total</span>
               <span className="text-lg font-bold tabular-nums text-[#028697]">{formatCurrency(total)}</span>
             </div>
@@ -1420,7 +1425,11 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         </DialogContent>
       </Dialog>
 
-      <div className="relative flex flex-col lg:flex-row gap-3 h-[calc(100dvh-13rem)] lg:h-[calc(100dvh-8.5rem)] lg:min-h-[560px]">
+      <div
+        ref={posRootRef}
+        style={posHeight ? { height: posHeight } : undefined}
+        className="relative flex flex-col lg:flex-row gap-3 h-[calc(100dvh-13rem)] lg:h-[calc(100dvh-17rem)] lg:min-h-[320px]"
+      >
         <PosNotice notice={notice} onDismiss={dismissNotice} />
         {/* ── Left: Product browser ── */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">

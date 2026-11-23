@@ -3,133 +3,369 @@ import { lowStockWhere } from '@/lib/inventory-totals';
 import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { Package, ShoppingCart, Users, DollarSign } from 'lucide-react';
-import { SalesTrendChart } from '@/components/charts/sales-trend-chart';
+import { paymentMethodLabel } from '@/lib/payment';
+import {
+  Package, ShoppingCart, Users, Wallet, CheckCircle2, Clock, Receipt, AlertTriangle,
+} from 'lucide-react';
+import { SalesTrendChart, type SalesTrendPoint } from '@/components/charts/sales-trend-chart';
+import { RangeFilter } from '@/components/dashboard/range-filter';
+import { DeltaBadge } from '@/components/dashboard/delta-badge';
+import {
+  getRangeWindow, parseRange, percentChange, toWib, RANGE_META, type RangeWindow,
+} from '@/lib/dashboard-range';
 
-const DAY_LABELS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+type PayStatus = 'PAID' | 'PENDING' | 'FAILED' | 'REFUNDED';
 
-async function getSalesTrend(storeId: string) {
-  const days = 7;
-  const since = new Date();
-  since.setDate(since.getDate() - (days - 1));
-  since.setHours(0, 0, 0, 0);
-
-  const sales = await db.sale.findMany({
-    where: { storeId, createdAt: { gte: since } },
-    select: { total: true, createdAt: true },
-  });
-
-  const buckets = new Map<string, number>();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(since);
-    d.setDate(d.getDate() + i);
-    buckets.set(d.toDateString(), 0);
-  }
-
-  for (const sale of sales) {
-    const key = sale.createdAt.toDateString();
-    buckets.set(key, (buckets.get(key) ?? 0) + Number(sale.total));
-  }
-
-  return Array.from(buckets.entries()).map(([dateKey, total]) => ({
-    label: DAY_LABELS[new Date(dateKey).getDay()],
-    total,
-  }));
+// Penjualan lama (sebelum ada tabel Payment) tidak punya baris payment → dianggap lunas.
+function statusOf(payment: { status: PayStatus } | null): PayStatus {
+  return payment?.status ?? 'PAID';
 }
 
-async function getDashboardStats(storeId: string) {
-  const [totalProducts, totalSales, totalCustomers, lowStockItems, salesAgg, cashflowAgg] =
-    await Promise.all([
-      db.productVariant.count({ where: { storeId } }),
-      db.sale.count({ where: { storeId } }),
-      db.storeUser.count({ where: { storeId } }),
-      db.productVariant.count({ where: lowStockWhere(storeId) }),
-      db.sale.aggregate({ where: { storeId }, _sum: { total: true } }),
-      db.cashflow.aggregate({ where: { storeId, type: 'INCOME' }, _sum: { amount: true } }),
-    ]);
+async function getPeriodSales(storeId: string, win: RangeWindow) {
+  const [sales, prevSales] = await Promise.all([
+    db.sale.findMany({
+      where: { storeId, createdAt: { gte: win.start, lt: win.end } },
+      select: {
+        total: true,
+        createdAt: true,
+        payment: { select: { status: true, method: true } },
+        items: { select: { quantity: true } },
+      },
+    }),
+    db.sale.findMany({
+      where: { storeId, createdAt: { gte: win.prevStart, lt: win.prevEnd } },
+      select: { total: true, payment: { select: { status: true } } },
+    }),
+  ]);
+
+  let paidTotal = 0, paidCount = 0, pendingTotal = 0, pendingCount = 0;
+  let failedCount = 0, refundedCount = 0, itemsSold = 0;
+  const methodTotals = new Map<string, { total: number; count: number }>();
+  const bucketMap = new Map<string, { paid: number; pending: number }>();
+  win.buckets.forEach((b) => bucketMap.set(b.key, { paid: 0, pending: 0 }));
+
+  const bucketKeyOf = (d: Date): string | null => {
+    const t = d.getTime();
+    const idx = win.buckets.findIndex((b) => t >= b.start.getTime() && t < b.end.getTime());
+    return idx >= 0 ? win.buckets[idx].key : null;
+  };
+
+  for (const s of sales) {
+    const total = Number(s.total);
+    const status = statusOf(s.payment as { status: PayStatus } | null);
+    const bucket = bucketMap.get(bucketKeyOf(s.createdAt) ?? '');
+
+    if (status === 'PAID') {
+      paidTotal += total; paidCount++;
+      itemsSold += s.items.reduce((sum, i) => sum + i.quantity, 0);
+      if (bucket) bucket.paid += total;
+      const label = paymentMethodLabel(s.payment?.method ?? 'CASH');
+      const m = methodTotals.get(label) ?? { total: 0, count: 0 };
+      m.total += total; m.count++;
+      methodTotals.set(label, m);
+    } else if (status === 'PENDING') {
+      pendingTotal += total; pendingCount++;
+      if (bucket) bucket.pending += total;
+    } else if (status === 'FAILED') {
+      failedCount++;
+    } else if (status === 'REFUNDED') {
+      refundedCount++;
+    }
+  }
+
+  let prevPaidTotal = 0, prevPaidCount = 0, prevPendingTotal = 0;
+  for (const s of prevSales) {
+    const status = statusOf(s.payment as { status: PayStatus } | null);
+    if (status === 'PAID') { prevPaidTotal += Number(s.total); prevPaidCount++; }
+    else if (status === 'PENDING') prevPendingTotal += Number(s.total);
+  }
+
+  const trend: SalesTrendPoint[] = win.buckets.map((b) => {
+    const v = bucketMap.get(b.key)!;
+    return { label: b.label, tooltip: b.tooltip, paid: v.paid, pending: v.pending };
+  });
+
+  const methods = Array.from(methodTotals.entries())
+    .map(([label, v]) => ({ label, ...v }))
+    .sort((a, b) => b.total - a.total);
 
   return {
-    totalProducts, totalSales, totalCustomers, lowStockItems,
-    totalRevenue: Number(salesAgg._sum.total    || 0),
-    totalIncome:  Number(cashflowAgg._sum.amount || 0),
+    paidTotal, paidCount, pendingTotal, pendingCount, failedCount, refundedCount, itemsSold,
+    avgTicket: paidCount > 0 ? paidTotal / paidCount : 0,
+    prevPaidTotal, prevPaidCount, prevPendingTotal,
+    prevAvgTicket: prevPaidCount > 0 ? prevPaidTotal / prevPaidCount : 0,
+    trend, methods,
   };
 }
 
-async function getRecentActivity(storeId: string) {
-  const [recentSales, lowStockProducts] = await Promise.all([
-    db.sale.findMany({
-      where: { storeId }, take: 5, orderBy: { createdAt: 'desc' },
-      include: { customer: { select: { name: true } } },
-    }),
-    db.productVariant.findMany({
-      where: lowStockWhere(storeId),
-      include: { product: true }, take: 5,
-    }),
-  ]);
-  return { recentSales, lowStockProducts };
+async function getTopProducts(storeId: string, win: RangeWindow) {
+  const grouped = await db.saleItem.groupBy({
+    by: ['variantId'],
+    where: {
+      sale: {
+        storeId,
+        createdAt: { gte: win.start, lt: win.end },
+        OR: [{ payment: { is: null } }, { payment: { is: { status: 'PAID' } } }],
+      },
+    },
+    _sum: { quantity: true, subtotal: true },
+    orderBy: { _sum: { quantity: 'desc' } },
+    take: 5,
+  });
+  if (grouped.length === 0) return [];
+
+  const variants = await db.productVariant.findMany({
+    where: { id: { in: grouped.map((g) => g.variantId) } },
+    select: { id: true, name: true, product: { select: { name: true } } },
+  });
+  const map = new Map(variants.map((v) => [v.id, v]));
+
+  return grouped.map((g) => {
+    const v = map.get(g.variantId);
+    return {
+      id: g.variantId,
+      name: v?.product.name ?? 'Produk',
+      variant: v?.name ?? '',
+      qty: g._sum.quantity ?? 0,
+      revenue: Number(g._sum.subtotal ?? 0),
+    };
+  });
 }
 
-export default async function RingkasanPage() {
-  const { storeId } = await getStoreContext();
+async function getStoreInfo(storeId: string) {
+  const [totalVariants, totalCustomers, lowStockItems, lowStockProducts, recentSales] = await Promise.all([
+    db.productVariant.count({ where: { storeId } }),
+    db.storeUser.count({ where: { storeId } }),
+    db.productVariant.count({ where: lowStockWhere(storeId) }),
+    db.productVariant.findMany({ where: lowStockWhere(storeId), include: { product: true }, take: 5 }),
+    db.sale.findMany({
+      where: { storeId }, take: 5, orderBy: { createdAt: 'desc' },
+      include: { customer: { select: { name: true } }, payment: { select: { status: true } } },
+    }),
+  ]);
+  return { totalVariants, totalCustomers, lowStockItems, lowStockProducts, recentSales };
+}
 
-  const [stats, { recentSales, lowStockProducts }, salesTrend] = await Promise.all([
-    getDashboardStats(storeId),
-    getRecentActivity(storeId),
-    getSalesTrend(storeId),
+function StatusPill({ status }: { status: PayStatus }) {
+  const map: Record<PayStatus, { label: string; cls: string }> = {
+    PAID:     { label: 'Lunas',    cls: 'bg-green-50 text-green-700' },
+    PENDING:  { label: 'Pending',  cls: 'bg-amber-50 text-amber-700' },
+    FAILED:   { label: 'Gagal',    cls: 'bg-red-50 text-red-600' },
+    REFUNDED: { label: 'Refund',   cls: 'bg-gray-100 text-gray-600' },
+  };
+  const m = map[status];
+  return <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${m.cls}`}>{m.label}</span>;
+}
+
+export default async function RingkasanPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ range?: string }>;
+}) {
+  const [{ slug }, sp, { storeId }] = await Promise.all([params, searchParams, getStoreContext()]);
+  const range = parseRange(sp?.range);
+  const win = getRangeWindow(range);
+  const meta = RANGE_META[range];
+
+  const [period, topProducts, info] = await Promise.all([
+    getPeriodSales(storeId, win),
+    getTopProducts(storeId, win),
+    getStoreInfo(storeId),
   ]);
 
+  const totalTx = period.paidCount + period.pendingCount;
+  const paidShare = totalTx > 0 ? Math.round((period.paidCount / totalTx) * 100) : 0;
+  const methodSum = period.methods.reduce((s, m) => s + m.total, 0);
+  const periodHint = (() => {
+    const s = toWib(win.start);
+    return range === 'day' ? `Per jam · WIB` : range === 'week' ? 'Per hari · 7 hari terakhir' : `Per hari · bulan berjalan (${s.year})`;
+  })();
+
   return (
-    <div className="space-y-6 md:space-y-8">
-      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="col-span-2 lg:col-span-1 order-4 lg:order-1 lg:border-0 lg:bg-[#028697] lg:shadow-none">
+    <div className="space-y-5 md:space-y-6">
+      {/* Filter periode */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold md:text-lg">{meta.title}</h2>
+          <p className="text-xs text-muted-foreground">Ringkasan penjualan, dibandingkan dengan {meta.compareLabel}</p>
+        </div>
+        <RangeFilter slug={slug} active={range} />
+      </div>
+
+      {/* Kartu utama */}
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+        <Card className="col-span-2 border-0 bg-[#028697] shadow-none lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium lg:text-white/80">Pendapatan</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0 lg:hidden" />
-            <div className="hidden lg:flex w-7 h-7 rounded-lg bg-white/15 items-center justify-center flex-shrink-0">
-              <DollarSign className="h-4 w-4 text-white" />
+            <CardTitle className="text-xs font-medium text-white/80 md:text-sm">Omzet (Lunas)</CardTitle>
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">
+              <Wallet className="h-4 w-4 text-white" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-base md:text-2xl font-bold break-all leading-tight lg:text-white lg:text-[1.6rem]">{formatCurrency(stats.totalRevenue)}</div>
-            <p className="text-[10px] md:text-xs text-muted-foreground mt-1 lg:text-white/70">Total pendapatan penjualan</p>
+            <div className="break-all text-2xl font-bold leading-tight text-white md:text-[1.9rem]">
+              {formatCurrency(period.paidTotal)}
+            </div>
+            <DeltaBadge onDark value={percentChange(period.paidTotal, period.prevPaidTotal)} label={meta.compareLabel} />
           </CardContent>
         </Card>
-        <Card className="order-1 lg:order-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-xs md:text-sm font-medium">Total Varian Produk</CardTitle><Package className="h-4 w-4 text-muted-foreground" /></CardHeader>
-          <CardContent><div className="text-xl md:text-2xl font-bold">{stats.totalProducts}</div><p className="text-[10px] md:text-xs text-muted-foreground">Varian produk di stok</p></CardContent>
-        </Card>
-        <Card className="order-2 lg:order-3">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-xs md:text-sm font-medium">Total Penjualan</CardTitle><ShoppingCart className="h-4 w-4 text-muted-foreground" /></CardHeader>
-          <CardContent><div className="text-xl md:text-2xl font-bold">{stats.totalSales}</div><p className="text-[10px] md:text-xs text-muted-foreground">Transaksi selesai</p></CardContent>
-        </Card>
-        <Card className="order-3 lg:order-4">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-xs md:text-sm font-medium">Total Pelanggan</CardTitle><Users className="h-4 w-4 text-muted-foreground" /></CardHeader>
-          <CardContent><div className="text-xl md:text-2xl font-bold">{stats.totalCustomers}</div><p className="text-[10px] md:text-xs text-muted-foreground">Member terdaftar</p></CardContent>
-        </Card>
-      </div>
 
-      <div className="hidden lg:block">
         <Card>
-          <CardHeader><CardTitle className="text-base font-medium">Tren penjualan 7 hari terakhir</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium md:text-sm">Transaksi Lunas</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          </CardHeader>
           <CardContent>
-            <SalesTrendChart data={salesTrend} />
+            <div className="text-xl font-bold md:text-2xl">{period.paidCount}</div>
+            <DeltaBadge value={percentChange(period.paidCount, period.prevPaidCount)} label={meta.compareLabel} />
+          </CardContent>
+        </Card>
+
+        <Card className={period.pendingCount > 0 ? 'border-amber-200 bg-amber-50/40' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium md:text-sm">Pending</CardTitle>
+            <Clock className="h-4 w-4 text-amber-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold md:text-2xl">{period.pendingCount}</div>
+            <p className="mt-1 break-all text-[10px] text-muted-foreground md:text-xs">
+              {period.pendingCount > 0 ? `${formatCurrency(period.pendingTotal)} belum diterima` : 'Tidak ada tagihan tertunda'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium md:text-sm">Rata-rata / Transaksi</CardTitle>
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="break-all text-base font-bold leading-tight md:text-2xl">{formatCurrency(Math.round(period.avgTicket))}</div>
+            <DeltaBadge value={percentChange(period.avgTicket, period.prevAvgTicket)} label={meta.compareLabel} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-xs font-medium md:text-sm">Item Terjual</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold md:text-2xl">{period.itemsSold}</div>
+            <p className="mt-1 text-[10px] text-muted-foreground md:text-xs">Dari transaksi lunas</p>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-medium md:text-sm">Komposisi Status Pembayaran</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+              {totalTx > 0 && (
+                <>
+                  <div className="bg-green-500" style={{ width: `${(period.paidCount / totalTx) * 100}%` }} />
+                  <div className="bg-amber-500" style={{ width: `${(period.pendingCount / totalTx) * 100}%` }} />
+                </>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground md:text-xs">
+              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-green-500" />Lunas {paidShare}%</span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" />Pending {totalTx > 0 ? 100 - paidShare : 0}%</span>
+              {(period.failedCount > 0 || period.refundedCount > 0) && (
+                <span>
+                  {period.failedCount > 0 && `${period.failedCount} gagal`}
+                  {period.failedCount > 0 && period.refundedCount > 0 && ' · '}
+                  {period.refundedCount > 0 && `${period.refundedCount} refund`}
+                </span>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Grafik tren — tampil di semua ukuran layar */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-baseline justify-between gap-2 text-base font-medium">
+            <span>Tren Penjualan</span>
+            <span className="text-[11px] font-normal text-muted-foreground">{periodHint}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SalesTrendChart data={period.trend} />
+        </CardContent>
+      </Card>
+
+      {/* Metode pembayaran + produk terlaris */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base md:text-lg">Metode Pembayaran</CardTitle></CardHeader>
+          <CardContent>
+            {period.methods.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Belum ada pembayaran lunas</p>
+            ) : (
+              <div className="space-y-3">
+                {period.methods.map((m) => (
+                  <div key={m.label}>
+                    <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+                      <span className="truncate font-medium">{m.label} <span className="font-normal text-muted-foreground">· {m.count}x</span></span>
+                      <span className="shrink-0 tabular-nums">{formatCurrency(m.total)}</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                      <div className="h-full rounded-full bg-[#028697]" style={{ width: `${methodSum > 0 ? (m.total / methodSum) * 100 : 0}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base md:text-lg">Produk Terlaris</CardTitle></CardHeader>
+          <CardContent>
+            {topProducts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Belum ada produk terjual</p>
+            ) : (
+              <div className="space-y-3">
+                {topProducts.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#028697]/10 text-xs font-bold text-[#028697]">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{p.name}</p>
+                      {p.variant && <p className="truncate text-xs text-muted-foreground">{p.variant}</p>}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold tabular-nums">{p.qty}x</p>
+                      <p className="text-[11px] tabular-nums text-muted-foreground">{formatCurrency(p.revenue)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Penjualan terbaru + stok menipis */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader><CardTitle className="text-base md:text-lg">Penjualan Terbaru</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3 md:space-y-4">
-              {recentSales.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada penjualan</p> : (
-                recentSales.map((sale) => (
+              {info.recentSales.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada penjualan</p> : (
+                info.recentSales.map((sale) => (
                   <div key={sale.id} className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1 mr-3">
-                      <p className="text-xs font-semibold truncate">{sale.customer?.name || 'Pelanggan Umum'}</p>
-                      <p className="text-xs text-muted-foreground italic truncate">{sale.saleNumber}</p>
+                    <div className="mr-3 min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold">{sale.customer?.name || 'Pelanggan Umum'}</p>
+                      <p className="truncate text-xs italic text-muted-foreground">{sale.saleNumber}</p>
                     </div>
-                    <div className="text-xs font-medium flex-shrink-0">{formatCurrency(Number(sale.total))}</div>
+                    <div className="flex shrink-0 flex-col items-end gap-0.5">
+                      <span className="text-xs font-medium">{formatCurrency(Number(sale.total))}</span>
+                      <StatusPill status={statusOf(sale.payment as { status: PayStatus } | null)} />
+                    </div>
                   </div>
                 ))
               )}
@@ -138,23 +374,40 @@ export default async function RingkasanPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base md:text-lg">Stok Menipis ({stats.lowStockItems})</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base md:text-lg">Stok Menipis ({info.lowStockItems})</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3 md:space-y-4">
-              {lowStockProducts.length === 0 ? <p className="text-sm text-muted-foreground">Semua stok tersedia</p> : (
-                lowStockProducts.map((variant) => (
+              {info.lowStockProducts.length === 0 ? <p className="text-sm text-muted-foreground">Semua stok tersedia</p> : (
+                info.lowStockProducts.map((variant) => (
                   <div key={variant.id} className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1 mr-3">
-                      <p className="text-sm font-medium truncate">{variant.product.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{variant.name}</p>
+                    <div className="mr-3 min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{variant.product.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{variant.name}</p>
                     </div>
-                    <div className="text-sm font-medium text-red-600 flex-shrink-0">{variant.stock} tersisa</div>
+                    <div className="flex-shrink-0 text-sm font-medium text-red-600">{variant.stock} tersisa</div>
                   </div>
                 ))
               )}
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Info toko (tidak terpengaruh filter) */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { icon: Package, label: 'Varian Produk', value: info.totalVariants },
+          { icon: Users, label: 'Member', value: info.totalCustomers },
+          { icon: AlertTriangle, label: 'Stok Menipis', value: info.lowStockItems },
+        ].map(({ icon: Icon, label, value }) => (
+          <div key={label} className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3 py-2.5">
+            <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="text-base font-bold leading-none">{value}</p>
+              <p className="mt-1 truncate text-[10px] text-muted-foreground md:text-xs">{label}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
