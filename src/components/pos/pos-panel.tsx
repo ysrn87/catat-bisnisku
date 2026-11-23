@@ -1116,9 +1116,9 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
             >
               <div className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.productName}>{item.productName}</p>
+                  <p className="line-clamp-2 break-words text-sm font-semibold leading-snug" title={item.variantName}>{item.variantName}</p>
                   {item.variantName !== item.productName && (
-                    <p className="break-words text-xs leading-snug text-muted-foreground">{item.variantName}</p>
+                    <p className="break-words text-xs leading-snug text-muted-foreground">{item.productName}</p>
                   )}
                 </div>
                 <button
