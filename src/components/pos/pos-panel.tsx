@@ -1631,11 +1631,11 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                       </div>
 
                       {/* Nama: sampai 2 baris, tinggi tetap agar semua kartu sejajar */}
-                      <p className={cn('line-clamp-2 min-h-[2.4em] break-words text-[13px] font-semibold leading-tight', isOutOfStock && 'text-muted-foreground')}>
-                        {variant.product.name}
+                      <p className={cn('line-clamp-2 break-words text-[13px] font-semibold leading-tight', isOutOfStock && 'text-muted-foreground')}>
+                        {showVariant ? variant.name : '\u00A0'}
                       </p>
                       <p className="mt-1 line-clamp-1 min-h-[1.1rem] break-all text-[11px] leading-snug text-muted-foreground">
-                        {showVariant ? variant.name : '\u00A0'}
+                        {variant.product.name}
                       </p>
 
                       {/* Harga + stok ditumpuk (tidak bertabrakan di kartu sempit) */}
