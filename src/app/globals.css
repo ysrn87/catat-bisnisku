@@ -183,3 +183,11 @@ a:focus-visible {
     size: A4;
   }
 }
+
+/* Lebar sidebar desktop; diciutkan lewat <html data-sidebar="collapsed"> (lihat use-sidebar-collapsed) */
+:root {
+  --sidebar-w: 15rem;
+}
+html[data-sidebar="collapsed"] {
+  --sidebar-w: 4rem;
+}

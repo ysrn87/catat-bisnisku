@@ -2,13 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useTransition, useState, useEffect } from 'react';
+import { Fragment, useTransition, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt, ChevronDown, Zap, Crown, BookMarked } from 'lucide-react';
+import { Home, Package, ShoppingCart, Settings, LogOut, Coins, Loader2, Receipt, ChevronDown, Search, PanelLeftClose, PanelLeftOpen, Zap, Crown, BookMarked } from 'lucide-react';
 import { logoutAction } from '@/actions/auth';
 import { triggerLoader } from '@/components/layouts/navigation-loader';
 import { PlanBadge } from '@/components/plan/plan-badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { CommandPalette, type PaletteEntry } from '@/components/command-palette';
+import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed';
 import { cn } from '@/lib/utils';
 
 interface SubNavItem {
@@ -42,6 +47,9 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [expandedHref, setExpandedHref] = useState<string | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { collapsed, toggle: toggleSidebar } = useSidebarCollapsed();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [isMac, setIsMac] = useState(false);
 
   const base = `/${storeSlug}`;
   const homeHref =
@@ -274,6 +282,26 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
   };
   const roleLabel = ROLE_LABELS[role] ?? role;
 
+  // Pintasan Ctrl/Cmd + K membuka pencarian halaman.
+  useEffect(() => {
+    setIsMac(/Mac|iPhone|iPad/.test(navigator.platform));
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Daftar halaman untuk pencarian: submenu diutamakan, menu tanpa submenu berdiri sendiri.
+  const paletteEntries: PaletteEntry[] = navItems.flatMap((item) =>
+    item.subItems
+      ? item.subItems.map((sub) => ({ href: sub.href, label: sub.label, section: item.label, icon: item.icon }))
+      : [{ href: item.href, label: item.label, icon: item.icon }]
+  );
+
   // Spinner & menu pengguna di-reset begitu rute berpindah.
   useEffect(() => {
     setPendingHref(null);
@@ -291,138 +319,214 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
 
   return (
     <>
-      {/* ── DESKTOP SIDEBAR (lg dan ke atas) ── */}
-      <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-60 bg-white border-r border-gray-100">
+      {/* ── DESKTOP SIDEBAR (lg dan ke atas) ──
+          Lebar mengikuti --sidebar-w (15rem normal, 4rem saat diciutkan; lihat globals.css).
+          Saat diciutkan, teks disembunyikan lewat CSS (html[data-sidebar=collapsed]) agar tidak berkedip
+          sebelum hidrasi; struktur interaktif (tooltip / menu submenu) dipilih lewat state `collapsed`. */}
+      <aside className="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:w-[var(--sidebar-w)] overflow-hidden bg-white border-r border-gray-100 transition-[width] duration-200 ease-out">
         {/* Logo + Store name */}
-        <div className="flex items-center gap-2.5 h-16 px-5 border-b border-gray-100 flex-shrink-0">
-          {logoUrl ? (
-            <img src={logoUrl} alt={storeName ?? 'Logo'} className="w-7 h-7 rounded-lg object-contain flex-shrink-0" />
-          ) : (
-            <div className="w-7 h-7 rounded-lg bg-[#028697] flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xs font-medium">{(storeName ?? 'C').charAt(0).toUpperCase()}</span>
-            </div>
-          )}
+        <div className="flex h-16 flex-shrink-0 items-center border-b border-gray-100 px-5 [html[data-sidebar=collapsed]_&]:justify-center [html[data-sidebar=collapsed]_&]:px-0">
           <Link
             href={homeHref}
-            className="text-sm font-medium text-gray-900 truncate hover:opacity-80 transition-opacity leading-tight"
+            title={storeName ?? 'Catat Bisnisku'}
+            className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-80"
           >
-            {storeName ?? 'Catat Bisnisku'}
+            {logoUrl ? (
+              <img src={logoUrl} alt={storeName ?? 'Logo'} className="w-7 h-7 rounded-lg object-contain flex-shrink-0" />
+            ) : (
+              <div className="w-7 h-7 rounded-lg bg-[#028697] flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-xs font-medium">{(storeName ?? 'C').charAt(0).toUpperCase()}</span>
+              </div>
+            )}
+            <span className="truncate text-sm font-medium leading-tight text-gray-900 [html[data-sidebar=collapsed]_&]:hidden">
+              {storeName ?? 'Catat Bisnisku'}
+            </span>
           </Link>
         </div>
 
         {/* Nav items */}
-        <nav aria-label="Navigasi utama" className="flex-1 overflow-y-auto px-3.5 py-4 space-y-0.5">
-          {navItems.map((item, index) => {
-            const isActive = isNavItemActive(item);
-            const hasSub = !!item.subItems;
-            const isExpanded = expandedHref === item.href;
-            const matchedSub = isActive ? findActiveSub(item) : undefined;
-            const itemLoading = pendingHref === item.href && pathname !== item.href;
-            const group = groupOf(item);
-            const showGroup = !!group && group !== groupOf(navItems[index - 1]);
+        <TooltipProvider delayDuration={150}>
+          <nav aria-label="Navigasi utama" className="flex-1 overflow-y-auto overflow-x-hidden px-3.5 py-4 space-y-0.5 [html[data-sidebar=collapsed]_&]:px-2">
+            {navItems.map((item, index) => {
+              const isActive = isNavItemActive(item);
+              const hasSub = !!item.subItems;
+              const isExpanded = expandedHref === item.href;
+              const matchedSub = isActive ? findActiveSub(item) : undefined;
+              const itemLoading = pendingHref === item.href && pathname !== item.href;
+              const group = groupOf(item);
+              const showGroup = !!group && group !== groupOf(navItems[index - 1]);
 
-            return (
-              <div key={item.href}>
-                {showGroup && (
-                  <p className={cn(
-                    'px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none',
-                    index === 0 ? 'pt-0' : 'pt-4'
-                  )}>
-                    {group}
-                  </p>
-                )}
+              const iconNode = (
+                <span className={cn('flex-shrink-0', isActive && 'text-[#028697]')}>
+                  {itemLoading ? <Loader2 className="w-4 h-4 animate-spin text-[#028697]" /> : item.icon}
+                </span>
+              );
 
-                <div
-                  className={cn(
-                    'relative flex items-center rounded-lg text-sm transition-colors duration-150',
-                    isActive
-                      ? 'bg-[#028697]/10 text-gray-900 font-medium'
-                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                  )}
+              const linkEl = (
+                <Link
+                  href={item.href}
+                  onClick={(e) => {
+                    handleNavClick(e, item.href);
+                    if (hasSub) setExpandedHref(item.href);
+                  }}
+                  aria-label={collapsed ? item.label : undefined}
+                  aria-current={isActive ? (hasSub ? 'true' : 'page') : undefined}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40 [html[data-sidebar=collapsed]_&]:justify-center [html[data-sidebar=collapsed]_&]:px-0"
                 >
-                  {isActive && (
-                    <span aria-hidden className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#028697]" />
-                  )}
-                  <Link
-                    href={item.href}
-                    onClick={(e) => {
-                      handleNavClick(e, item.href);
-                      if (hasSub) setExpandedHref(item.href);
-                    }}
-                    aria-current={isActive ? (hasSub ? 'true' : 'page') : undefined}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40"
-                  >
-                    <span className={cn('flex-shrink-0', isActive && 'text-[#028697]')}>
-                      {itemLoading ? <Loader2 className="w-4 h-4 animate-spin text-[#028697]" /> : item.icon}
-                    </span>
-                    <span className="truncate">{item.label}</span>
-                  </Link>
+                  {iconNode}
+                  <span className="truncate [html[data-sidebar=collapsed]_&]:hidden">{item.label}</span>
+                </Link>
+              );
 
-                  {hasSub && (
-                    <button
-                      type="button"
-                      onClick={() => setExpandedHref(isExpanded ? null : item.href)}
-                      aria-expanded={isExpanded}
-                      aria-controls={`submenu-${index}`}
-                      aria-label={`${isExpanded ? 'Tutup' : 'Buka'} submenu ${item.label}`}
-                      className="mr-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/70 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40"
-                    >
-                      <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', isExpanded && 'rotate-180')} />
-                    </button>
+              return (
+                <div key={item.href}>
+                  {showGroup && (
+                    <>
+                      {index > 0 && (
+                        <div aria-hidden className="mx-3 my-2 hidden border-t border-gray-100 [html[data-sidebar=collapsed]_&]:block" />
+                      )}
+                      <p className={cn(
+                        'px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400 select-none [html[data-sidebar=collapsed]_&]:hidden',
+                        index === 0 ? 'pt-0' : 'pt-4'
+                      )}>
+                        {group}
+                      </p>
+                    </>
                   )}
-                </div>
 
-                {hasSub && (
                   <div
-                    id={`submenu-${index}`}
                     className={cn(
-                      'grid transition-[grid-template-rows,visibility] duration-200 ease-out',
-                      isExpanded ? 'visible grid-rows-[1fr]' : 'invisible grid-rows-[0fr]'
+                      'relative flex items-center rounded-lg text-sm transition-colors duration-150',
+                      isActive
+                        ? 'bg-[#028697]/10 text-gray-900 font-medium'
+                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                     )}
                   >
-                    <div className="overflow-hidden">
-                      <div className="mt-0.5 mb-1 ml-[1.65rem] pl-3 flex flex-col gap-0.5">
-                        {item.subItems!.map((sub) => {
-                          const subActive = matchedSub?.href === sub.href;
-                          const subLoading = pendingHref === sub.href && pathname !== sub.href;
-                          const danger = isDangerSub(sub);
-                          return (
-                            <div key={sub.href}>
-                              {sub.group && (
-                                <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 px-3 pt-2 pb-0.5 select-none">
-                                  {sub.group}
-                                </p>
-                              )}
-                              <Link
-                                href={sub.href}
-                                onClick={(e) => handleNavClick(e, sub.href)}
-                                aria-current={subActive ? 'page' : undefined}
-                                className={cn(
-                                  'flex w-full items-center justify-between truncate border-l-2 py-1.5 pl-3 pr-2 text-left text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40',
-                                  subActive
-                                    ? 'border-[#028697] font-medium text-[#028697]'
-                                    : danger
-                                      ? 'border-gray-100 text-red-400 hover:border-red-300 hover:text-red-600'
-                                      : 'border-gray-100 text-gray-500 hover:border-gray-300 hover:text-gray-800'
+                    {isActive && (
+                      <span aria-hidden className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#028697]" />
+                    )}
+
+                    {collapsed && hasSub ? (
+                      /* Rail: menu induk membuka daftar submenu di samping */
+                      <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={`${item.label} (buka submenu)`}
+                            title={item.label}
+                            className="flex min-w-0 flex-1 items-center justify-center rounded-lg py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40"
+                          >
+                            {iconNode}
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start" sideOffset={10} className="w-52">
+                          <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                            {item.label}
+                          </DropdownMenuLabel>
+                          {item.subItems!.map((sub) => {
+                            const subActive = matchedSub?.href === sub.href;
+                            const danger = isDangerSub(sub);
+                            return (
+                              <Fragment key={sub.href}>
+                                {sub.group && (
+                                  <DropdownMenuLabel className="pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+                                    {sub.group}
+                                  </DropdownMenuLabel>
                                 )}
-                              >
-                                <span className="truncate">{sub.label}</span>
-                                {subLoading && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0 ml-1.5 text-[#028697]" />}
-                              </Link>
-                            </div>
-                          );
-                        })}
+                                <DropdownMenuItem asChild>
+                                  <Link
+                                    href={sub.href}
+                                    onClick={(e) => handleNavClick(e, sub.href)}
+                                    aria-current={subActive ? 'page' : undefined}
+                                    className={cn(
+                                      'cursor-pointer',
+                                      subActive && 'bg-[#028697]/10 font-medium text-[#028697]',
+                                      danger && !subActive && 'text-red-500 focus:text-red-600'
+                                    )}
+                                  >
+                                    {sub.label}
+                                  </Link>
+                                </DropdownMenuItem>
+                              </Fragment>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : collapsed ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                        <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      linkEl
+                    )}
+
+                    {hasSub && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedHref(isExpanded ? null : item.href)}
+                        aria-expanded={isExpanded}
+                        aria-controls={`submenu-${index}`}
+                        aria-label={`${isExpanded ? 'Tutup' : 'Buka'} submenu ${item.label}`}
+                        className="mr-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white/70 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40 [html[data-sidebar=collapsed]_&]:hidden"
+                      >
+                        <ChevronDown className={cn('w-3.5 h-3.5 transition-transform duration-200', isExpanded && 'rotate-180')} />
+                      </button>
+                    )}
+                  </div>
+
+                  {hasSub && (
+                    <div
+                      id={`submenu-${index}`}
+                      className={cn(
+                        'grid transition-[grid-template-rows,visibility] duration-200 ease-out [html[data-sidebar=collapsed]_&]:hidden',
+                        isExpanded ? 'visible grid-rows-[1fr]' : 'invisible grid-rows-[0fr]'
+                      )}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="mt-0.5 mb-1 ml-[1.65rem] pl-3 flex flex-col gap-0.5">
+                          {item.subItems!.map((sub) => {
+                            const subActive = matchedSub?.href === sub.href;
+                            const subLoading = pendingHref === sub.href && pathname !== sub.href;
+                            const danger = isDangerSub(sub);
+                            return (
+                              <div key={sub.href}>
+                                {sub.group && (
+                                  <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 px-3 pt-2 pb-0.5 select-none">
+                                    {sub.group}
+                                  </p>
+                                )}
+                                <Link
+                                  href={sub.href}
+                                  onClick={(e) => handleNavClick(e, sub.href)}
+                                  aria-current={subActive ? 'page' : undefined}
+                                  className={cn(
+                                    'flex w-full items-center justify-between truncate border-l-2 py-1.5 pl-3 pr-2 text-left text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40',
+                                    subActive
+                                      ? 'border-[#028697] font-medium text-[#028697]'
+                                      : danger
+                                        ? 'border-gray-100 text-red-400 hover:border-red-300 hover:text-red-600'
+                                        : 'border-gray-100 text-gray-500 hover:border-gray-300 hover:text-gray-800'
+                                  )}
+                                >
+                                  <span className="truncate">{sub.label}</span>
+                                  {subLoading && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0 ml-1.5 text-[#028697]" />}
+                                </Link>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        </TooltipProvider>
 
         {/* Info paket (akun & logout ada di menu avatar pada topbar) */}
-        <div className="flex-shrink-0 border-t border-gray-100 px-4 py-3">
+        <div className="flex-shrink-0 border-t border-gray-100 px-4 py-3 [html[data-sidebar=collapsed]_&]:hidden">
           <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
             <span>Paket toko</span>
             <PlanBadge plan={storePlan} storeSlug={storeSlug} compact />
@@ -431,67 +535,102 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       </aside>
 
       {/* ── DESKTOP TOPBAR (lg dan ke atas) ── */}
-      <header className="hidden lg:flex lg:fixed lg:top-0 lg:left-60 lg:right-0 lg:z-30 h-16 items-center justify-between gap-4 px-8 bg-white border-b border-gray-100">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm min-w-0">
-          {activeSub && activeItem ? (
-            <>
-              <Link
-                href={activeItem.href}
-                onClick={(e) => handleNavClick(e, activeItem.href)}
-                className="text-gray-500 truncate transition-colors hover:text-gray-900"
-              >
-                {activeItem.label}
-              </Link>
-              <span className="text-gray-300" aria-hidden>/</span>
-              <span className="text-gray-900 font-medium truncate" aria-current="page">{activeSub.label}</span>
-            </>
-          ) : (
-            <span className="text-gray-900 font-medium truncate" aria-current="page">{activeItem?.label ?? 'Dashboard'}</span>
-          )}
-        </nav>
+      <header className="hidden lg:flex lg:fixed lg:top-0 lg:left-[var(--sidebar-w)] lg:right-0 lg:z-30 h-16 items-center justify-between gap-4 px-8 bg-white border-b border-gray-100 transition-[left] duration-200 ease-out">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+            aria-pressed={collapsed}
+            title={collapsed ? 'Perluas sidebar' : 'Ciutkan sidebar'}
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40"
+          >
+            {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </button>
 
-        <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen} modal={false}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="Menu akun"
-              className="-mr-2 flex min-w-0 flex-shrink-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40"
-            >
-              <div className="text-right min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate max-w-[140px]">{userName ?? 'User'}</p>
-                <p className="text-xs text-gray-400 truncate">{roleLabel}</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-[#028697]/10 border border-[#028697]/20 flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-medium text-[#028697]">
-                  {(userName ?? 'U').charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <ChevronDown className={cn('w-3.5 h-3.5 text-gray-400 transition-transform duration-200', userMenuOpen && 'rotate-180')} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64 p-0">
-            <div className="border-b border-gray-100 px-4 py-3">
-              <p className="truncate text-sm font-medium text-gray-900">{userName ?? 'User'}</p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center whitespace-nowrap rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">
-                  {roleLabel}
-                </span>
-                <PlanBadge plan={storePlan} storeSlug={storeSlug} compact />
-              </div>
-              {storeName && <p className="mt-2 truncate text-xs text-gray-400">{storeName}</p>}
-            </div>
-            <form action={logoutAction} className="p-1">
+          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
+            {activeSub && activeItem ? (
+              <>
+                <Link
+                  href={activeItem.href}
+                  onClick={(e) => handleNavClick(e, activeItem.href)}
+                  className="text-gray-500 truncate transition-colors hover:text-gray-900"
+                >
+                  {activeItem.label}
+                </Link>
+                <span className="text-gray-300" aria-hidden>/</span>
+                <span className="text-gray-900 font-medium truncate" aria-current="page">{activeSub.label}</span>
+              </>
+            ) : (
+              <span className="text-gray-900 font-medium truncate" aria-current="page">{activeItem?.label ?? 'Dashboard'}</span>
+            )}
+          </nav>
+        </div>
+
+        <div className="flex flex-shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            aria-label="Cari halaman"
+            className="flex w-56 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:border-gray-300 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40"
+          >
+            <Search className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 truncate text-left">Cari halaman…</span>
+            <kbd className="flex-shrink-0 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-400">
+              {isMac ? '⌘ K' : 'Ctrl K'}
+            </kbd>
+          </button>
+
+          <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen} modal={false}>
+            <DropdownMenuTrigger asChild>
               <button
-                type="submit"
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:bg-red-50 focus-visible:outline-none"
+                type="button"
+                aria-label="Menu akun"
+                className="-mr-2 flex min-w-0 flex-shrink-0 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#028697]/40"
               >
-                <LogOut className="w-4 h-4" />
-                Logout
+                <div className="text-right min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate max-w-[140px]">{userName ?? 'User'}</p>
+                  <p className="text-xs text-gray-400 truncate">{roleLabel}</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-[#028697]/10 border border-[#028697]/20 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-medium text-[#028697]">
+                    {(userName ?? 'U').charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <ChevronDown className={cn('w-3.5 h-3.5 text-gray-400 transition-transform duration-200', userMenuOpen && 'rotate-180')} />
               </button>
-            </form>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 p-0">
+              <div className="border-b border-gray-100 px-4 py-3">
+                <p className="truncate text-sm font-medium text-gray-900">{userName ?? 'User'}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center whitespace-nowrap rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">
+                    {roleLabel}
+                  </span>
+                  <PlanBadge plan={storePlan} storeSlug={storeSlug} compact />
+                </div>
+                {storeName && <p className="mt-2 truncate text-xs text-gray-400">{storeName}</p>}
+              </div>
+              <form action={logoutAction} className="p-1">
+                <button
+                  type="submit"
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:bg-red-50 focus-visible:outline-none"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </form>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </header>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        entries={paletteEntries}
+        currentPath={pathname}
+      />
 
       {/* ── MOBILE TOP BAR (di bawah lg) ── */}
       <nav className="lg:hidden bg-white/95 border-b border-[#a8f0f8] sticky top-0 z-40 shadow-md backdrop-blur-sm">
