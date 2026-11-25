@@ -9,9 +9,10 @@ import {
 } from 'lucide-react';
 import { SalesTrendChart, type SalesTrendPoint } from '@/components/charts/sales-trend-chart';
 import { RangeFilter } from '@/components/dashboard/range-filter';
+import { DateNavigator } from '@/components/dashboard/date-navigator';
 import { DeltaBadge } from '@/components/dashboard/delta-badge';
 import {
-  getRangeWindow, parseRange, percentChange, toWib, RANGE_META, type RangeWindow,
+  getRangeWindow, parseDashboardQuery, percentChange, queryToSearch, type DashboardQuery, type RangeWindow,
 } from '@/lib/dashboard-range';
 
 type PayStatus = 'PAID' | 'PENDING' | 'FAILED' | 'REFUNDED';
@@ -132,14 +133,15 @@ async function getTopProducts(storeId: string, win: RangeWindow) {
   });
 }
 
-async function getStoreInfo(storeId: string) {
+async function getStoreInfo(storeId: string, win: RangeWindow) {
   const [totalVariants, totalCustomers, lowStockItems, lowStockProducts, recentSales] = await Promise.all([
     db.productVariant.count({ where: { storeId } }),
     db.storeUser.count({ where: { storeId } }),
     db.productVariant.count({ where: lowStockWhere(storeId) }),
     db.productVariant.findMany({ where: lowStockWhere(storeId), include: { product: true }, take: 5 }),
+    // Penjualan terbaru DI DALAM periode yang dipilih (bukan selalu yang paling baru secara global)
     db.sale.findMany({
-      where: { storeId }, take: 5, orderBy: { createdAt: 'desc' },
+      where: { storeId, createdAt: { gte: win.start, lt: win.end } }, take: 5, orderBy: { createdAt: 'desc' },
       include: { customer: { select: { name: true } }, payment: { select: { status: true } } },
     }),
   ]);
@@ -162,36 +164,48 @@ export default async function RingkasanPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; date?: string; from?: string; to?: string }>;
 }) {
   const [{ slug }, sp, { storeId }] = await Promise.all([params, searchParams, getStoreContext()]);
-  const range = parseRange(sp?.range);
-  const win = getRangeWindow(range);
-  const meta = RANGE_META[range];
+  const win = getRangeWindow(parseDashboardQuery(sp ?? {}));
+  const base = `/${slug}/admin/summary`;
+  const hrefOf = (q: DashboardQuery | null) => (q ? `${base}${queryToSearch(q)}` : null);
 
   const [period, topProducts, info] = await Promise.all([
     getPeriodSales(storeId, win),
     getTopProducts(storeId, win),
-    getStoreInfo(storeId),
+    getStoreInfo(storeId, win),
   ]);
 
   const totalTx = period.paidCount + period.pendingCount;
   const paidShare = totalTx > 0 ? Math.round((period.paidCount / totalTx) * 100) : 0;
   const methodSum = period.methods.reduce((s, m) => s + m.total, 0);
-  const periodHint = (() => {
-    const s = toWib(win.start);
-    return range === 'day' ? `Per jam · WIB` : range === 'week' ? 'Per hari · 7 hari terakhir' : `Per hari · bulan berjalan (${s.year})`;
-  })();
+  const periodHint = win.days === 1 ? 'Per jam · WIB' : `Per hari · ${win.periodText}`;
 
   return (
     <div className="space-y-5 md:space-y-6">
       {/* Filter periode */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold md:text-lg">{meta.title}</h2>
-          <p className="text-xs text-muted-foreground">Ringkasan penjualan, dibandingkan dengan {meta.compareLabel}</p>
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold md:text-lg">{win.title}</h2>
+            <p className="text-xs text-muted-foreground">
+              {win.title !== win.periodText && `${win.periodText} · `}dibandingkan dengan {win.compareLabel}
+            </p>
+          </div>
+          <RangeFilter slug={slug} win={win} />
         </div>
-        <RangeFilter slug={slug} active={range} />
+        <DateNavigator
+          slug={slug}
+          range={win.range}
+          anchorYmd={win.anchorYmd}
+          fromYmd={win.startYmd}
+          toYmd={win.lastYmd}
+          todayYmd={win.todayYmd}
+          prevHref={hrefOf(win.prevQuery)}
+          nextHref={hrefOf(win.nextQuery)}
+          todayHref={hrefOf(win.todayQuery)}
+        />
       </div>
 
       {/* Kartu utama */}
@@ -207,7 +221,7 @@ export default async function RingkasanPage({
             <div className="break-all text-2xl font-bold leading-tight text-white md:text-[1.9rem]">
               {formatCurrency(period.paidTotal)}
             </div>
-            <DeltaBadge onDark value={percentChange(period.paidTotal, period.prevPaidTotal)} label={meta.compareLabel} />
+            <DeltaBadge onDark value={percentChange(period.paidTotal, period.prevPaidTotal)} label={win.compareLabel} />
           </CardContent>
         </Card>
 
@@ -218,7 +232,7 @@ export default async function RingkasanPage({
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold md:text-2xl">{period.paidCount}</div>
-            <DeltaBadge value={percentChange(period.paidCount, period.prevPaidCount)} label={meta.compareLabel} />
+            <DeltaBadge value={percentChange(period.paidCount, period.prevPaidCount)} label={win.compareLabel} />
           </CardContent>
         </Card>
 
@@ -242,7 +256,7 @@ export default async function RingkasanPage({
           </CardHeader>
           <CardContent>
             <div className="break-all text-base font-bold leading-tight md:text-2xl">{formatCurrency(Math.round(period.avgTicket))}</div>
-            <DeltaBadge value={percentChange(period.avgTicket, period.prevAvgTicket)} label={meta.compareLabel} />
+            <DeltaBadge value={percentChange(period.avgTicket, period.prevAvgTicket)} label={win.compareLabel} />
           </CardContent>
         </Card>
 
@@ -352,10 +366,10 @@ export default async function RingkasanPage({
       {/* Penjualan terbaru + stok menipis */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base md:text-lg">Penjualan Terbaru</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base md:text-lg">{win.isCurrent ? 'Penjualan Terbaru' : 'Penjualan pada Periode Ini'}</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3 md:space-y-4">
-              {info.recentSales.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada penjualan</p> : (
+              {info.recentSales.length === 0 ? <p className="text-sm text-muted-foreground">Belum ada penjualan pada periode ini</p> : (
                 info.recentSales.map((sale) => (
                   <div key={sale.id} className="flex items-center justify-between">
                     <div className="mr-3 min-w-0 flex-1">

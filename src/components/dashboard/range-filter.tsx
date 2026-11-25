@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { RANGE_OPTIONS, type DashboardRange } from '@/lib/dashboard-range';
+import { RANGE_OPTIONS, queryForRange, queryToSearch, type RangeWindow } from '@/lib/dashboard-range';
 
-export function RangeFilter({ slug, active }: { slug: string; active: DashboardRange }) {
+/** Pilihan mode periode. Berpindah mode mempertahankan konteks tanggal (lihat queryForRange). */
+export function RangeFilter({ slug, win }: { slug: string; win: RangeWindow }) {
   return (
     <div
       role="tablist"
@@ -10,17 +11,17 @@ export function RangeFilter({ slug, active }: { slug: string; active: DashboardR
       className="inline-flex w-full gap-1 rounded-xl bg-muted p-1 sm:w-auto"
     >
       {RANGE_OPTIONS.map((opt) => {
-        const isActive = opt.value === active;
+        const isActive = opt.value === win.range;
         return (
           <Link
             key={opt.value}
             role="tab"
             aria-selected={isActive}
-            href={`/${slug}/admin/summary?range=${opt.value}`}
+            href={`/${slug}/admin/summary${queryToSearch(queryForRange(win, opt.value))}`}
             scroll={false}
             prefetch
             className={cn(
-              'flex-1 rounded-lg px-4 py-1.5 text-center text-sm font-medium transition-all sm:flex-none',
+              'flex-1 rounded-lg px-3.5 py-1.5 text-center text-sm font-medium transition-all sm:flex-none sm:px-4',
               isActive
                 ? 'bg-background text-[#028697] shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'

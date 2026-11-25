@@ -17,6 +17,7 @@ import { ScannerDialog } from './scanner-dialog';
 import { posFeedback, readStorage, writeStorage } from './pos-feedback';
 import { useKeyboardBarcode } from '@/hooks/use-keyboard-barcode';
 import { useFillViewportHeight } from '@/hooks/use-fill-viewport-height';
+import { CategoryBar } from '@/components/pos/category-bar';
 import { paymentMethodLabel, roundMoney } from '@/lib/payment';
 import type { ComboInfo } from '@/lib/combo-pricing';
 
@@ -459,6 +460,22 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     }
     return Array.from(map.values());
   }, [variants]);
+
+  // Jumlah produk per kategori (untuk badge di pil kategori)
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const v of variants) {
+      if (v.category) counts[v.category.name] = (counts[v.category.name] ?? 0) + 1;
+    }
+    return counts;
+  }, [variants]);
+
+  // Bila kategori yang dipilih sudah tidak ada (mis. data produk berubah), kembali ke "Semua"
+  useEffect(() => {
+    if (activeCategory !== 'all' && !categories.some((c) => c.name === activeCategory)) {
+      setActiveCategory('all');
+    }
+  }, [categories, activeCategory]);
 
   const filteredVariants = useMemo(() => {
     return variants.filter((v) => {
@@ -1509,33 +1526,13 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
           {/* Category pills */}
           {viewMode === 'products' && categories.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto px-0.5 py-1 -my-1 scrollbar-hide shrink-0">
-              <button
-                onClick={() => setActiveCategory('all')}
-                className={cn(
-                  'shrink-0 px-3.5 py-1.5 text-xs font-medium rounded-full border transition-colors',
-                  activeCategory === 'all'
-                    ? 'bg-[#028697] text-white border-[#028697]'
-                    : 'bg-background border-border text-muted-foreground hover:border-[#028697]/60'
-                )}
-              >
-                🛒 Semua
-              </button>
-              {categories.map((cat) => (
-                <button
-                  key={cat.name}
-                  onClick={() => setActiveCategory(cat.name)}
-                  className={cn(
-                    'shrink-0 px-3.5 py-1.5 text-xs font-medium rounded-full border transition-colors whitespace-nowrap',
-                    activeCategory === cat.name
-                      ? 'bg-[#028697] text-white border-[#028697]'
-                      : 'bg-background border-border text-muted-foreground hover:border-[#028697]/60'
-                  )}
-                >
-                  {cat.icon ? `${cat.icon} ` : ''}{cat.name}
-                </button>
-              ))}
-            </div>
+            <CategoryBar
+              categories={categories}
+              counts={categoryCounts}
+              total={variants.length}
+              active={activeCategory}
+              onChange={setActiveCategory}
+            />
           )}
 
           {/* Product grid */}
