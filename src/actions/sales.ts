@@ -28,6 +28,10 @@ type PaymentStatusValue = 'PAID' | 'PENDING' | 'FAILED' | 'REFUNDED';
 /** Hanya dua status yang dihasilkan UI; status lain tidak punya perlakuan akuntansi yang jelas. */
 const isSettlableStatus = (s: string): s is 'PAID' | 'PENDING' => s === 'PAID' || s === 'PENDING';
 
+// Batas paket per transaksi: jenis paket berbeda & total unit (mis. pesanan 100 pcs)
+const MAX_PACKAGE_ENTRIES = 50;
+const MAX_PACKAGE_UNITS   = 500;
+
 const isMoney = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
 
 interface CreateSaleInput {
@@ -48,7 +52,7 @@ interface CreateSaleInput {
   notes?:          string;
   pointsRedeemed?: number;
   /** Paket: isi dipilih per slot; harga SELALU dihitung ulang di server. */
-  packages?:       Array<{ comboId: string; selections: ComboSelections }>;
+  packages?:       Array<{ comboId: string; selections: ComboSelections; quantity?: number }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,9 +122,12 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     // ── Paket (combo): validasi pilihan & hitung harga di SERVER ───────────────
-    const resolvedPackages: Array<{ combo: ComboWithSlots; res: Extract<ComboResolution, { ok: true }> }> = [];
+    // Satu entri `packages` bisa membawa `quantity` (mis. 100 paket dengan isi pilihan yang sama).
+    // Harga dihitung SEKALI per entri lalu dikalikan; tiap unit tetap disimpan sebagai SaleCombo
+    // sendiri agar laporan, struk, dan edit transaksi tidak berubah.
+    const resolvedPackages: Array<{ combo: ComboWithSlots; res: Extract<ComboResolution, { ok: true }>; quantity: number }> = [];
     if (packages.length > 0) {
-      if (packages.length > 50) return { success: false, error: 'Terlalu banyak paket dalam satu transaksi' };
+      if (packages.length > MAX_PACKAGE_ENTRIES) return { success: false, error: 'Terlalu banyak jenis paket dalam satu transaksi' };
 
       const comboIds = [...new Set(packages.map((p) => p.comboId))];
       const combos = await db.combo.findMany({
@@ -129,12 +136,19 @@ export async function createSaleAction(input: CreateSaleInput) {
       });
       const comboById = new Map(combos.map((c) => [c.id, c]));
 
+      let totalPackageUnits = 0;
       for (const pkg of packages) {
         const combo = comboById.get(pkg.comboId);
         if (!combo) return { success: false, error: 'Paket tidak ditemukan atau sudah tidak aktif' };
+        const quantity = pkg.quantity ?? 1;
+        if (!Number.isInteger(quantity) || quantity < 1) return { success: false, error: `${combo.name}: jumlah paket tidak valid` };
+        totalPackageUnits += quantity;
+        if (totalPackageUnits > MAX_PACKAGE_UNITS) {
+          return { success: false, error: `Maksimal ${MAX_PACKAGE_UNITS} paket dalam satu transaksi` };
+        }
         const res = resolveComboSelection(toComboInfo(combo), pkg.selections ?? {});
         if (!res.ok) return { success: false, error: `${combo.name}: ${res.error}` };
-        resolvedPackages.push({ combo, res });
+        resolvedPackages.push({ combo, res, quantity });
       }
     }
 
@@ -142,7 +156,7 @@ export async function createSaleAction(input: CreateSaleInput) {
     const demand = new Map<string, number>();
     for (const i of items) demand.set(i.variantId, (demand.get(i.variantId) ?? 0) + i.quantity);
     for (const p of resolvedPackages) {
-      for (const l of p.res.lines) demand.set(l.variantId, (demand.get(l.variantId) ?? 0) + 1);
+      for (const l of p.res.lines) demand.set(l.variantId, (demand.get(l.variantId) ?? 0) + p.quantity);
     }
 
     const variantRows = await db.productVariant.findMany({
@@ -164,8 +178,8 @@ export async function createSaleAction(input: CreateSaleInput) {
     }
 
     const itemsSubtotal   = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const comboItemsTotal = round2(resolvedPackages.reduce((sum, p) => sum + p.res.itemsTotal, 0));
-    const comboDiscount   = round2(resolvedPackages.reduce((sum, p) => sum + p.res.discount, 0));
+    const comboItemsTotal = round2(resolvedPackages.reduce((sum, p) => sum + p.res.itemsTotal * p.quantity, 0));
+    const comboDiscount   = round2(resolvedPackages.reduce((sum, p) => sum + p.res.discount * p.quantity, 0));
     const subtotal        = round2(itemsSubtotal + comboItemsTotal);
     const conversionRate  = await getPointsConversionRate();
     const pointDiscount   = pointsRedeemed * conversionRate;
@@ -229,10 +243,12 @@ export async function createSaleAction(input: CreateSaleInput) {
         include: { items: true },
       });
 
-      // Isi paket → SaleItem biasa (harga satuan) dikelompokkan oleh SaleCombo
+      // Isi paket → SaleItem biasa (harga satuan) dikelompokkan oleh SaleCombo.
+      // Satu unit paket = satu SaleCombo; `quantity` diekspansi dengan INSERT massal
+      // (bukan loop create per unit) supaya 100+ paket tetap cepat di dalam transaksi.
       for (const p of resolvedPackages) {
-        const saleCombo = await tx.saleCombo.create({
-          data: {
+        const saleCombos = await tx.saleCombo.createManyAndReturn({
+          data: Array.from({ length: p.quantity }, () => ({
             storeId,
             saleId:       newSale.id,
             comboId:      p.combo.id,
@@ -240,18 +256,20 @@ export async function createSaleAction(input: CreateSaleInput) {
             packagePrice: p.res.packagePrice,
             itemsTotal:   p.res.itemsTotal,
             discount:     p.res.discount,
-          },
+          })),
           select: { id: true },
         });
         await tx.saleItem.createMany({
-          data: p.res.lines.map((l) => ({
-            saleId:      newSale.id,
-            saleComboId: saleCombo.id,
-            variantId:   l.variantId,
-            quantity:    1,
-            price:       l.price,
-            subtotal:    l.price,
-          })),
+          data: saleCombos.flatMap((sc) =>
+            p.res.lines.map((l) => ({
+              saleId:      newSale.id,
+              saleComboId: sc.id,
+              variantId:   l.variantId,
+              quantity:    1,
+              price:       l.price,
+              subtotal:    l.price,
+            }))
+          ),
         });
       }
 
@@ -350,8 +368,10 @@ export async function createSaleAction(input: CreateSaleInput) {
         cashReceived: l.cashReceived,
         changeAmount: l.changeAmount,
       })),
+      // Struk: satu baris per jenis paket + jumlahnya (nilai di bawah adalah per 1 paket)
       combos: resolvedPackages.map((p) => ({
         name:         p.combo.name,
+        quantity:     p.quantity,
         packagePrice: p.res.packagePrice,
         itemsTotal:   p.res.itemsTotal,
         discount:     p.res.discount,
@@ -450,7 +470,7 @@ export async function updateSaleAction(
     if (items.some((i) => !Number.isInteger(i.quantity) || i.quantity <= 0)) {
       return { success: false, error: 'Kuantitas item tidak valid' };
     }
-    if (packages.length > 50) return { success: false, error: 'Terlalu banyak paket dalam satu transaksi' };
+    if (packages.length > MAX_PACKAGE_UNITS) return { success: false, error: 'Terlalu banyak paket dalam satu transaksi' };
 
     // ── Paket: pertahankan yang tidak diubah, hitung ulang yang baru/diubah ────
     const existingComboById = new Map(existingSale.combos.map((c) => [c.id, c]));

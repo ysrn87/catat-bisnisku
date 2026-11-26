@@ -137,7 +137,7 @@ export default async function SalesPage({ searchParams }: {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <SalesActions variants={variants} customers={members} walkInCustomers={nonMembers} conversionRate={conversionRate} />
+      <SalesActions variants={variants} customers={members} walkInCustomers={nonMembers} conversionRate={conversionRate} combos={await getCombosForPos()} />
       <Card>
         <CardHeader><CardTitle className="text-sm sm:text-xl">Penjualan Terbaru</CardTitle></CardHeader>
         <CardContent className="space-y-3">

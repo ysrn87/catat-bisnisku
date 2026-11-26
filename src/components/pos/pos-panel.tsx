@@ -12,6 +12,7 @@ import { createSaleAction } from '@/actions/sales';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { ComboPickerDialog, type ComboCartLine } from './combo-picker-dialog';
+import { ComboQtyControl } from './combo-qty-control';
 import { CheckoutDialog, type CheckoutPayload } from './checkout-dialog';
 import { ScannerDialog } from './scanner-dialog';
 import { posFeedback, readStorage, writeStorage } from './pos-feedback';
@@ -19,7 +20,7 @@ import { useKeyboardBarcode } from '@/hooks/use-keyboard-barcode';
 import { useFillViewportHeight } from '@/hooks/use-fill-viewport-height';
 import { CategoryBar } from '@/components/pos/category-bar';
 import { paymentMethodLabel, roundMoney } from '@/lib/payment';
-import type { ComboInfo } from '@/lib/combo-pricing';
+import { MAX_COMBO_QUANTITY, type ComboInfo } from '@/lib/combo-pricing';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,8 @@ const MAX_HELD = 10;
 
 interface ReceiptCombo {
   name: string;
+  /** Jumlah paket; nilai harga di bawah adalah per 1 paket. */
+  quantity?: number;
   packagePrice: number;
   itemsTotal: number;
   discount: number;
@@ -167,7 +170,7 @@ function buildReceiptText(data: ReceiptData, storeName: string): string {
     const name = i.variantName !== i.productName ? `${i.productName} – ${i.variantName}` : i.productName;
     lines.push(`• ${name} ×${i.quantity}  ${formatCurrency(i.price * i.quantity)}`);
   }
-  for (const c of data.combos) lines.push(`• Paket ${c.name}  ${formatCurrency(c.packagePrice)}`);
+  for (const c of data.combos) lines.push(`• Paket ${c.name} ×${c.quantity ?? 1}  ${formatCurrency(c.packagePrice * (c.quantity ?? 1))}`);
   lines.push('', `*Total: ${formatCurrency(data.total)}*`);
   if (data.payments.length > 1) {
     for (const p of data.payments) lines.push(`${paymentMethodLabel(p.method)}: ${formatCurrency(p.amount)}`);
@@ -266,7 +269,8 @@ function ReceiptDialog({
 
             {data.combos.map((c, ci) => (
               <div key={ci} className="space-y-1 pt-1.5 first:pt-0">
-                <p className="text-sm font-semibold">{c.name}</p>
+                <p className="text-sm font-semibold">{c.name}{(c.quantity ?? 1) > 1 ? ` ×${c.quantity}` : ''}</p>
+                {(c.quantity ?? 1) > 1 && <p className="pl-3 text-[11px] text-muted-foreground">Isi per paket:</p>}
                 {c.lines.map((l, li) => (
                   <div key={li} className="flex justify-between gap-2 pl-3 text-sm">
                     <span className="min-w-0 break-words text-muted-foreground">
@@ -277,13 +281,13 @@ function ReceiptDialog({
                 ))}
                 {c.discount > 0 && (
                   <div className="flex justify-between pl-3 text-sm text-green-600">
-                    <span>Diskon paket</span>
-                    <span>− {formatCurrency(c.discount)}</span>
+                    <span>Diskon paket{(c.quantity ?? 1) > 1 ? ` (${c.quantity} × ${formatCurrency(c.discount)})` : ''}</span>
+                    <span>− {formatCurrency(c.discount * (c.quantity ?? 1))}</span>
                   </div>
                 )}
                 <div className="flex justify-between pl-3 text-sm font-medium">
-                  <span>Harga paket</span>
-                  <span>{formatCurrency(c.itemsTotal - c.discount)}</span>
+                  <span>{(c.quantity ?? 1) > 1 ? `Harga paket (${c.quantity} × ${formatCurrency(c.itemsTotal - c.discount)})` : 'Harga paket'}</span>
+                  <span>{formatCurrency((c.itemsTotal - c.discount) * (c.quantity ?? 1))}</span>
                 </div>
               </div>
             ))}
@@ -494,8 +498,8 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
   const availablePoints = selectedMember?.points ?? 0;
   const pointDiscount = pointsToRedeem * conversionRate;
 
-  const comboItemsTotal = comboCart.reduce((sum, l) => sum + l.itemsTotal, 0);
-  const comboDiscount   = comboCart.reduce((sum, l) => sum + l.discount, 0);
+  const comboItemsTotal = comboCart.reduce((sum, l) => sum + l.itemsTotal * l.quantity, 0);
+  const comboDiscount   = comboCart.reduce((sum, l) => sum + l.discount * l.quantity, 0);
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0) + comboItemsTotal;
   const total = roundMoney(Math.max(0, subtotal - comboDiscount - discount - pointDiscount + tax + ongkir));
 
@@ -504,16 +508,16 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
       ? cart.reduce((sum, item) => {
           const v = variants.find((x) => x.id === item.variantId);
           return sum + (v?.pointsPerUnit ?? 0) * item.quantity;
-        }, 0) + comboCart.reduce((sum, l) => sum + l.lines.reduce((s, x) => s + x.pointsPerUnit, 0), 0)
+        }, 0) + comboCart.reduce((sum, l) => sum + l.lines.reduce((s, x) => s + x.pointsPerUnit, 0) * l.quantity, 0)
       : 0;
 
-  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0) + comboCart.length;
+  const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0) + comboCart.reduce((sum, l) => sum + l.quantity, 0);
   const hasItems  = cart.length > 0 || comboCart.length > 0;
 
   // Pemakaian stok oleh isi paket di keranjang (digabung dengan item biasa saat cek stok)
   const comboUsage = useMemo(() => {
     const m = new Map<string, number>();
-    for (const l of comboCart) for (const x of l.lines) m.set(x.variantId, (m.get(x.variantId) ?? 0) + 1);
+    for (const l of comboCart) for (const x of l.lines) m.set(x.variantId, (m.get(x.variantId) ?? 0) + l.quantity);
     return m;
   }, [comboCart]);
 
@@ -614,6 +618,37 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
         .filter(Boolean)
     );
   }, [comboUsage]);
+
+  // Paket yang sama persis (paket + pilihan isi) digabung jadi satu baris dengan jumlah bertambah
+  const addComboLine = useCallback((line: ComboCartLine) => {
+    setComboCart((prev) => {
+      const sig = (l: ComboCartLine) => l.comboId + '|' + Object.entries(l.selections).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}:${v}`).join(',');
+      const idx = prev.findIndex((l) => sig(l) === sig(line));
+      if (idx === -1) return [...prev, line];
+      return prev.map((l, i) => (i === idx ? { ...l, quantity: Math.min(MAX_COMBO_QUANTITY, l.quantity + line.quantity) } : l));
+    });
+  }, []);
+
+  // Jumlah maksimum satu baris paket: sisa stok varian setelah dikurangi item biasa & paket lain
+  const maxForComboLine = (l: ComboCartLine): number => {
+    let max = MAX_COMBO_QUANTITY;
+    const perCombo = new Map<string, number>();
+    for (const x of l.lines) perCombo.set(x.variantId, (perCombo.get(x.variantId) ?? 0) + 1);
+    for (const [variantId, n] of perCombo) {
+      const meta = comboVariantMeta.get(variantId);
+      if (!meta || meta.type === 'PREORDER') continue;
+      const inCart = cart.find((i) => i.variantId === variantId)?.quantity ?? 0;
+      const usedByOthers = (comboUsage.get(variantId) ?? 0) - l.quantity * n;
+      max = Math.min(max, Math.floor((meta.stock - inCart - usedByOthers) / n));
+    }
+    return Math.max(1, max);
+  };
+
+  const setComboQuantity = (key: string, quantity: number) => {
+    setComboCart((prev) => prev.map((l) =>
+      l.key === key ? { ...l, quantity: Math.max(1, Math.min(maxForComboLine(l), Math.floor(quantity) || 1)) } : l
+    ));
+  };
 
   const removeCombo = useCallback((key: string) => {
     const removed = comboCart.find((l) => l.key === key);
@@ -736,7 +771,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     try {
       const result = await createSaleAction({
         items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.price })),
-        packages: comboCart.map((l) => ({ comboId: l.comboId, selections: l.selections })),
+        packages: comboCart.map((l) => ({ comboId: l.comboId, selections: l.selections, quantity: l.quantity })),
         customerId: customerType === 'walk-in' ? walkInCustomerId || null : null,
         memberId:   customerType === 'member'  ? customerId        || null : null,
 
@@ -812,11 +847,11 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
 
     const combosHTML = receipt.combos.map((c) => `
       <div class="item">
-        <div class="item-name"><strong>${esc(c.name)}</strong></div>
+        <div class="item-name"><strong>${esc(c.name)}${(c.quantity ?? 1) > 1 ? ` x${c.quantity}` : ''}</strong></div>
         ${c.lines.map((l) => `
         <div class="item-line"><span>&nbsp;&nbsp;${esc(l.productName)}${l.variantName !== l.productName ? ` – ${esc(l.variantName)}` : ''}</span><span>${l.quantity} x ${formatCurrency(l.price)}</span></div>`).join('')}
-        ${c.discount > 0 ? `<div class="item-line"><span>&nbsp;&nbsp;Diskon paket</span><span>- ${formatCurrency(c.discount)}</span></div>` : ''}
-        <div class="item-line"><span>&nbsp;&nbsp;<strong>Harga paket</strong></span><span><strong>${formatCurrency(c.itemsTotal - c.discount)}</strong></span></div>
+        ${c.discount > 0 ? `<div class="item-line"><span>&nbsp;&nbsp;Diskon paket</span><span>- ${formatCurrency(c.discount * (c.quantity ?? 1))}</span></div>` : ''}
+        <div class="item-line"><span>&nbsp;&nbsp;<strong>Harga paket</strong>${(c.quantity ?? 1) > 1 ? ` (${c.quantity} x ${formatCurrency(c.itemsTotal - c.discount)})` : ''}</span><span><strong>${formatCurrency((c.itemsTotal - c.discount) * (c.quantity ?? 1))}</strong></span></div>
       </div>
     `).join('');
 
@@ -1036,7 +1071,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
     const redeem = h.customerType === 'member' ? Math.min(h.pointsToRedeem, member?.points ?? 0) : 0;
 
     setCart(restored);
-    setComboCart(h.comboCart);
+    setComboCart(h.comboCart.map((l) => ({ ...l, quantity: l.quantity ?? 1 })));
     setCustomerType(h.customerType);
     setCustomerId(h.customerId);
     setWalkInCustomerId(h.walkInCustomerId);
@@ -1102,7 +1137,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                   <span className="line-clamp-2 break-words">{line.name}</span>
                 </p>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-xs font-semibold">{formatCurrency(line.itemsTotal - line.discount)}</span>
+                  <span className="text-xs font-semibold">{formatCurrency((line.itemsTotal - line.discount) * line.quantity)}</span>
                   <button
                     onClick={() => removeCombo(line.key)}
                     className="p-1.5 -mr-1.5 text-muted-foreground/50 transition-colors hover:text-destructive"
@@ -1121,11 +1156,21 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                 ))}
                 {line.discount > 0 && (
                   <li className="flex justify-between text-[11px] text-green-600">
-                    <span>Diskon paket</span>
-                    <span>− {formatCurrency(line.discount)}</span>
+                    <span>Diskon paket{line.quantity > 1 ? ` (×${line.quantity})` : ''}</span>
+                    <span>− {formatCurrency(line.discount * line.quantity)}</span>
                   </li>
                 )}
               </ul>
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] text-muted-foreground">
+                  {formatCurrency(line.itemsTotal - line.discount)} / paket
+                </span>
+                <ComboQtyControl
+                  value={line.quantity}
+                  max={maxForComboLine(line)}
+                  onChange={(n) => setComboQuantity(line.key, n)}
+                />
+              </div>
             </div>
           ))}
           {cart.map((item) => (
@@ -1359,7 +1404,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
           combo={pickerCombo}
           onClose={() => setPickerCombo(null)}
           remaining={remainingForCombo}
-          onAdd={(line) => setComboCart((prev) => [...prev, line])}
+          onAdd={addComboLine}
         />
       )}
 
@@ -1547,7 +1592,7 @@ export function PosPanel({ variants, members, walkInCustomers, conversionRate, s
                 <div className="grid grid-cols-1 gap-2.5 pb-4 sm:grid-cols-2 xl:grid-cols-3">
                   {filteredCombos.map((c) => {
                     const available = comboAvailable(c);
-                    const inCart = comboCart.filter((l) => l.comboId === c.id).length;
+                    const inCart = comboCart.filter((l) => l.comboId === c.id).reduce((sum, l) => sum + l.quantity, 0);
                     return (
                       <button
                         key={c.id}

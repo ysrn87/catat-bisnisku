@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Layers } from 'lucide-react';
+import { Check, Layers, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn, formatCurrency } from '@/lib/utils';
 import {
   resolveComboSelection,
+  maxComboQuantity,
+  MAX_COMBO_QUANTITY,
   type ComboInfo,
   type ComboSelections,
   type ResolvedComboLine,
@@ -20,8 +22,10 @@ export interface ComboCartLine {
   packagePrice: number;
   selections:   ComboSelections;
   lines:        ResolvedComboLine[];
+  /** Harga isi & diskon di bawah adalah per 1 paket; kalikan dengan `quantity`. */
   itemsTotal:   number;
   discount:     number;
+  quantity:     number;
 }
 
 interface Props {
@@ -33,12 +37,16 @@ interface Props {
   /** Pilihan awal (mis. saat mengubah isi paket yang sudah ada). */
   initialSelections?: ComboSelections;
   submitLabel?: string;
+  /** Tampilkan input jumlah paket (default true). Dimatikan di dialog edit transaksi. */
+  allowQuantity?: boolean;
 }
 
 const newKey = () => `combo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSelections, submitLabel }: Props) {
+export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSelections, submitLabel, allowQuantity = true }: Props) {
   const [selections, setSelections] = useState<ComboSelections>(initialSelections ?? {});
+  // Disimpan sebagai string agar kolom bisa dikosongkan saat mengetik (mis. hapus lalu ketik 100)
+  const [qtyText, setQtyText] = useState('1');
 
   const resolution = resolveComboSelection(combo, selections);
 
@@ -57,9 +65,21 @@ export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSel
       return next;
     });
 
-  const outOfStockLine =
-    resolution.ok ? resolution.lines.find((l) => remaining(l.variantId) < 1) : undefined;
-  const canAdd = resolution.ok && !outOfStockLine;
+  // Berapa paket dengan pilihan ini yang masih cukup stoknya
+  const maxQty = resolution.ok ? maxComboQuantity(resolution.lines, remaining) : MAX_COMBO_QUANTITY;
+  const parsedQty = Number.parseInt(qtyText, 10);
+  const quantity = allowQuantity ? (Number.isFinite(parsedQty) ? parsedQty : 0) : 1;
+  const qtyTooMany = allowQuantity && resolution.ok && quantity > maxQty;
+  const outOfStockLine = resolution.ok
+    ? resolution.lines.find((l) => {
+        const perCombo = resolution.lines.filter((x) => x.variantId === l.variantId).length;
+        return remaining(l.variantId) < Math.max(1, quantity) * perCombo;
+      })
+    : undefined;
+  const canAdd = resolution.ok && quantity >= 1 && quantity <= MAX_COMBO_QUANTITY && !outOfStockLine;
+
+  const setQty = (n: number) => setQtyText(String(Math.min(MAX_COMBO_QUANTITY, Math.max(1, Math.floor(n))) || 1));
+  const stepQty = (delta: number) => setQty((Number.isFinite(parsedQty) ? parsedQty : 0) + delta);
 
   const handleAdd = () => {
     if (!resolution.ok || outOfStockLine) return;
@@ -75,6 +95,7 @@ export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSel
       lines:        resolution.lines,
       itemsTotal:   resolution.itemsTotal,
       discount:     resolution.discount,
+      quantity,
     });
     onClose();
   };
@@ -149,24 +170,64 @@ export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSel
         </div>
 
         <div className="shrink-0 space-y-3 border-t border-gray-100 bg-gray-50/50 px-5 sm:px-6 py-4">
+          {allowQuantity && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold">Jumlah paket</span>
+              <div className="flex items-center gap-1.5">
+                <button type="button" onClick={() => stepQty(-1)} disabled={quantity <= 1}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white transition-colors hover:bg-gray-50 disabled:opacity-40"
+                  aria-label="Kurangi jumlah">
+                  <Minus className="h-4 w-4" />
+                </button>
+                <input
+                  type="text" inputMode="numeric" value={qtyText}
+                  onChange={(e) => setQtyText(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={() => setQty(Number.isFinite(parsedQty) ? parsedQty : 1)}
+                  aria-label="Jumlah paket"
+                  className="h-9 w-16 rounded-lg border border-gray-200 bg-white text-center text-sm font-semibold tabular-nums focus:border-[#028697] focus:outline-none"
+                />
+                <button type="button" onClick={() => stepQty(1)} disabled={quantity >= Math.min(maxQty, MAX_COMBO_QUANTITY)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white transition-colors hover:bg-gray-50 disabled:opacity-40"
+                  aria-label="Tambah jumlah">
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          {allowQuantity && (
+            <div className="flex flex-wrap gap-1.5">
+              {[10, 25, 50, 100].map((n) => (
+                <button key={n} type="button" onClick={() => setQty(n)}
+                  className={cn('rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                    quantity === n ? 'border-[#028697] bg-[#028697]/10 text-[#028697]' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300')}>
+                  {n} pcs
+                </button>
+              ))}
+            </div>
+          )}
+
           {resolution.ok ? (
             <div className="space-y-1 text-xs">
               <div className="flex justify-between text-muted-foreground">
-                <span>Harga satuan ({resolution.lines.length} item)</span>
-                <span>{formatCurrency(resolution.itemsTotal)}</span>
+                <span>Harga satuan ({resolution.lines.length} item{quantity > 1 ? ` × ${quantity}` : ''})</span>
+                <span>{formatCurrency(resolution.itemsTotal * Math.max(1, quantity))}</span>
               </div>
               {resolution.discount > 0 && (
                 <div className="flex justify-between text-green-600">
                   <span>Diskon paket</span>
-                  <span>− {formatCurrency(resolution.discount)}</span>
+                  <span>− {formatCurrency(resolution.discount * Math.max(1, quantity))}</span>
                 </div>
               )}
               <div className="flex justify-between pt-1 text-sm font-bold">
-                <span>Harga paket</span>
-                <span className="text-[#028697]">{formatCurrency(resolution.charged)}</span>
+                <span>{quantity > 1 ? `Harga ${quantity} paket` : 'Harga paket'}</span>
+                <span className="text-[#028697]">{formatCurrency(resolution.charged * Math.max(1, quantity))}</span>
               </div>
               {outOfStockLine && (
-                <p className="text-red-500">Stok {outOfStockLine.productName} – {outOfStockLine.variantName} tidak cukup.</p>
+                <p className="text-red-500">
+                  Stok {outOfStockLine.productName} – {outOfStockLine.variantName} tidak cukup
+                  {qtyTooMany && maxQty >= 1 ? ` (maksimal ${maxQty} paket)` : ''}.
+                </p>
               )}
             </div>
           ) : (
@@ -178,7 +239,7 @@ export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSel
               Batal
             </button>
             <Button onClick={handleAdd} disabled={!canAdd} className="min-w-[160px] bg-[#028697] text-white hover:bg-[#017585]">
-              {submitLabel ?? 'Tambah ke Keranjang'}
+              {submitLabel ?? (quantity > 1 ? `Tambah ${quantity} Paket` : 'Tambah ke Keranjang')}
             </Button>
           </div>
         </div>

@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { updateSaleAction, type UpdateSalePackageInput } from '@/actions/sales';
 import { ComboPickerDialog } from '@/components/pos/combo-picker-dialog';
+import { useActivePaymentAccounts } from '@/components/payments/payment-account-info';
+import { PaymentEditor, usePaymentEditor } from '@/components/payments/payment-editor';
 import type { ComboInfo, ComboSelections } from '@/lib/combo-pricing';
 import {
   Trash2, Gift, Plus, Minus, Search, X, Package,
@@ -26,6 +28,8 @@ interface EditSaleDialogProps {
     memberId?: string | null;
     paymentMethod: string;
     paymentStatus?: string;
+    /** Rincian pembayaran lunas (satu baris = tunggal, lebih dari satu = split). */
+    paymentSplits?: Array<{ method: string; amount: number; cashReceived: number | null; changeAmount: number | null }>;
     discount: number;
     tax: number;
     ongkir: number;
@@ -114,7 +118,6 @@ export function EditSaleDialog({
   const [items, setItems] = useState<SaleItem[]>([]);
   const [packages, setPackages] = useState<EditPackage[]>([]);
   const [picker, setPicker] = useState<{ combo: ComboInfo; editKey?: string; initial?: ComboSelections } | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<string>(sale.paymentMethod);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
     (sale.paymentStatus as PaymentStatus) || PaymentStatus.PAID,
   );
@@ -179,6 +182,16 @@ export function EditSaleDialog({
   const packagesDiscount = packages.reduce((sum, p) => sum + p.discount, 0);
   const subtotal = itemsSubtotal + packagesItemsTotal;
   const total = subtotal - discount - packagesDiscount - pointDiscount + tax + ongkir;
+
+  // Pembayaran: terisi dari rincian transaksi ini (tunggal/split); total yang berubah ditampilkan sebagai selisih
+  const { accounts: paymentAccounts, loaded: accountsLoaded } = useActivePaymentAccounts(open);
+  const pay = usePaymentEditor({
+    total: Math.max(0, total),
+    status: paymentStatus === PaymentStatus.PAID ? 'PAID' : 'PENDING',
+    cashMode: 'optional',
+    initialLines: (sale.paymentSplits ?? []).map((l) => ({ method: l.method, amount: l.amount, cashReceived: l.cashReceived })),
+    initialMethod: sale.paymentMethod === 'SPLIT' ? undefined : sale.paymentMethod,
+  });
 
   // ── Paket: ketersediaan stok untuk pemilih (stok sekarang + qty transaksi ini yang akan dikembalikan)
   const comboVariantMeta = useMemo(() => {
@@ -291,6 +304,11 @@ export function EditSaleDialog({
       toast({ title: 'Error', description: 'Penjualan harus ada min. 1 item.', variant: 'destructive' });
       return;
     }
+    if (!pay.payload) {
+      toast({ title: 'Pembayaran belum lengkap', description: pay.error ?? 'Periksa rincian pembayaran.', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await updateSaleAction(sale.id, {
@@ -305,7 +323,8 @@ export function EditSaleDialog({
             : { comboId: p.comboId as string, selections: p.selections ?? {}, ...(p.saleComboId ? { saleComboId: p.saleComboId } : {}) },
         ),
         customerId: sale.customerId || null,
-        paymentMethod,
+        paymentMethod: pay.payload.paymentMethod,
+        payments: pay.payload.payments,
         paymentStatus,
         discount,
         tax,
@@ -702,32 +721,32 @@ export function EditSaleDialog({
               <CreditCard className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Pembayaran</span>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-gray-500 font-medium">Metode</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod} disabled={loading}>
-                  <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {sale.paymentMethod === 'SPLIT' && <SelectItem value="SPLIT">🔀 Split (tidak diubah)</SelectItem>}
-                    <SelectItem value="CASH">💵 Cash</SelectItem>
-                    <SelectItem value="CARD">💳 Kartu</SelectItem>
-                    <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
-                    <SelectItem value="EWALLET">👛 E-Wallet</SelectItem>
-                    <SelectItem value="QRIS">📱 QRIS</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-gray-500 font-medium">Status</Label>
-                <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as PaymentStatus)} disabled={loading}>
-                  <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PENDING">⏳ Pending</SelectItem>
-                    <SelectItem value="PAID">✅ Lunas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-gray-500 font-medium">Status</Label>
+              <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as PaymentStatus)} disabled={loading}>
+                <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDING">⏳ Pending</SelectItem>
+                  <SelectItem value="PAID">✅ Lunas</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            <PaymentEditor
+              pay={pay}
+              accounts={paymentAccounts}
+              accountsLoaded={accountsLoaded}
+              disabled={loading}
+              heading={
+                <Label className="text-xs text-gray-500 font-medium">
+                  {paymentStatus === PaymentStatus.PAID ? 'Metode' : 'Metode yang direncanakan'}
+                </Label>
+              }
+            />
+            {paymentStatus === PaymentStatus.PAID && pay.error && (
+              <p className="text-xs text-red-600" role="alert">{pay.error}</p>
+            )}
+
             <div className="grid grid-cols-3 gap-2">
               <div className="space-y-1.5">
                 <Label className="text-xs text-gray-500 font-medium">Diskon</Label>
@@ -873,6 +892,7 @@ export function EditSaleDialog({
             key={`${picker.combo.id}-${picker.editKey ?? 'new'}`}
             combo={picker.combo}
             initialSelections={picker.initial}
+            allowQuantity={false}
             submitLabel={picker.editKey ? 'Terapkan Perubahan' : 'Tambah ke Transaksi'}
             onClose={() => setPicker(null)}
             remaining={(variantId) => remainingForCombo(variantId, picker.editKey)}

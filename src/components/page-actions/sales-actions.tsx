@@ -3,12 +3,14 @@
 import { NewSaleDialog } from '@/components/sales/new-sale-dialog';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import type { ComboInfo } from '@/lib/combo-pricing';
 
 interface SalesActionsProps {
   variants: any[];
   customers: any[];
   walkInCustomers: any[];
   conversionRate: number;
+  combos?: ComboInfo[];
 }
 
 const FAB_CLASS = [
@@ -19,7 +21,7 @@ const FAB_CLASS = [
 ].join(' ');
 
 export function SalesActions({
-  variants, customers, walkInCustomers, conversionRate,
+  variants, customers, walkInCustomers, conversionRate, combos = [],
 }: SalesActionsProps) {
   return (
     <NewSaleDialog
@@ -27,6 +29,7 @@ export function SalesActions({
       customers={customers}
       walkInCustomers={walkInCustomers}
       conversionRate={conversionRate}
+      combos={combos}
       trigger={
         <div>
           <Button className="hidden sm:inline-flex bg-[#028697] hover:bg-[#017585] text-white shadow-sm">

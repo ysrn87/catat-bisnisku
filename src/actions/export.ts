@@ -37,9 +37,16 @@ export async function getSalesExportData() {
   const rows = sales.map((s) => {
     const comboDiscount = s.combos.reduce((sum, c) => sum + Number(c.discount), 0);
     const itemLabel = (i: (typeof s.items)[number]) => `${i.variant.product.name} - ${i.variant.name} (${i.quantity})`;
+    // Paket identik (mis. pesanan 100 pcs) dirangkum jadi "100× Paket ..." agar sel tidak sangat panjang
+    const comboCounts = new Map<string, number>();
+    for (const c of s.combos) {
+      const label = `Paket ${c.name}: ${s.items.filter((i) => i.saleComboId === c.id).map(itemLabel).join(', ')}`;
+      comboCounts.set(label, (comboCounts.get(label) ?? 0) + 1);
+    }
+    const comboLabels = [...comboCounts.entries()].map(([label, n]) => (n > 1 ? `${n}× ${label}` : label));
     const itemParts = [
       ...s.items.filter((i) => !i.saleComboId).map(itemLabel),
-      ...s.combos.map((c) => `Paket ${c.name}: ${s.items.filter((i) => i.saleComboId === c.id).map(itemLabel).join(', ')}`),
+      ...comboLabels,
     ];
     return {
     'No. Transaksi': sanitizeCsvValue(s.saleNumber),

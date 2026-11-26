@@ -107,3 +107,23 @@ export function resolveComboSelection(combo: ComboInfo, selections: ComboSelecti
     charged: round2(itemsTotal - discount),
   };
 }
+
+/** Batas kuantitas paket per satu baris keranjang (harus sama dengan batas di server). */
+export const MAX_COMBO_QUANTITY = 500;
+
+/**
+ * Berapa unit paket dengan isi yang sama masih bisa dibuat dari stok tersisa.
+ * `remaining(variantId)` = sisa stok varian (Infinity untuk pre-order).
+ * Tiap isi paket memakai 1 unit varian per paket.
+ */
+export function maxComboQuantity(
+  lines: Array<{ variantId: string }>,
+  remaining: (variantId: string) => number,
+): number {
+  // Varian yang sama bisa muncul di beberapa slot → kebutuhan per paket = jumlah kemunculannya
+  const perCombo = new Map<string, number>();
+  for (const l of lines) perCombo.set(l.variantId, (perCombo.get(l.variantId) ?? 0) + 1);
+  let max = MAX_COMBO_QUANTITY;
+  for (const [variantId, n] of perCombo) max = Math.min(max, Math.floor(remaining(variantId) / n));
+  return Math.max(0, max);
+}

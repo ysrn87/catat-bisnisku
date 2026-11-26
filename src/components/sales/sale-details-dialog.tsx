@@ -124,6 +124,17 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
   const manualDiscount    = Math.max(0, sale.discount - comboDiscountSum);
   const plainItems        = sale.items.filter((i) => !i.saleComboId);
   const itemsOfCombo      = (comboId: string) => sale.items.filter((i) => i.saleComboId === comboId);
+  // Paket yang identik (paket, harga, dan isi sama) ditampilkan sebagai satu baris dengan jumlah
+  const comboGroups = (() => {
+    const map = new Map<string, { rep: (typeof combos)[number]; count: number }>();
+    for (const c of combos) {
+      const sig = [c.comboId ?? c.name, c.packagePrice, c.itemsTotal, c.discount,
+        itemsOfCombo(c.id).map((i) => `${i.variant.id}:${i.quantity}:${i.price}`).sort().join(',')].join('|');
+      const g = map.get(sig);
+      if (g) g.count += 1; else map.set(sig, { rep: c, count: 1 });
+    }
+    return [...map.values()];
+  })();
   const escHtml           = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const handlePrint = async () => {
@@ -510,9 +521,12 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                 <td class="r" style="font-weight:600;">${formatCurrency(item.subtotal)}</td>
               </tr>
             `).join('')}
-            ${combos.map(c => `
+            ${comboGroups.map(({ rep: c, count }) => `
               <tr>
-                <td colspan="4" style="padding-top:10px;"><div class="item-name"><strong>${escHtml(c.name)}</strong></div></td>
+                <td style="padding-top:10px;"><div class="item-name"><strong>${escHtml(c.name)}</strong></div><div class="item-meta">Paket · isi dihitung ${count} paket</div></td>
+                <td class="r" style="padding-top:10px;font-weight:100;">${formatCurrency(c.itemsTotal - c.discount)}</td>
+                <td class="r item-meta" style="padding-top:10px;font-weight:600;">x ${count}</td>
+                <td class="r" style="padding-top:10px;"></td>
               </tr>
               ${itemsOfCombo(c.id).map(item => `
               <tr>
@@ -521,17 +535,17 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   <div class="item-meta" style="padding-left:12px;">${item.variant.product.name} &nbsp;·&nbsp; ${item.variant.sku}</div>
                 </td>
                 <td class="r" style="font-weight:100;">${formatCurrency(item.price)}</td>
-                <td class="r item-meta" style="font-weight:600;">x ${item.quantity}</td>
-                <td class="r" style="font-weight:600;">${formatCurrency(item.subtotal)}</td>
+                <td class="r item-meta" style="font-weight:600;">x ${item.quantity * count}</td>
+                <td class="r" style="font-weight:600;">${formatCurrency(item.subtotal * count)}</td>
               </tr>`).join('')}
               ${c.discount > 0 ? `
               <tr>
-                <td colspan="3" class="item-meta" style="padding-left:12px;">Diskon paket</td>
-                <td class="r" style="color:#16a34a;font-weight:600;">− ${formatCurrency(c.discount)}</td>
+                <td colspan="3" class="item-meta" style="padding-left:12px;">Diskon paket${count > 1 ? ` (${count} x ${formatCurrency(c.discount)})` : ''}</td>
+                <td class="r" style="color:#16a34a;font-weight:600;">− ${formatCurrency(c.discount * count)}</td>
               </tr>` : ''}
               <tr>
-                <td colspan="3" style="padding-left:12px;"><strong>Harga paket</strong></td>
-                <td class="r" style="font-weight:700;">${formatCurrency(c.itemsTotal - c.discount)}</td>
+                <td colspan="3" style="padding-left:12px;"><strong>Subtotal paket</strong>${count > 1 ? ` <span class="item-meta">(${count} x ${formatCurrency(c.itemsTotal - c.discount)})</span>` : ''}</td>
+                <td class="r" style="font-weight:700;border-top:1px solid #e5e7eb;">${formatCurrency((c.itemsTotal - c.discount) * count)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -770,11 +784,14 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                   </div>
                 ))}
 
-                {combos.map((c) => (
+                {comboGroups.map(({ rep: c, count }) => (
                   <div key={c.id} className="bg-white p-3 sm:p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold text-xs sm:text-sm">{c.name}</p>
-                      <p className="font-semibold text-xs sm:text-base">{formatCurrency(c.itemsTotal - c.discount)}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-xs sm:text-sm">{c.name}</p>
+                        <p className="text-[11px] text-gray-400">{formatCurrency(c.itemsTotal - c.discount)} x {count} paket</p>
+                      </div>
+                      <p className="font-semibold text-xs sm:text-base shrink-0">{formatCurrency((c.itemsTotal - c.discount) * count)}</p>
                     </div>
                     <div className="space-y-1 border-l-2 border-[#028697]/30 pl-3">
                       {itemsOfCombo(c.id).map((item) => (
@@ -782,13 +799,13 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
                           <span className="min-w-0 truncate">
                             {item.variant.product.name}{item.variant.name !== item.variant.product.name ? ` – ${item.variant.name}` : ''}
                           </span>
-                          <span className="shrink-0">{formatCurrency(item.price)} x {item.quantity}</span>
+                          <span className="shrink-0">{formatCurrency(item.price)} x {item.quantity * count}</span>
                         </div>
                       ))}
                       {c.discount > 0 && (
                         <div className="flex justify-between text-[11px] sm:text-sm text-green-600">
-                          <span>Diskon paket</span>
-                          <span>-{formatCurrency(c.discount)}</span>
+                          <span>Diskon paket{count > 1 ? ` (${count} × ${formatCurrency(c.discount)})` : ''}</span>
+                          <span>-{formatCurrency(c.discount * count)}</span>
                         </div>
                       )}
                     </div>

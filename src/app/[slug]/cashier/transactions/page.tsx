@@ -4,6 +4,7 @@ import { getStoreContext } from '@/lib/store-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SalesTable } from '@/components/sales/sales-table';
 import { getPointsConversionRate } from '@/actions/settings';
+import { getCombosForPos } from '@/actions/combos';
 import { SearchFilterBar } from '@/components/filters/search-filter-bar';
 import { SalesActions } from '@/components/page-actions/sales-actions';
 
@@ -138,7 +139,7 @@ export default async function CashierTransactionsPage({ searchParams }: {
 
   return (
     <div className="space-y-6 md:space-y-8">
-      <SalesActions variants={variants} customers={members} walkInCustomers={nonMembers} conversionRate={conversionRate} />
+      <SalesActions variants={variants} customers={members} walkInCustomers={nonMembers} conversionRate={conversionRate} combos={await getCombosForPos()} />
       <Card>
         <CardHeader><CardTitle className="text-sm sm:text-xl">Transaksi Saya</CardTitle></CardHeader>
         <CardContent className="space-y-3">

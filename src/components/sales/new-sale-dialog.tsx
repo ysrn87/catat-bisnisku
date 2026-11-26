@@ -10,11 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { createSaleAction } from '@/actions/sales';
-import { Plus, Trash2, Gift, X, User, Search, ChevronDown, UserPlus, ShoppingCart, CreditCard, Package, FileText, Minus, Loader2, ScanLine, CameraOff } from 'lucide-react';
+import { Plus, Trash2, Gift, X, User, Search, ChevronDown, UserPlus, ShoppingCart, CreditCard, Package, FileText, Minus, Loader2, ScanLine, CameraOff, Layers } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { QuickAddCustomerForm } from '@/components/customers/quick-add-customer-form';
-import { PaymentAccountPanel, useActivePaymentAccounts } from '@/components/payments/payment-account-info';
+import { useActivePaymentAccounts } from '@/components/payments/payment-account-info';
+import { PaymentEditor, usePaymentEditor } from '@/components/payments/payment-editor';
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
+import { ComboPickerDialog, type ComboCartLine } from '@/components/pos/combo-picker-dialog';
+import { ComboQtyControl } from '@/components/pos/combo-qty-control';
+import { MAX_COMBO_QUANTITY, type ComboInfo } from '@/lib/combo-pricing';
 
 interface SaleItem {
   variantId: string;
@@ -47,21 +51,24 @@ interface NewSaleDialogProps {
     phone: string;
   }>;
   conversionRate?: number;
+  /** Paket aktif (opsional). Bila ada, bagian "Paket" muncul di dialog. */
+  combos?: ComboInfo[];
   trigger?: React.ReactNode;
 }
 
-export function NewSaleDialog({ variants, customers, walkInCustomers = [], conversionRate = 1000, trigger }: NewSaleDialogProps) {
+export function NewSaleDialog({ variants, customers, walkInCustomers = [], conversionRate = 1000, combos = [], trigger }: NewSaleDialogProps) {
   const [open, setOpen] = useState(false);
   // Info rekening/e-wallet/QRIS sesuai metode yang dipilih (diambil tiap dialog dibuka)
   const { accounts: paymentAccounts, loaded: accountsLoaded } = useActivePaymentAccounts(open);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<SaleItem[]>([]);
+  const [comboLines, setComboLines] = useState<ComboCartLine[]>([]);
+  const [pickerCombo, setPickerCombo] = useState<ComboInfo | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [customerId, setCustomerId] = useState<string>('');
   const [walkInCustomerId, setWalkInCustomerId] = useState<string>('');
   const [customerType, setCustomerType] = useState<'member' | 'walk-in' | 'customer' | ''>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('CASH');
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.PAID);
   const [discount, setDiscount] = useState<number>(0);
   const [tax, setTax] = useState<number>(0);
@@ -136,14 +143,62 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
   const availablePoints = selectedCustomer?.points || 0;
   const pointDiscount = pointsToRedeem * conversionRate;
 
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  // Paket: harga isi & diskon dihitung per 1 paket lalu dikalikan jumlahnya (server menghitung ulang)
+  const comboItemsTotal = comboLines.reduce((sum, l) => sum + l.itemsTotal * l.quantity, 0);
+  const comboDiscount   = comboLines.reduce((sum, l) => sum + l.discount * l.quantity, 0);
+  const comboCount      = comboLines.reduce((sum, l) => sum + l.quantity, 0);
+  const grossSubtotal   = items.reduce((sum, item) => sum + (item.price * item.quantity), 0) + comboItemsTotal;
+  // `subtotal` = setelah diskon paket, sehingga validasi diskon/poin di bawah tetap berlaku apa adanya
+  const subtotal = grossSubtotal - comboDiscount;
   const total = subtotal - discount - pointDiscount + tax + ongkir;
+  const hasItems = items.length > 0 || comboLines.length > 0;
+
+  // Pemakaian stok oleh paket di keranjang
+  const comboUsage = new Map<string, number>();
+  for (const l of comboLines) for (const x of l.lines) comboUsage.set(x.variantId, (comboUsage.get(x.variantId) ?? 0) + l.quantity);
+  const comboVariantMeta = new Map<string, { stock: number; type: string }>();
+  for (const c of combos) for (const sl of c.slots) for (const v of sl.variants) comboVariantMeta.set(v.id, { stock: v.stock, type: v.type });
+  const remainingForCombo = (variantId: string, excludeKey?: string): number => {
+    const meta = comboVariantMeta.get(variantId);
+    if (!meta) return 0;
+    if (meta.type === 'PREORDER') return Infinity;
+    const inItems = items.find((i) => i.variantId === variantId)?.quantity ?? 0;
+    const inCombos = comboLines.filter((l) => l.key !== excludeKey)
+      .reduce((sum, l) => sum + l.quantity * l.lines.filter((x) => x.variantId === variantId).length, 0);
+    return meta.stock - inItems - inCombos;
+  };
+  const maxForComboLine = (l: ComboCartLine): number => {
+    let max = MAX_COMBO_QUANTITY;
+    const perCombo = new Map<string, number>();
+    for (const x of l.lines) perCombo.set(x.variantId, (perCombo.get(x.variantId) ?? 0) + 1);
+    for (const [variantId, n] of perCombo) max = Math.min(max, Math.floor(remainingForCombo(variantId, l.key) / n));
+    return Math.max(1, max);
+  };
+  const addComboLine = (line: ComboCartLine) => {
+    setComboLines((prev) => {
+      const sig = (l: ComboCartLine) => l.comboId + '|' + Object.entries(l.selections).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}:${v}`).join(',');
+      const idx = prev.findIndex((l) => sig(l) === sig(line));
+      if (idx === -1) return [...prev, line];
+      return prev.map((l, i) => (i === idx ? { ...l, quantity: Math.min(MAX_COMBO_QUANTITY, l.quantity + line.quantity) } : l));
+    });
+  };
+  const setComboQuantity = (key: string, quantity: number) =>
+    setComboLines((prev) => prev.map((l) =>
+      l.key === key ? { ...l, quantity: Math.max(1, Math.min(maxForComboLine(l), Math.floor(quantity) || 1)) } : l
+    ));
+
+  // Pembayaran: satu metode atau split beberapa metode (divalidasi sama seperti di server)
+  const pay = usePaymentEditor({
+    total: Math.max(0, total),
+    status: paymentStatus === PaymentStatus.PAID ? 'PAID' : 'PENDING',
+    cashMode: 'optional',
+  });
 
   const pointsEarned = (customerId && customerType === 'member' && pointsToRedeem === 0)
     ? items.reduce((sum, item) => {
         const variant = variants.find(v => v.id === item.variantId);
         return sum + (variant?.pointsPerUnit ?? 0) * item.quantity;
-      }, 0)
+      }, 0) + comboLines.reduce((sum, l) => sum + l.lines.reduce((s, x) => s + x.pointsPerUnit, 0) * l.quantity, 0)
     : 0;
 
   const handleCustomerChange = (value: string) => {
@@ -221,8 +276,10 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
     }
     const variant = variants.find(v => v.id === selectedVariantId);
     if (!variant) return;
-    if (variant.type !== 'PREORDER' && quantity > variant.stock) {
-      toast({ title: 'Error', description: `Stok tersedia hanya ${variant.stock} unit.`, variant: 'destructive' });
+    const usedByCombos = comboUsage.get(variant.id) ?? 0;
+    const alreadyInCart = items.find(i => i.variantId === variant.id)?.quantity ?? 0;
+    if (variant.type !== 'PREORDER' && alreadyInCart + quantity + usedByCombos > variant.stock) {
+      toast({ title: 'Error', description: `Stok tersedia hanya ${Math.max(0, variant.stock - usedByCombos - alreadyInCart)} unit${usedByCombos > 0 ? ' (sebagian dipakai paket)' : ''}.`, variant: 'destructive' });
       return;
     }
     const existingItemIndex = items.findIndex(item => item.variantId === selectedVariantId);
@@ -247,7 +304,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
     if (newQty < 1) return;
     const variant = variants.find(v => v.id === items[index].variantId);
     if (!variant) return;
-    if (variant.type === 'PREORDER' || newQty <= variant.stock) {
+    if (variant.type === 'PREORDER' || newQty + (comboUsage.get(variant.id) ?? 0) <= variant.stock) {
       const newItems = [...items];
       newItems[index].quantity = newQty;
       setItems(newItems);
@@ -263,8 +320,8 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
       toast({ title: 'Error', description: 'Pilih pelanggan terlebih dahulu.', variant: 'destructive' });
       return;
     }
-    if (items.length === 0) {
-      toast({ title: 'Error', description: 'Tambahkan minimal satu produk.', variant: 'destructive' });
+    if (!hasItems) {
+      toast({ title: 'Error', description: 'Tambahkan minimal satu produk atau paket.', variant: 'destructive' });
       return;
     }
     if (discount > subtotal) {
@@ -289,13 +346,20 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
       return;
     }
 
+    if (!pay.payload) {
+      toast({ title: 'Pembayaran belum lengkap', description: pay.error ?? 'Periksa rincian pembayaran.', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await createSaleAction({
         items: items.map(item => ({ variantId: item.variantId, quantity: item.quantity, price: item.price })),
+        packages: comboLines.map(l => ({ comboId: l.comboId, selections: l.selections, quantity: l.quantity })),
         customerId: customerType === 'walk-in' ? walkInCustomerId || null : null,
         memberId:   customerType === 'member'  ? customerId       || null : null,
-        paymentMethod,
+        paymentMethod: pay.payload.paymentMethod,
+        payments: pay.payload.payments,
         paymentStatus,
         discount,
         tax,
@@ -307,13 +371,15 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
       if (result.success) {
         toast({ title: 'Transaksi Berhasil! 🎉', description: `Total: ${formatCurrency(total)}` });
         setItems([]);
+        setComboLines([]);
+        setPickerCombo(null);
         setCustomerId('');
         setWalkInCustomerId('');
         setCustomerType('');
         setDiscount(0);
         setTax(0);
         setOngkir(0);
-        setPaymentMethod('CASH');
+        pay.reset();
         setPaymentStatus('PAID');
         setPointsToRedeem(0);
         setNotes('');
@@ -618,13 +684,13 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                   )}
                 </div>
 
-                {items.length === 0 ? (
+                {items.length === 0 && comboLines.length === 0 ? (
                   <div className="border-2 border-dashed border-gray-200 rounded-xl py-7 flex flex-col items-center gap-1.5 bg-gray-50/40">
                     <ShoppingCart className="w-6 h-6 text-gray-300" />
                     <p className="text-sm font-medium text-gray-400">Keranjang masih kosong</p>
                     <p className="text-xs text-gray-300">Tambahkan produk di bawah ini</p>
                   </div>
-                ) : (
+                ) : items.length === 0 ? null : (
                   <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                     <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-100">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Produk</span>
@@ -936,6 +1002,85 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                 </div>
               </section>
 
+              {/* ─── 3b. PAKET ─── */}
+              {combos.length > 0 && (
+                <section className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Paket</span>
+                    {comboCount > 0 && (
+                      <span className="text-[11px] font-bold text-[#028697] bg-[#028697]/[0.08] px-2.5 py-0.5 rounded-full border border-blue-100">
+                        {comboCount} paket
+                      </span>
+                    )}
+                    <div className="flex-1 border-t border-gray-100" />
+                  </div>
+
+                  {comboLines.length > 0 && (
+                    <div className="space-y-2">
+                      {comboLines.map((line) => (
+                        <div key={line.key} className="rounded-xl border border-[#028697]/30 bg-[#028697]/5 p-3 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-semibold break-words">{line.name}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-sm font-semibold tabular-nums">{formatCurrency((line.itemsTotal - line.discount) * line.quantity)}</span>
+                              <button
+                                type="button"
+                                onClick={() => setComboLines((prev) => prev.filter((l) => l.key !== line.key))}
+                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                aria-label={`Hapus ${line.name}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <ul className="space-y-0.5">
+                            {line.lines.map((l) => (
+                              <li key={l.variantId} className="flex justify-between text-xs text-gray-500">
+                                <span className="break-words pr-2">{l.productName}{l.variantName !== l.productName ? ` – ${l.variantName}` : ''}</span>
+                                <span className="shrink-0">{formatCurrency(l.price)}</span>
+                              </li>
+                            ))}
+                            {line.discount > 0 && (
+                              <li className="flex justify-between text-xs text-emerald-600">
+                                <span>Diskon paket{line.quantity > 1 ? ` (×${line.quantity})` : ''}</span>
+                                <span>−{formatCurrency(line.discount * line.quantity)}</span>
+                              </li>
+                            )}
+                          </ul>
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <span className="text-xs text-gray-500">{formatCurrency(line.itemsTotal - line.discount)} / paket</span>
+                            <ComboQtyControl value={line.quantity} max={maxForComboLine(line)} onChange={(n) => setComboQuantity(line.key, n)} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {combos.map((c) => {
+                      const available = c.slots.every((sl) => !sl.isRequired || sl.variants.some((v) => remainingForCombo(v.id) >= 1))
+                        && c.slots.some((sl) => sl.variants.some((v) => remainingForCombo(v.id) >= 1));
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          disabled={!available}
+                          onClick={() => setPickerCombo(c)}
+                          className="flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-[#028697]/60 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">{c.name}</span>
+                            <span className="block text-xs font-bold text-[#028697]">{formatCurrency(c.price)}{!available ? ' · Stok habis' : ''}</span>
+                          </span>
+                          <Plus className="w-4 h-4 shrink-0 text-[#028697]" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
               {/* ─── 4. PEMBAYARAN ─── */}
               <section className="space-y-2.5">
                 <div className="flex items-center gap-2 mb-1">
@@ -944,37 +1089,33 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                   <div className="flex-1 border-t border-gray-100" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-500 font-medium">Metode</Label>
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg focus:ring-[#028697]/30 focus:border-[#028697]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="CASH">💵 Cash</SelectItem>
-                        <SelectItem value="CARD">💳 Kartu</SelectItem>
-                        <SelectItem value="QRIS">📱 QRIS</SelectItem>
-                        <SelectItem value="TRANSFER">🏦 Transfer Bank</SelectItem>
-                        <SelectItem value="EWALLET">👛 E-Wallet</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-gray-500 font-medium">Status</Label>
-                    <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as PaymentStatus)}>
-                      <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg focus:ring-[#028697]/30 focus:border-[#028697]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="PAID">✅ Lunas</SelectItem>
-                        <SelectItem value="PENDING">⏳ Pending</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-gray-500 font-medium">Status</Label>
+                  <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as PaymentStatus)}>
+                    <SelectTrigger className="h-9 text-xs text-left border-gray-200 rounded-lg focus:ring-[#028697]/30 focus:border-[#028697]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PAID">✅ Lunas</SelectItem>
+                      <SelectItem value="PENDING">⏳ Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <PaymentAccountPanel method={paymentMethod} accounts={paymentAccounts} loaded={accountsLoaded} />
+                <PaymentEditor
+                  pay={pay}
+                  accounts={paymentAccounts}
+                  accountsLoaded={accountsLoaded}
+                  disabled={loading}
+                  heading={
+                    <Label className="text-xs text-gray-500 font-medium">
+                      {paymentStatus === PaymentStatus.PAID ? 'Metode' : 'Metode yang direncanakan'}
+                    </Label>
+                  }
+                />
+                {paymentStatus === PaymentStatus.PAID && pay.error && hasItems && (
+                  <p className="text-xs text-red-600" role="alert">{pay.error}</p>
+                )}
 
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1.5">
@@ -1092,7 +1233,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
               )}
 
               {/* ─── 7. RINGKASAN ─── */}
-              {items.length > 0 && (
+              {hasItems && (
                 <section className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                   <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
                     <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Ringkasan</span>
@@ -1100,8 +1241,14 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
                   <div className="px-4 py-3.5 space-y-2.5">
                     <div className="flex justify-between items-center text-sm text-gray-500">
                       <span>Subtotal</span>
-                      <span className="font-semibold text-gray-700 tabular-nums">{formatCurrency(subtotal)}</span>
+                      <span className="font-semibold text-gray-700 tabular-nums">{formatCurrency(grossSubtotal)}</span>
                     </div>
+                    {comboDiscount > 0 && (
+                      <div className="flex justify-between items-center text-sm text-emerald-600">
+                        <span>Diskon Paket</span>
+                        <span className="font-semibold tabular-nums">−{formatCurrency(comboDiscount)}</span>
+                      </div>
+                    )}
                     {discount > 0 && (
                       <div className="flex justify-between items-center text-sm text-emerald-600">
                         <span>Diskon</span>
@@ -1178,7 +1325,7 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
             onClick={handleSubmit}
             disabled={
               loading ||
-              items.length === 0 ||
+              !hasItems ||
               (!customerId && !walkInCustomerId && customerType !== 'customer') ||
               (discount + pointDiscount) > subtotal ||
               total < 0
@@ -1198,6 +1345,15 @@ export function NewSaleDialog({ variants, customers, walkInCustomers = [], conve
             )}
           </Button>
         </div>
+        {pickerCombo && (
+          <ComboPickerDialog
+            key={pickerCombo.id}
+            combo={pickerCombo}
+            onClose={() => setPickerCombo(null)}
+            remaining={(variantId) => remainingForCombo(variantId)}
+            onAdd={addComboLine}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
