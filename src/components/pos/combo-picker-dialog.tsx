@@ -39,14 +39,16 @@ interface Props {
   submitLabel?: string;
   /** Tampilkan input jumlah paket (default true). Dimatikan di dialog edit transaksi. */
   allowQuantity?: boolean;
+  /** Jumlah awal di kolom jumlah (mis. saat mengubah isi sekelompok paket). */
+  initialQuantity?: number;
 }
 
 const newKey = () => `combo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSelections, submitLabel, allowQuantity = true }: Props) {
+export function ComboPickerDialog({ combo, onClose, remaining, onAdd, initialSelections, submitLabel, allowQuantity = true, initialQuantity = 1 }: Props) {
   const [selections, setSelections] = useState<ComboSelections>(initialSelections ?? {});
   // Disimpan sebagai string agar kolom bisa dikosongkan saat mengetik (mis. hapus lalu ketik 100)
-  const [qtyText, setQtyText] = useState('1');
+  const [qtyText, setQtyText] = useState(String(Math.max(1, initialQuantity)));
 
   const resolution = resolveComboSelection(combo, selections);
 

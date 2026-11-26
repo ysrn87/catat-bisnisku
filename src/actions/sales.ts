@@ -647,9 +647,18 @@ export async function updateSaleAction(
         });
       }
 
+      // Paket baru/diubah yang identik dikelompokkan lalu disimpan dengan insert massal
+      // (pesanan 100 paket tidak perlu 100× create berurutan di dalam transaksi).
+      const freshGroups = new Map<string, { f: (typeof fresh)[number]; count: number }>();
       for (const f of fresh) {
-        const saleCombo = await tx.saleCombo.create({
-          data: {
+        const sig = [f.combo.id, f.res.packagePrice, f.res.itemsTotal, f.res.discount,
+          f.res.lines.map((l) => `${l.variantId}:${l.price}`).join(',')].join('|');
+        const g = freshGroups.get(sig);
+        if (g) g.count += 1; else freshGroups.set(sig, { f, count: 1 });
+      }
+      for (const { f, count } of freshGroups.values()) {
+        const saleCombos = await tx.saleCombo.createManyAndReturn({
+          data: Array.from({ length: count }, () => ({
             storeId,
             saleId,
             comboId:      f.combo.id,
@@ -657,18 +666,20 @@ export async function updateSaleAction(
             packagePrice: f.res.packagePrice,
             itemsTotal:   f.res.itemsTotal,
             discount:     f.res.discount,
-          },
+          })),
           select: { id: true },
         });
         await tx.saleItem.createMany({
-          data: f.res.lines.map((l) => ({
-            saleId,
-            saleComboId: saleCombo.id,
-            variantId:   l.variantId,
-            quantity:    1,
-            price:       l.price,
-            subtotal:    l.price,
-          })),
+          data: saleCombos.flatMap((sc) =>
+            f.res.lines.map((l) => ({
+              saleId,
+              saleComboId: sc.id,
+              variantId:   l.variantId,
+              quantity:    1,
+              price:       l.price,
+              subtotal:    l.price,
+            }))
+          ),
         });
       }
 
