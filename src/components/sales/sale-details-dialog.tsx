@@ -6,10 +6,13 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { paymentMethodLabel } from '@/lib/payment';
 import { useToast } from '@/components/ui/use-toast';
-import { Printer, Pencil, Gift, Trash2, AlertTriangle } from 'lucide-react';
+import { Printer, Pencil, Gift, Trash2, AlertTriangle, ChevronDown, FileText, Receipt } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EditSaleDialog } from './edit-sale-dialog';
 import { deleteSaleAction } from '@/actions/sales';
 import { getActivePaymentAccounts } from '@/actions/payment-accounts';
+import { getReceiptStoreNameAction } from '@/actions/receipt';
+import { buildReceiptHtml } from '@/lib/receipt-html';
 import { buildInvoicePaymentInfoHtml, INVOICE_PAYMENT_CSS } from '@/lib/invoice-payment-html';
 import type { ComboInfo } from '@/lib/combo-pricing';
 
@@ -137,7 +140,73 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
   })();
   const escHtml           = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  const handlePrint = async () => {
+  /** Cetak struk thermal (58/80mm) dari data transaksi yang tersimpan. */
+  const handlePrintReceipt = async () => {
+    // window.open harus dipanggil langsung dari klik (sebelum await) agar tidak diblokir popup blocker.
+    const printWindow = window.open('', '_blank', 'width=420,height=600');
+    if (!printWindow) {
+      toast({ title: 'Popup diblokir', description: 'Izinkan popup untuk mencetak struk.', variant: 'destructive' });
+      return;
+    }
+    printWindow.document.write('<!doctype html><title>Struk</title><body style="font-family:sans-serif;padding:24px;color:#6b7280">Menyiapkan struk…</body>');
+
+    let storeName = '';
+    try { storeName = await getReceiptStoreNameAction(); } catch { /* struk tetap tercetak tanpa nama toko */ }
+    if (printWindow.closed) return;
+
+    // Pembayaran: ambil tunai diterima/kembalian dari rincian pembayaran bila ada
+    const splits = sale.paymentSplits ?? [];
+    const cashSplit = splits.find((p) => p.cashReceived != null && p.changeAmount != null);
+
+    const html = buildReceiptHtml(
+      {
+        saleNumber: sale.saleNumber,
+        createdAt: sale.createdAt,
+        customerName: sale.customer?.name ?? sale.nonMemberCustomer?.name ?? 'Pelanggan Umum',
+        paymentMethod: paymentMethodLabel(sale.paymentMethod),
+        paymentStatus: sale.paymentStatus,
+        items: plainItems.map((i) => ({
+          productName: i.variant.product.name,
+          variantName: i.variant.name,
+          quantity: i.quantity,
+          price: i.price,
+        })),
+        // Paket identik dirangkum: satu entri + jumlah (nilai harga per 1 paket)
+        combos: comboGroups.map(({ rep, count }) => ({
+          name: rep.name,
+          quantity: count,
+          packagePrice: rep.packagePrice,
+          itemsTotal: rep.itemsTotal,
+          discount: rep.discount,
+          lines: itemsOfCombo(rep.id).map((i) => ({
+            productName: i.variant.product.name,
+            variantName: i.variant.name,
+            price: i.price,
+            quantity: i.quantity,
+          })),
+        })),
+        subtotal: sale.subtotal,
+        comboDiscount: comboDiscountSum,
+        discount: manualDiscount,
+        pointDiscount,
+        tax: sale.tax,
+        ongkir: sale.ongkir,
+        total: sale.total,
+        payments: splits.map((p) => ({ method: p.method, amount: p.amount })),
+        cashReceived: cashSplit?.cashReceived ?? null,
+        changeAmount: cashSplit?.changeAmount ?? null,
+        pointsEarned: sale.pointsEarned,
+      },
+      storeName,
+      sale.cashierName ?? undefined,
+    );
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const handlePrintInvoice = async () => {
     // window.open harus dipanggil langsung dari klik (sebelum await) agar tidak diblokir popup blocker.
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -463,9 +532,41 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
             body { padding: 24px 32px; }
             .print-btn-wrap { display: none; }
           }
+
+          ${sale.paymentStatus === 'PAID' ? `
+          /* ── STEMPEL LUNAS ── */
+          .paid-stamp {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-20deg);
+            z-index: 10;
+            pointer-events: none;
+            user-select: none;
+            padding: 6px 44px 6px 52px;
+            border: 9px solid #16a34a;
+            border-radius: 18px;
+            outline: 3px solid #16a34a;
+            outline-offset: 7px;
+            color: #16a34a;
+            font-family: 'Inter', Arial, sans-serif;
+            font-size: 120px;
+            font-weight: 800;
+            letter-spacing: 14px;
+            line-height: 1.1;
+            text-transform: uppercase;
+            white-space: nowrap;
+            opacity: 0.2;
+            mix-blend-mode: multiply;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          @media (max-width: 600px) { .paid-stamp { font-size: 64px; border-width: 6px; letter-spacing: 8px; padding: 4px 24px 4px 30px; } }
+          ` : ''}
         </style>
       </head>
       <body>
+        ${sale.paymentStatus === 'PAID' ? '<div class="paid-stamp" aria-hidden="true">Lunas</div>' : ''}
 
         <!-- Header -->
         <div class="header">
@@ -652,10 +753,31 @@ export function SaleDetailsDialog({ sale, conversionRate = 1000, userRole, varia
 
               {/* ── Action buttons ── */}
               <div className="flex gap-2 flex-wrap">
-                <Button variant="outline" size="sm" onClick={handlePrint} className="flex-1 sm:flex-initial">
-                  <Printer className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Print Invoice</span>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1 sm:flex-initial">
+                      <Printer className="w-4 h-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Print</span>
+                      <ChevronDown className="w-3.5 h-3.5 ml-1 text-gray-400" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem onSelect={() => { void handlePrintInvoice(); }} className="cursor-pointer gap-2">
+                      <FileText className="w-4 h-4 text-gray-500" />
+                      <span className="flex flex-col">
+                        <span className="text-sm font-medium">Cetak Invoice</span>
+                        <span className="text-[11px] text-muted-foreground">Dokumen A4 lengkap</span>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { void handlePrintReceipt(); }} className="cursor-pointer gap-2">
+                      <Receipt className="w-4 h-4 text-gray-500" />
+                      <span className="flex flex-col">
+                        <span className="text-sm font-medium">Cetak Struk</span>
+                        <span className="text-[11px] text-muted-foreground">Printer thermal 58/80mm</span>
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button variant="outline" size="sm" onClick={() => setShowEditDialog(true)} className="flex-1 sm:flex-initial">
                   <Pencil className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Edit</span>
