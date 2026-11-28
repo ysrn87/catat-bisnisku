@@ -165,6 +165,11 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
       label: 'Dashboard',
       mobileLabel: 'Dashboard',
       icon: <Home className="w-4 h-4" />,
+      matchPaths: [`${base}/manager/summary`],
+      subItems: [
+        { href: `${base}/manager`,         label: 'POS Kasir' },
+        { href: `${base}/manager/summary`, label: 'Ringkasan' },
+      ],
     },
     {
       href: `${base}/manager/transactions/sales`,
@@ -203,9 +208,14 @@ export function Navigation({ role, userName, storeSlug, storeName, storePlan = '
   const cashierNavItems: NavItem[] = [
     {
       href: `${base}/cashier`,
-      label: 'POS Kasir',
-      mobileLabel: 'POS',
-      icon: <ShoppingCart className="w-4 h-4" />,
+      label: 'Dashboard',
+      mobileLabel: 'Dashboard',
+      icon: <Home className="w-4 h-4" />,
+      matchPaths: [`${base}/cashier/summary`],
+      subItems: [
+        { href: `${base}/cashier`,         label: 'POS Kasir' },
+        { href: `${base}/cashier/summary`, label: 'Ringkasan Saya' },
+      ],
     },
     {
       href: `${base}/cashier/transactions`,

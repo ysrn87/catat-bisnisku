@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { RANGE_OPTIONS, queryForRange, queryToSearch, type RangeWindow } from '@/lib/dashboard-range';
 
 /** Pilihan mode periode. Berpindah mode mempertahankan konteks tanggal (lihat queryForRange). */
-export function RangeFilter({ slug, win }: { slug: string; win: RangeWindow }) {
+export function RangeFilter({ basePath, win }: { basePath: string; win: RangeWindow }) {
   return (
     <div
       role="tablist"
@@ -17,7 +17,7 @@ export function RangeFilter({ slug, win }: { slug: string; win: RangeWindow }) {
             key={opt.value}
             role="tab"
             aria-selected={isActive}
-            href={`/${slug}/admin/summary${queryToSearch(queryForRange(win, opt.value))}`}
+            href={`${basePath}${queryToSearch(queryForRange(win, opt.value))}`}
             scroll={false}
             prefetch
             className={cn(

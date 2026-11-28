@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils';
 import { MAX_CUSTOM_DAYS, queryToSearch, type DashboardRange } from '@/lib/dashboard-range';
 
 interface DateNavigatorProps {
-  slug: string;
+  /** Path halaman Ringkasan, mis. `/toko-a/manager/summary`. */
+  basePath: string;
   range: DashboardRange;
   /** Tanggal acuan (day/week/month). */
   anchorYmd: string;
@@ -34,11 +35,11 @@ const arrowClass =
  * Semua perubahan ditulis ke URL, jadi halaman tetap dirender di server.
  */
 export function DateNavigator({
-  slug, range, anchorYmd, fromYmd, toYmd, todayYmd, prevHref, nextHref, todayHref,
+  basePath, range, anchorYmd, fromYmd, toYmd, todayYmd, prevHref, nextHref, todayHref,
 }: DateNavigatorProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const base = `/${slug}/admin/summary`;
+  const base = basePath;
 
   const [from, setFrom] = useState(fromYmd);
   const [to, setTo] = useState(toYmd);
